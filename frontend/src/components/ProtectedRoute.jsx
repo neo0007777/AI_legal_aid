@@ -8,15 +8,14 @@ const ProtectedRoute = ({ children }) => {
 
     if (loading) {
         return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0B1C2C', color: 'white' }}>
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-                <span className="ml-4 font-semibold tracking-widest text-sm uppercase">Verifying Key...</span>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#63120e', color: '#f9eedc' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '3px solid #dfa46f', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }}></div>
+                <span style={{ marginLeft: '1rem', fontWeight: 600, letterSpacing: '2px', fontSize: '0.85rem', textTransform: 'uppercase', color: '#f1d1a6' }}>Verifying Key...</span>
             </div>
         );
     }
 
     if (!isAuthenticated) {
-        // Redirect them violently to the login page, but dynamically save the origin
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 

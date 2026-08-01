@@ -1,21 +1,44 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 
 :root {
-  --bg-color: #fdfbf7;
-  --panel-bg: rgba(255, 255, 255, 0.98);
-  --primary-color: #0B1C2C;
-  /* Deep Navy */
-  --primary-hover: #1f2937;
-  --primary-glow: rgba(11, 28, 44, 0.08);
-  --text-primary: #111827;
-  /* Near black */
-  --text-secondary: #374151;
-  /* Darker gray */
-  --border-color: #E5E7EB;
-
-  --success-color: #10B981;
-  --warning-color: #F59E0B;
-  --danger-color: #EF4444;
+  /* Primary Colors */
+  --bg-primary: #f9eedc;
+  --bg-secondary: #f6e2c6;
+  --bg-card: #f1d1a6;
+  --bg-accent: #ecbf89;
+  --bg-color: #f9eedc;
+  --panel-bg: #f6e2c6;
+  
+  /* Accent Colors */
+  --accent-gold: #ecbf89;
+  --accent-copper: #dfa46f;
+  --accent-terracotta: #c98659;
+  
+  /* Text Colors */
+  --text-primary: #8c3a2a;
+  --text-heading: #63120e;
+  --text-muted: #c98659;
+  --text-secondary: #8c3a2a;
+  
+  /* Sidebar */
+  --sidebar-bg: #63120e;
+  --sidebar-active: #ecbf89;
+  --sidebar-text: #f9eedc;
+  
+  /* Buttons */
+  --primary-color: #8c3a2a;
+  --primary-hover: #63120e;
+  --btn-primary: #8c3a2a;
+  --btn-primary-hover: #63120e;
+  --btn-secondary: transparent;
+  --btn-secondary-border: #c98659;
+  
+  /* Borders */
+  --border-color: #c98659;
+  --border-light: #f1d1a6;
+  
+  /* Shadows */
+  --shadow-warm: rgba(140, 58, 42, 0.15);
 
   --font-main: 'Inter', sans-serif;
   --font-heading: 'Playfair Display', serif;
@@ -36,10 +59,10 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 
-  /* Subtle grid-line accents (almost invisible) */
+  /* Subtle warm grid-line accents */
   background-image:
-    linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+    linear-gradient(rgba(201, 134, 89, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201, 134, 89, 0.04) 1px, transparent 1px);
   background-size: 60px 60px;
   background-attachment: fixed;
 }
@@ -64,6 +87,7 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
+  background-color: var(--bg-primary);
 }
 
 h1,
@@ -72,20 +96,20 @@ h3,
 h4,
 h5,
 h6 {
-  color: var(--text-primary);
+  color: var(--text-heading);
   font-family: var(--font-heading);
   font-weight: 700;
   letter-spacing: -0.5px;
 }
 
 a {
-  color: var(--primary-color);
+  color: var(--accent-copper);
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 a:hover {
-  color: var(--primary-hover);
+  color: var(--text-heading);
 }
 
 button {
@@ -93,8 +117,8 @@ button {
   font-family: var(--font-main);
   border: none;
   border-radius: 8px;
-  background-color: var(--primary-color);
-  color: #fff;
+  background-color: var(--btn-primary);
+  color: #f9eedc;
   padding: 0.75rem 1.5rem;
   font-weight: 600;
   transition: all 0.3s cubic-bezier(0.1, 1, 0.3, 1);
@@ -106,16 +130,16 @@ button {
 
 button.outline {
   background-color: transparent;
-  border: 1px solid var(--primary-color);
-  color: var(--primary-color);
+  border: 1px solid var(--btn-secondary-border);
+  color: var(--text-primary);
 }
 
 button.outline:hover {
-  background-color: rgba(11, 28, 44, 0.05);
+  background-color: var(--bg-secondary);
 }
 
 button:hover:not(.outline) {
-  background-color: var(--primary-hover);
+  background-color: var(--btn-primary-hover);
   transform: translateY(-2px);
 }
 
@@ -127,9 +151,9 @@ input,
 textarea,
 select {
   font-family: var(--font-main);
-  background-color: #ffffff;
+  background-color: #fff8ef;
   border: 1px solid var(--border-color);
-  color: var(--text-primary);
+  color: var(--text-heading);
   border-radius: 8px;
   padding: 1rem 1.25rem;
   outline: none;
@@ -140,13 +164,13 @@ select {
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--text-secondary);
-  box-shadow: 0 0 0 3px rgba(11, 28, 44, 0.1);
+  border-color: var(--accent-copper);
+  box-shadow: 0 0 0 3px rgba(223, 164, 111, 0.2);
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #6B7280;
+  color: var(--accent-terracotta);
   font-weight: 400;
 }
 
@@ -206,10 +230,10 @@ textarea::placeholder {
 }
 
 .glass-panel {
-  background: var(--panel-bg);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px var(--shadow-warm);
 }
 
 @keyframes fadeIn {

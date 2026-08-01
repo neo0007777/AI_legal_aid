@@ -1,4 +1,4 @@
-/* Premium Multi-Party Matrix Analyzer CSS */
+/* Premium Multi-Party Matrix Analyzer CSS - NyayaSetu PRO Warm Palette */
 
 .conflict-workspace-layout {
     display: flex;
@@ -6,46 +6,44 @@
     height: 100%;
     width: 100%;
     font-family: var(--font-main);
-    background: #F3F4F6;
-    /* Global canvas background */
+    background: #f9eedc;
 }
 
 /* =========================================
    HEADER
 ========================================= */
 .conflict-header-premium {
-    background: #ffffff;
+    background: #f6e2c6;
     padding: 3rem 4rem;
     display: flex;
     align-items: center;
     gap: 1.5rem;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid #c98659;
     z-index: 10;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 4px 20px rgba(140, 58, 42, 0.05);
 }
 
 .header-icon-wrapper {
-    background: #F0FdfA;
-    /* Very light teal/blue */
+    background: #f1d1a6;
     padding: 1.25rem;
     border-radius: 16px;
-    color: #1E40AF;
-    box-shadow: 0 4px 15px rgba(30, 64, 175, 0.08);
-    /* Blue shadow */
+    color: #8c3a2a;
+    box-shadow: 0 4px 15px rgba(140, 58, 42, 0.1);
+    border: 1px solid #c98659;
 }
 
 .header-text-block h2 {
     font-size: 2rem;
     font-weight: 800;
-    color: #0B1C2C;
-    /* NyayaSetu Navy */
+    color: #63120e;
     margin-bottom: 0.5rem;
     letter-spacing: -0.5px;
+    font-family: var(--font-heading);
 }
 
 .header-text-block p {
     font-size: 1.1rem;
-    color: #4B5563;
+    color: #8c3a2a;
     line-height: 1.6;
     max-width: 800px;
 }
@@ -57,6 +55,7 @@
     flex: 1;
     overflow-y: auto;
     padding: 3rem 4rem;
+    background: #f9eedc;
 }
 
 /* 1. UPLOAD MATRIX */
@@ -73,13 +72,11 @@
 }
 
 .party-card-premium {
-    background: #ffffff;
+    background: #f6e2c6;
     border-radius: 16px;
-    /* rounded-xl */
     padding: 1.5rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-    /* Premium soft dropshadow */
-    border: 1px solid #E5E7EB;
+    box-shadow: 0 10px 30px rgba(140, 58, 42, 0.08);
+    border: 1px solid #c98659;
     display: flex;
     flex-direction: column;
     transition: transform 0.3s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.3s;
@@ -87,7 +84,8 @@
 
 .party-card-premium:hover {
     transform: translateY(-3px);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 20px 40px rgba(140, 58, 42, 0.15);
+    border-color: #dfa46f;
 }
 
 .party-card-header {
@@ -104,17 +102,16 @@
     border-bottom: 2px solid transparent;
     font-size: 1.25rem;
     font-weight: 800;
-    color: #0B1C2C;
-    /* Dark dominant text */
+    color: #63120e;
     padding: 0.5rem 0;
     background: transparent;
     outline: none;
     transition: border-bottom-color 0.2s;
+    font-family: var(--font-heading);
 }
 
 .party-name-input:focus {
-    border-bottom-color: #1E40AF;
-    /* NyayaSetu Blue */
+    border-bottom-color: #8c3a2a;
 }
 
 .remove-party-btn {
@@ -138,21 +135,20 @@
 }
 
 .party-upload-zone {
-    border: 2px dashed #D1D5DB;
+    border: 2px dashed #c98659;
     border-radius: 12px;
     padding: 2.5rem 1rem;
     text-align: center;
     cursor: pointer;
-    background: #F9FAFB;
+    background: #fff8ef;
     transition: all 0.25s ease;
     flex-shrink: 0;
     margin-bottom: 1.5rem;
 }
 
 .party-upload-zone:hover {
-    border-color: #3B82F6;
-    /* Bright blue tint */
-    background: #F0FdfA;
+    border-color: #dfa46f;
+    background: #f1d1a6;
 }
 
 .hidden-file-input {
@@ -160,24 +156,24 @@
 }
 
 .upload-icon-faded {
-    color: #9CA3AF;
+    color: #c98659;
     margin: 0 auto 1rem;
     transition: color 0.2s;
 }
 
 .party-upload-zone:hover .upload-icon-faded {
-    color: #3B82F6;
+    color: #8c3a2a;
 }
 
 .party-upload-zone p {
-    color: #111827;
+    color: #63120e;
     font-weight: 600;
     margin-bottom: 0.25rem;
 }
 
 .upload-subtext {
     font-size: 0.75rem;
-    color: #6B7280;
+    color: #8c3a2a;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -187,7 +183,6 @@
     flex-direction: column;
     gap: 0.5rem;
     flex: 1;
-    /* Stretch to fill bottom */
     overflow-y: auto;
     max-height: 200px;
 }
@@ -196,17 +191,17 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    background: #ffffff;
-    border: 1px solid #E5E7EB;
+    background: #f1d1a6;
+    border: 1px solid #c98659;
     border-radius: 8px;
     padding: 0.75rem 1rem;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 2px 5px rgba(140, 58, 42, 0.05);
 }
 
 .file-name-truncate {
     flex: 1;
     font-size: 0.9rem;
-    color: #374151;
+    color: #63120e;
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
@@ -216,7 +211,7 @@
 .remove-file-btn {
     background: transparent;
     border: none;
-    color: #9CA3AF;
+    color: #c98659;
     cursor: pointer;
     padding: 0.25rem;
     display: flex;
@@ -242,8 +237,8 @@
 
 .add-party-ghost-btn {
     background: transparent;
-    border: 2px dashed #9CA3AF;
-    color: #4B5563;
+    border: 2px dashed #c98659;
+    color: #8c3a2a;
     padding: 1rem 2rem;
     border-radius: 12px;
     font-size: 1rem;
@@ -256,15 +251,14 @@
 }
 
 .add-party-ghost-btn:hover {
-    border-color: #1E40AF;
-    color: #1E40AF;
-    background: rgba(30, 64, 175, 0.05);
+    border-color: #dfa46f;
+    color: #63120e;
+    background: #f6e2c6;
 }
 
 .analyze-matrix-btn {
-    background: #0B1C2C;
-    /* Massive Deep Navy Primary CTA */
-    color: white;
+    background: #8c3a2a;
+    color: #f9eedc;
     border: none;
     padding: 1.5rem 4rem;
     border-radius: 16px;
@@ -274,20 +268,19 @@
     align-items: center;
     gap: 0.75rem;
     cursor: pointer;
-    box-shadow: 0 10px 25px rgba(11, 28, 44, 0.2);
+    box-shadow: 0 10px 25px rgba(140, 58, 42, 0.2);
     transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
 }
 
 .analyze-matrix-btn.active:hover {
-    background: #1e3a8a;
-    /* Shift to blue */
+    background: #63120e;
     transform: translateY(-4px);
-    box-shadow: 0 20px 40px rgba(11, 28, 44, 0.3);
+    box-shadow: 0 20px 40px rgba(99, 18, 14, 0.3);
 }
 
 .analyze-matrix-btn.disabled {
-    background: #D1D5DB;
-    color: #9CA3AF;
+    background: #f1d1a6;
+    color: #c98659;
     cursor: not-allowed;
     box-shadow: none;
     transform: none;
@@ -304,23 +297,24 @@
 }
 
 .spinner-ring {
-    background: #ffffff;
+    background: #f1d1a6;
     padding: 1.5rem;
     border-radius: 50%;
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
-    /* Elevated spinner */
+    box-shadow: 0 15px 40px rgba(140, 58, 42, 0.1);
     margin-bottom: 2rem;
+    color: #8c3a2a;
 }
 
 .matrix-loading-state h3 {
     font-size: 1.75rem;
-    color: #0B1C2C;
+    color: #63120e;
     font-weight: 800;
     margin-bottom: 0.5rem;
+    font-family: var(--font-heading);
 }
 
 .loading-stage-text {
-    color: #6B7280;
+    color: #8c3a2a;
     font-size: 1.15rem;
     transition: opacity 0.3s;
     animation: pulse 1.5s infinite;
@@ -358,29 +352,30 @@
 
 .results-header-actions h3 {
     font-size: 1.6rem;
-    color: #0B1C2C;
+    color: #63120e;
     font-weight: 800;
     display: flex;
     align-items: center;
+    font-family: var(--font-heading);
 }
 
 .reset-matrix-btn {
-    background: #ffffff;
-    border: 1px solid #D1D5DB;
-    color: #374151;
+    background: transparent;
+    border: 1px solid #c98659;
+    color: #8c3a2a;
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 4px 10px rgba(140, 58, 42, 0.05);
 }
 
 .reset-matrix-btn:hover {
-    background: #F9FAFB;
-    border-color: #9CA3AF;
+    background: #f6e2c6;
+    border-color: #dfa46f;
     transform: translateY(-2px);
-    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 8px 15px rgba(140, 58, 42, 0.1);
 }
 
 .results-metrics-strip {
@@ -391,11 +386,11 @@
 }
 
 .metric-box {
-    background: #ffffff;
+    background: #f6e2c6;
     border-radius: 12px;
     padding: 1.5rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
-    border: 1px solid #E5E7EB;
+    box-shadow: 0 10px 30px rgba(140, 58, 42, 0.06);
+    border: 1px solid #c98659;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -405,14 +400,15 @@
 .metric-value {
     font-size: 2.5rem;
     font-weight: 800;
-    color: #0B1C2C;
+    color: #63120e;
     line-height: 1;
     margin-bottom: 0.5rem;
+    font-family: var(--font-heading);
 }
 
 .metric-label {
     font-size: 0.85rem;
-    color: #6B7280;
+    color: #8c3a2a;
     text-transform: uppercase;
     font-weight: 700;
     letter-spacing: 0.5px;
@@ -426,17 +422,17 @@
 }
 
 .conflict-result-card {
-    background: #ffffff;
+    background: #f6e2c6;
     border-radius: 16px;
-    border: 1px solid #E5E7EB;
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.05);
+    border: 1px solid #c98659;
+    box-shadow: 0 15px 40px rgba(140, 58, 42, 0.08);
     overflow: hidden;
 }
 
 .conflict-result-header {
-    background: #F8FAFC;
+    background: #f1d1a6;
     padding: 1.25rem 2rem;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid #c98659;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -445,7 +441,8 @@
 .conflict-party-badge {
     font-size: 1.15rem;
     font-weight: 800;
-    color: #0B1C2C;
+    color: #63120e;
+    font-family: var(--font-heading);
 }
 
 .severity-badge {
@@ -473,9 +470,9 @@
 }
 
 .badge-low {
-    background: #EFF6FF;
-    color: #2563EB;
-    border: 1px solid #93C5FD;
+    background: #f1d1a6;
+    color: #63120e;
+    border: 1px solid #dfa46f;
 }
 
 .conflict-clauses-split {
@@ -487,8 +484,8 @@
 
 .clause-box {
     flex: 1;
-    background: #F9FAFB;
-    border: 1px solid #E5E7EB;
+    background: #fff8ef;
+    border: 1px solid #c98659;
     border-radius: 12px;
     padding: 1.5rem;
 }
@@ -501,7 +498,7 @@
 .clause-source-label {
     display: block;
     font-size: 0.8rem;
-    color: #6B7280;
+    color: #8c3a2a;
     font-weight: 700;
     text-transform: uppercase;
     margin-bottom: 0.75rem;
@@ -510,33 +507,31 @@
 
 .clause-text {
     font-size: 1.05rem;
-    color: #111827;
+    color: #63120e;
     line-height: 1.6;
     font-family: 'Times New Roman', Times, serif;
-    /* Match legal text */
 }
 
 .clause-divider-icon {
     display: flex;
     align-items: center;
     justify-content: center;
+    color: #c98659;
 }
 
 .conflict-implication-box {
-    background: #0B1C2C;
-    /* Deep NyayaSetu Navy insight box */
+    background: #63120e;
     margin: 0 2rem 2rem 2rem;
     padding: 1.5rem;
     border-radius: 12px;
-    color: #ffffff;
+    color: #f9eedc;
 }
 
 .conflict-implication-box h4 {
     font-size: 0.9rem;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: #93C5FD;
-    /* Bright blue accent */
+    color: #dfa46f;
     margin-bottom: 0.5rem;
     font-weight: 800;
 }
@@ -544,6 +539,7 @@
 .conflict-implication-box p {
     font-size: 1.05rem;
     line-height: 1.6;
+    color: #f9eedc;
 }
 
 .animate-fade-in {
@@ -572,16 +568,17 @@
         transform: rotate(90deg);
     }
 }
+
 .party-text-input {
     width: 100%;
     padding: 0.75rem;
-    border: 1px solid #E5E7EB;
+    border: 1px solid #c98659;
     border-radius: 8px;
     font-size: 0.875rem;
     resize: vertical;
     font-family: inherit;
-    color: #374151;
-    background: #F9FAFB;
+    color: #63120e;
+    background: #fff8ef;
     transition: border-color 0.2s;
     box-sizing: border-box;
     margin-top: 0.5rem;
@@ -589,7 +586,7 @@
 
 .party-text-input:focus {
     outline: none;
-    border-color: #1E40AF;
+    border-color: #8c3a2a;
     background: #ffffff;
 }
 
@@ -598,7 +595,7 @@
     align-items: center;
     gap: 0.75rem;
     margin: 0.75rem 0 0.25rem 0;
-    color: #9CA3AF;
+    color: #c98659;
     font-size: 0.8rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -610,7 +607,8 @@
     content: '';
     flex: 1;
     height: 1px;
-    background: #E5E7EB;
+    background: #c98659;
+    opacity: 0.5;
 }
 
 .error-banner {

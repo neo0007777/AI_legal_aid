@@ -2,12 +2,11 @@
 .sidebar-nav {
     width: 280px;
     height: 100vh;
-    background-color: #0B1C2C;
-    /* Deep Navy from our palette */
-    color: #ffffff;
+    background-color: var(--sidebar-bg, #63120e);
+    color: var(--sidebar-text, #f9eedc);
     display: flex;
     flex-direction: column;
-    border-right: 1px solid #1f2937;
+    border-right: 1px solid rgba(241, 209, 166, 0.2);
     flex-shrink: 0;
 }
 
@@ -16,15 +15,15 @@
     align-items: center;
     gap: 1rem;
     padding: 1.5rem;
-    border-bottom: 1px solid #1f2937;
+    border-bottom: 1px solid rgba(241, 209, 166, 0.2);
     margin-bottom: 1.5rem;
 }
 
 .logo-icon {
     width: 32px;
     height: 32px;
-    background: #ffffff;
-    color: #0B1C2C;
+    background: #ecbf89;
+    color: #63120e;
     border-radius: 8px;
     display: flex;
     align-items: center;
@@ -34,9 +33,10 @@
 .sidebar-logo-img {
     width: 36px;
     height: 36px;
-    object-fit: contain;
-    border-radius: 8px;
-    filter: drop-shadow(0 2px 8px rgba(59, 130, 246, 0.4));
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid #ecbf89;
+    filter: drop-shadow(0 2px 8px rgba(236, 191, 137, 0.4));
 }
 
 .logo-text {
@@ -50,11 +50,12 @@
     font-weight: 800;
     margin: 0;
     font-family: var(--font-heading);
-    color: #ffffff;
+    color: #f9eedc;
 }
 
 .badge {
-    background: #1E40AF;
+    background: #dfa46f;
+    color: #63120e;
     font-size: 0.65rem;
     padding: 0.15rem 0.4rem;
     border-radius: 4px;
@@ -69,7 +70,7 @@
 
 .section-title {
     font-size: 0.75rem;
-    color: #9CA3AF;
+    color: #f1d1a6;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -86,8 +87,8 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    color: #D1D5DB;
-    padding: 0.6rem 1rem;
+    color: #f9eedc;
+    padding: 0.65rem 1rem;
     border-radius: 8px;
     font-size: 0.95rem;
     font-weight: 500;
@@ -100,14 +101,15 @@
 }
 
 .nav-link:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
+    background: rgba(241, 209, 166, 0.15);
+    color: #ecbf89;
 }
 
 .nav-link.active {
-    background: #1E40AF;
-    color: #ffffff;
-    box-shadow: inset 3px 0 0 #60A5FA;
+    background: linear-gradient(135deg, #ecbf89 0%, #f1d1a6 100%);
+    color: #63120e;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(236, 191, 137, 0.3);
 }
 
 .mt-auto {
@@ -122,7 +124,7 @@
 
 .recent-item {
     font-size: 0.85rem;
-    color: #9CA3AF;
+    color: #f1d1a6;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -132,12 +134,12 @@
 }
 
 .recent-item:hover {
-    color: #ffffff;
+    color: #ecbf89;
 }
 
 .sidebar-footer {
     padding: 1.5rem;
-    border-top: 1px solid #1f2937;
+    border-top: 1px solid rgba(241, 209, 166, 0.2);
     position: relative;
     display: flex;
     flex-direction: column;
@@ -153,31 +155,32 @@
     align-items: center;
     gap: 12px;
     padding: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(241, 209, 166, 0.1);
+    border: 1px solid rgba(241, 209, 166, 0.2);
     border-radius: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .dynamic-user-profile:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(241, 209, 166, 0.2);
+    border-color: #dfa46f;
 }
 
 .dynamic-user-profile .avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%);
-    color: white;
+    background: linear-gradient(135deg, #ecbf89 0%, #dfa46f 100%);
+    color: #63120e;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
     font-size: 1.1rem;
     flex-shrink: 0;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 10px rgba(236, 191, 137, 0.3);
+    border: 2px solid #f1d1a6;
 }
 
 .dynamic-user-profile .user-info {
@@ -188,7 +191,7 @@
 }
 
 .dynamic-user-profile .user-info strong {
-    color: white;
+    color: #f9eedc;
     font-size: 0.95rem;
     font-weight: 600;
     white-space: nowrap;
@@ -197,7 +200,7 @@
 }
 
 .dynamic-user-profile .user-info span {
-    color: #9CA3AF;
+    color: #dfa46f;
     font-size: 0.8rem;
     font-weight: 500;
     margin-top: 2px;
@@ -214,10 +217,10 @@
     bottom: calc(100% + 10px);
     left: 0;
     width: 100%;
-    background: #ffffff;
+    background: #f6e2c6;
     border-radius: 12px;
-    border: 1px solid #E5E7EB;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    border: 1px solid #c98659;
+    box-shadow: 0 10px 25px rgba(99, 18, 14, 0.2);
     padding: 0.5rem;
     z-index: 100;
     display: flex;
@@ -231,12 +234,12 @@
 }
 
 .dropdown-user-header strong {
-    color: #111827;
+    color: #63120e;
     font-size: 0.95rem;
 }
 
 .dropdown-user-header span {
-    color: #6B7280;
+    color: #8c3a2a;
     font-size: 0.8rem;
     margin-top: 2px;
 }
@@ -244,7 +247,8 @@
 .dropdown-divider {
     height: 1px;
     width: 100%;
-    background: #E5E7EB;
+    background: #c98659;
+    opacity: 0.4;
     margin: 0.5rem 0;
 }
 
@@ -256,7 +260,7 @@
     padding: 0.75rem 0.5rem;
     border: none;
     background: transparent;
-    color: #374151;
+    color: #8c3a2a;
     font-size: 0.9rem;
     font-weight: 500;
     text-align: left;
@@ -266,17 +270,17 @@
 }
 
 .dropdown-action:hover {
-    background: #F3F4F6;
-    color: #111827;
+    background: #f1d1a6;
+    color: #63120e;
 }
 
 .dropdown-action.text-red-600 {
-    color: #DC2626;
+    color: #8c3a2a;
 }
 
 .dropdown-action.text-red-600:hover {
-    background: #FEF2F2;
-    color: #991B1B;
+    background: #ecbf89;
+    color: #63120e;
 }
 
 /* Unauthenticated State */
@@ -286,8 +290,8 @@
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    background: #ffffff;
-    color: #0B1C2C;
+    background: #ecbf89;
+    color: #63120e;
     border: none;
     padding: 1rem;
     border-radius: 12px;
@@ -295,13 +299,13 @@
     font-size: 0.95rem;
     cursor: pointer;
     transition: all 0.3s;
-    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.05);
+    box-shadow: 0 4px 12px rgba(236, 191, 137, 0.2);
 }
 
 .massive-login-btn:hover {
-    background: #E5E7EB;
+    background: #dfa46f;
     transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(255, 255, 255, 0.1);
+    box-shadow: 0 6px 15px rgba(223, 164, 111, 0.3);
 }
 
 /* Animations */

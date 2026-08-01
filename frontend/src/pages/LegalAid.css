@@ -1,32 +1,31 @@
-/* Premium Legal Intelligence CSS */
+/* Premium Legal Intelligence CSS - NyayaSetu PRO Warm Palette */
 
 .intelligence-workspace-layout {
     display: flex;
     height: 100vh;
     width: 100vw;
     font-family: var(--font-main);
-    background: var(--bg-main);
-    /* Standard stark layout */
+    background: #f9eedc;
 }
 
 /* =========================================
-   SIDEBAR (Inherits mostly from global)
+   SIDEBAR
 ========================================= */
 .intelligence-sidebar {
     width: 280px;
-    background: #0B1C2C;
-    /* Deep NyayaSetu Navy */
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    background: #63120e;
+    border-right: 1px solid rgba(241, 209, 166, 0.2);
     display: flex;
     flex-direction: column;
     padding: 1.5rem;
 }
 
 .intelligence-sidebar h3 {
-    color: white;
+    color: #f9eedc;
     margin-bottom: 2rem;
     font-size: 1.25rem;
     letter-spacing: -0.5px;
+    font-family: var(--font-heading);
 }
 
 /* =========================================
@@ -36,47 +35,48 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #F3F4F6;
-    /* Soft grey UI backdrop */
+    background: #f9eedc;
     height: 100vh;
 }
 
 /* Header UI */
 .feed-app-header {
     padding: 2rem 3rem 1.5rem;
-    background: #ffffff;
+    background: #f6e2c6;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    border-bottom: 1px solid #E5E7EB;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+    border-bottom: 1px solid #c98659;
+    box-shadow: 0 4px 15px rgba(140, 58, 42, 0.05);
     z-index: 10;
 }
 
 .header-titles h2 {
     font-size: 1.75rem;
     font-weight: 800;
-    color: #0B1C2C;
+    color: #63120e;
     margin-bottom: 0.25rem;
+    font-family: var(--font-heading);
 }
 
 .header-titles p {
-    color: #6B7280;
+    color: #8c3a2a;
     font-size: 0.95rem;
 }
 
 .model-segmented-control {
     display: flex;
-    background: #F3F4F6;
+    background: #f1d1a6;
     border-radius: 8px;
     padding: 4px;
+    border: 1px solid #c98659;
 }
 
 .segment {
     padding: 0.5rem 1rem;
     border: none;
     background: transparent;
-    color: #4B5563;
+    color: #8c3a2a;
     font-weight: 600;
     font-size: 0.85rem;
     cursor: pointer;
@@ -85,14 +85,14 @@
 }
 
 .segment.active {
-    background: #ffffff;
-    color: #0B1C2C;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    background: #8c3a2a;
+    color: #f9eedc;
+    box-shadow: 0 2px 5px rgba(140, 58, 42, 0.2);
 }
 
 .disclaimer-soft-box {
-    background: #FFFBEB;
-    border: 1px solid #FDE68A;
+    background: #f1d1a6;
+    border: 1px solid #dfa46f;
     margin: 1.5rem 3rem 0;
     padding: 1rem 1.5rem;
     border-radius: 12px;
@@ -102,13 +102,13 @@
 }
 
 .disclaimer-icon {
-    color: #D97706;
+    color: #8c3a2a;
     margin-top: 2px;
     flex-shrink: 0;
 }
 
 .disclaimer-soft-box p {
-    color: #92400E;
+    color: #63120e;
     font-size: 0.9rem;
     margin: 0;
     line-height: 1.5;
@@ -122,6 +122,7 @@
     display: flex;
     flex-direction: column;
     gap: 2rem;
+    background: #f9eedc;
 }
 
 /* Empty State / Suggestions */
@@ -134,10 +135,11 @@
 
 .empty-sandbox-state h2 {
     font-size: 2rem;
-    color: #0B1C2C;
+    color: #63120e;
     font-weight: 800;
     margin-bottom: 3rem;
     letter-spacing: -0.5px;
+    font-family: var(--font-heading);
 }
 
 .suggestion-chips-grid {
@@ -147,8 +149,8 @@
 }
 
 .suggestion-chip {
-    background: #ffffff;
-    border: 1px solid #E5E7EB;
+    background: #f6e2c6;
+    border: 1px solid #c98659;
     border-radius: 12px;
     padding: 1.25rem;
     display: flex;
@@ -157,24 +159,25 @@
     text-align: left;
     cursor: pointer;
     transition: all 0.2s;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 4px 6px rgba(140, 58, 42, 0.04);
 }
 
 .suggestion-chip:hover {
-    border-color: #3B82F6;
+    border-color: #dfa46f;
+    background: #f1d1a6;
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 10px 20px rgba(140, 58, 42, 0.1);
 }
 
 .chip-icon {
-    color: #3B82F6;
+    color: #dfa46f;
     flex-shrink: 0;
     margin-top: 2px;
 }
 
 .suggestion-chip span {
     font-size: 0.95rem;
-    color: #374151;
+    color: #63120e;
     font-weight: 500;
     line-height: 1.5;
 }
@@ -194,8 +197,9 @@
 }
 
 .user-query-bubble {
-    background: #E5E7EB;
-    color: #111827;
+    background: #f1d1a6;
+    color: #63120e;
+    border: 1px solid #dfa46f;
     padding: 1rem 1.5rem;
     border-radius: 20px 20px 0 20px;
     max-width: 70%;
@@ -205,12 +209,11 @@
 
 /* The Massive AI JSON Card */
 .ai-intelligence-card {
-    background: #ffffff;
-    border: 1px solid #E5E7EB;
+    background: #f6e2c6;
+    border: 1px solid #c98659;
     border-radius: 16px;
     width: 85%;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
-    /* Deep shadow */
+    box-shadow: 0 15px 35px rgba(140, 58, 42, 0.1);
     overflow: hidden;
     position: relative;
 }
@@ -218,7 +221,7 @@
 .card-top-accent {
     height: 4px;
     width: 100%;
-    background: linear-gradient(90deg, #1E40AF, #3B82F6);
+    background: linear-gradient(90deg, #ecbf89, #dfa46f);
 }
 
 .ai-card-content {
@@ -233,16 +236,16 @@
 }
 
 .intelligence-block.blue-tint {
-    background: #EFF6FF;
-    border: 1px solid #BFDBFE;
+    background: #f1d1a6;
+    border: 1px solid #dfa46f;
     padding: 1.25rem;
     border-radius: 12px;
 }
 
 .ai-card-footer {
-    background: #F9FAFB;
+    background: #f1d1a6;
     padding: 1.25rem 2rem;
-    border-top: 1px solid #E5E7EB;
+    border-top: 1px solid #c98659;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -254,8 +257,8 @@
 }
 
 .legal-tag {
-    background: #E0E7FF;
-    color: #3730A3;
+    background: #ecbf89;
+    color: #63120e;
     padding: 0.35rem 0.75rem;
     border-radius: 6px;
     font-size: 0.75rem;
@@ -270,9 +273,9 @@
 }
 
 .quick-action-btn {
-    background: #ffffff;
-    border: 1px solid #D1D5DB;
-    color: #374151;
+    background: transparent;
+    border: 1px solid #c98659;
+    color: #8c3a2a;
     padding: 0.5rem 1rem;
     border-radius: 8px;
     font-size: 0.85rem;
@@ -285,33 +288,33 @@
 }
 
 .quick-action-btn:hover {
-    background: #F3F4F6;
-    border-color: #9CA3AF;
+    background: #f1d1a6;
+    border-color: #dfa46f;
 }
 
 .quick-action-btn.primary {
-    background: #0B1C2C;
-    color: white;
+    background: #8c3a2a;
+    color: #f9eedc;
     border: none;
 }
 
 .quick-action-btn.primary:hover {
-    background: #1e3a8a;
+    background: #63120e;
 }
 
 /* Spinner Card */
 .ai-spinner-card {
-    background: #ffffff;
-    border: 1px solid #E5E7EB;
+    background: #f6e2c6;
+    border: 1px solid #c98659;
     border-radius: 12px;
     padding: 1.5rem 2rem;
     display: flex;
     align-items: center;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 10px 20px rgba(140, 58, 42, 0.05);
 }
 
 .spinner-text {
-    color: #4B5563;
+    color: #8c3a2a;
     font-size: 1.05rem;
     font-weight: 500;
     animation: pulse 1.5s infinite;
@@ -320,27 +323,27 @@
 /* Input Assembly */
 .huge-input-assembly {
     padding: 1.5rem 3rem 2rem;
-    background: #F3F4F6;
+    background: #f9eedc;
 }
 
 .search-bar-wrapper {
-    background: #ffffff;
-    border: 1px solid #D1D5DB;
+    background: #fff8ef;
+    border: 1.5px solid #dfa46f;
     border-radius: 16px;
     padding: 0.5rem;
     display: flex;
     align-items: center;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 10px 25px rgba(140, 58, 42, 0.08);
     transition: box-shadow 0.3s, border-color 0.3s;
 }
 
 .search-bar-wrapper:focus-within {
-    border-color: #1E40AF;
-    box-shadow: 0 15px 35px rgba(30, 64, 175, 0.1);
+    border-color: #8c3a2a;
+    box-shadow: 0 15px 35px rgba(140, 58, 42, 0.15);
 }
 
 .input-search-icon {
-    color: #9CA3AF;
+    color: #c98659;
     margin: 0 1rem;
 }
 
@@ -350,17 +353,17 @@
     background: transparent;
     padding: 1rem 0;
     font-size: 1.1rem;
-    color: #111827;
+    color: #63120e;
     outline: none;
 }
 
 .massive-legal-input::placeholder {
-    color: #9CA3AF;
+    color: #c98659;
 }
 
 .massive-send-btn {
-    background: #D1D5DB;
-    color: white;
+    background: #f1d1a6;
+    color: #c98659;
     border: none;
     width: 48px;
     height: 48px;
@@ -373,13 +376,14 @@
 }
 
 .massive-send-btn.active {
-    background: #0B1C2C;
+    background: #8c3a2a;
+    color: #f9eedc;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(11, 28, 44, 0.2);
+    box-shadow: 0 4px 10px rgba(140, 58, 42, 0.2);
 }
 
 .massive-send-btn.active:hover {
-    background: #1e3a8a;
+    background: #63120e;
     transform: translateY(-2px);
 }
 
@@ -388,12 +392,12 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    color: #6B7280;
+    color: #8c3a2a;
     font-size: 0.8rem;
     margin-top: 1rem;
 }
 
-/* Utilities reused from general styles mapped to Tailwind equivalent */
+/* Utilities reused from general styles */
 .flex {
     display: flex;
 }
@@ -443,39 +447,39 @@
 }
 
 .text-gray-800 {
-    color: #1F2937;
+    color: #63120e;
 }
 
 .text-gray-600 {
-    color: #4B5563;
+    color: #8c3a2a;
 }
 
 .text-gray-500 {
-    color: #6B7280;
+    color: #c98659;
 }
 
 .text-blue-900 {
-    color: #1E3A8A;
+    color: #63120e;
 }
 
 .text-blue-800 {
-    color: #1E40AF;
+    color: #8c3a2a;
 }
 
 .text-blue-300 {
-    color: #93C5FD;
+    color: #dfa46f;
 }
 
 .text-primary {
-    color: #1E40AF;
+    color: #8c3a2a;
 }
 
 .bg-gray-900 {
-    background: #111827;
+    background: #63120e;
 }
 
 .text-white {
-    color: white;
+    color: #f9eedc;
 }
 
 .rounded-lg {
@@ -525,7 +529,7 @@
 }
 
 .border-gray-400 {
-    border-left-color: #9CA3AF;
+    border-left-color: #c98659;
 }
 
 .opacity-50 {

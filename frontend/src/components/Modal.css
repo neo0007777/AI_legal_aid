@@ -1,4 +1,4 @@
-/* Generalized SaaS Modal CSS */
+/* Generalized SaaS Modal CSS - NyayaSetu PRO Warm Palette */
 
 .nyayasetu-modal-overlay {
     position: fixed;
@@ -6,8 +6,8 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(11, 28, 44, 0.6);
-    backdrop-filter: blur(4px);
+    background: rgba(99, 18, 14, 0.6);
+    backdrop-filter: blur(6px);
     z-index: 1000;
     display: flex;
     align-items: center;
@@ -17,37 +17,39 @@
 }
 
 .nyayasetu-modal-content {
-    background: #ffffff;
+    background: #f9eedc;
     border-radius: 16px;
     width: 100%;
     max-width: 650px;
     max-height: 85vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 25px 50px -12px rgba(99, 18, 14, 0.3);
+    border: 1px solid #c98659;
     overflow: hidden;
 }
 
 .modal-header {
     padding: 1.5rem 2rem;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid #f1d1a6;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #F9FAFB;
+    background: #f6e2c6;
 }
 
 .modal-header h3 {
     margin: 0;
     font-size: 1.25rem;
     font-weight: 800;
-    color: #0B1C2C;
+    color: #63120e;
+    font-family: var(--font-heading);
 }
 
 .modal-close-btn {
     background: transparent;
     border: none;
-    color: #6B7280;
+    color: #8c3a2a;
     cursor: pointer;
     border-radius: 50%;
     padding: 0.5rem;
@@ -58,21 +60,22 @@
 }
 
 .modal-close-btn:hover {
-    background: #F3F4F6;
-    color: #DC2626;
+    background: #f1d1a6;
+    color: #63120e;
 }
 
 .modal-body {
     padding: 2rem;
     overflow-y: auto;
     flex: 1;
+    background: #f9eedc;
 }
 
 /* Fallback UI */
 .modal-empty-state {
     text-align: center;
     padding: 3rem 1rem;
-    color: #9CA3AF;
+    color: #c98659;
     font-size: 1.05rem;
     font-style: italic;
 }
