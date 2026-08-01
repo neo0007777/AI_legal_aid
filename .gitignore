@@ -1,2 +1,26 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
 
+# Environment
+.env
+.env.*
+
+# Database
+*.db
+
+# Vector DB
 qdrant_db/
+backend/qdrant_db/
+chroma_db/
+
+# Node
+node_modules/
+frontend/dist/
+
+# OS
+.DS_Store

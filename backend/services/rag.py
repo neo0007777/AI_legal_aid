@@ -22,27 +22,36 @@ def get_qdrant():
         qdrant_url = os.getenv("QDRANT_URL")
         qdrant_api_key = os.getenv("QDRANT_API_KEY")
         
-        if qdrant_url and qdrant_api_key:
-            _qdrant_client = QdrantClient(
-            url=qdrant_url,
-            api_key=qdrant_api_key,
-            timeout=60  # add this line
-            )
+        if qdrant_url and qdrant_api_key and not qdrant_url.startswith("your_"):
+            try:
+                client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key, timeout=10)
+                client.get_collections()
+                _qdrant_client = client
+            except Exception:
+                print("[RAG] Cloud Qdrant connection failed. Falling back to local embedded Qdrant.")
+                _qdrant_client = QdrantClient(path=QDRANT_PATH)
         else:
-            # Local mode — development
             _qdrant_client = QdrantClient(path=QDRANT_PATH)
     return _qdrant_client
 
 
-def get_embeddings(texts: list) -> list:
+import hashlib
+import time
+
+def get_embeddings(texts: list, batch_size: int = 32) -> list:
     from fastembed import TextEmbedding
     global _embedding_model
     if _embedding_model is None:
-        print("[RAG] Loading fastembed model...")
-        _embedding_model = TextEmbedding("BAAI/bge-small-en-v1.5")
-        print("[RAG] Model ready.")
-    embeddings = list(_embedding_model.embed(texts))
-    return [e.tolist() for e in embeddings]
+        num_threads = max(2, (os.cpu_count() or 8) // 2)
+        _embedding_model = TextEmbedding("BAAI/bge-small-en-v1.5", threads=num_threads)
+        print(f"[RAG] FastEmbed model initialized with {num_threads} threads.", flush=True)
+    
+    all_embeddings = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        batch_embeddings = list(_embedding_model.embed(batch, batch_size=batch_size))
+        all_embeddings.extend([e.tolist() for e in batch_embeddings])
+    return all_embeddings
 
 
 def ensure_collection():
@@ -63,7 +72,7 @@ def get_collection_count() -> int:
         return 0
 
 
-def chunk_text(text: str, chunk_size: int = 600, overlap: int = 80) -> list:
+def chunk_text(text: str, chunk_size: int = 250, overlap: int = 40) -> list:
     words = text.split()
     chunks = []
     start = 0
@@ -75,60 +84,97 @@ def chunk_text(text: str, chunk_size: int = 600, overlap: int = 80) -> list:
     return chunks
 
 
-def ingest_documents():
+def ingest_documents(stream_batch_size: int = 128):
     ensure_collection()
 
-    if get_collection_count() > 0:
-        print(f"[RAG] {get_collection_count()} chunks already stored. Skipping.")
+    existing_count = get_collection_count()
+    if existing_count > 0:
+        print(f"[RAG] {existing_count} chunks already stored in Qdrant. Skipping ingestion.")
         return
 
+    start_time = time.perf_counter()
     documents = load_all_documents(DRAFTS_DATA_PATH)
     if not documents:
         print("[RAG] No documents found.")
         return
 
-    all_ids, all_texts, all_metadatas = [], [], []
+    print("[RAG] Chunking and deduplicating documents...")
+    all_items = []
+    seen_hashes = set()
+    duplicate_count = 0
 
     for doc in documents:
-        for i, chunk in enumerate(chunk_text(doc["text"])):
-            all_ids.append(str(uuid.uuid4()))
-            all_texts.append(chunk)
-            all_metadatas.append({
-                "filename": doc["metadata"]["filename"],
-                "category": doc["metadata"]["category"],
-                "chunk_index": i,
+        for i, chunk in enumerate(chunk_text(doc["text"], chunk_size=250, overlap=40)):
+            chunk_hash = hashlib.md5(chunk.encode("utf-8")).hexdigest()
+            if chunk_hash in seen_hashes:
+                duplicate_count += 1
+                continue
+            seen_hashes.add(chunk_hash)
+
+            all_items.append({
+                "id": str(uuid.uuid4()),
+                "text": chunk,
+                "metadata": {
+                    "filename": doc["metadata"]["filename"],
+                    "category": doc["metadata"]["category"],
+                    "chunk_index": i,
+                }
             })
 
-    print(f"[RAG] Generating embeddings for {len(all_texts)} chunks...")
-    all_embeddings = get_embeddings(all_texts)
+    total_chunks = len(all_items)
+    print(f"[RAG] Prepared {total_chunks} unique chunks ({duplicate_count} duplicates skipped).")
+    print(f"[RAG] Beginning Streaming Ingestion (Batch size = {stream_batch_size})...")
 
-    print(f"[RAG] Storing {len(all_texts)} chunks in Qdrant...")
     client = get_qdrant()
-    store_batch = 50
+    total_stored = 0
 
-    for i in range(0, len(all_texts), store_batch):
+    for i in range(0, total_chunks, stream_batch_size):
+        batch_items = all_items[i:i + stream_batch_size]
+        batch_texts = [item["text"] for item in batch_items]
+        
+        batch_num = i // stream_batch_size + 1
+        total_batches = (total_chunks + stream_batch_size - 1) // stream_batch_size
+        print(f"[RAG] Embedding batch {batch_num}/{total_batches} ({len(batch_texts)} chunks)...", flush=True)
+
+        # 1. Embed current batch (using 32 for ONNX CPU L2/L3 cache optimization)
+        batch_embeddings = get_embeddings(batch_texts, batch_size=32)
+
+        # 2. Build Qdrant points
         points = [
             PointStruct(
-                id=all_ids[i + j],
-                vector=all_embeddings[i + j],
-                payload={"text": all_texts[i + j], **all_metadatas[i + j]}
+                id=batch_items[j]["id"],
+                vector=batch_embeddings[j],
+                payload={
+                    "text": batch_items[j]["text"],
+                    **batch_items[j]["metadata"]
+                }
             )
-            for j in range(min(store_batch, len(all_texts) - i))
+            for j in range(len(batch_items))
         ]
+
+        # 3. Stream upsert immediately to Qdrant
         for attempt in range(3):
             try:
                 client.upsert(collection_name=COLLECTION_NAME, points=points)
-                print(f"[RAG] Stored {min(i + store_batch, len(all_texts))}/{len(all_texts)}", end="\r")
+                total_stored += len(points)
+                elapsed = time.perf_counter() - start_time
+                rate = total_stored / elapsed if elapsed > 0 else 0
+                pct = (total_stored / total_chunks) * 100
+                print(
+                    f"[RAG] Streamed {total_stored}/{total_chunks} chunks ({pct:.1f}%) "
+                    f"to Qdrant | Rate: {rate:.1f} chunks/sec | Elapsed: {elapsed:.1f}s",
+                    flush=True
+                )
                 break
             except Exception as e:
                 if attempt == 2:
-                    print(f"\n[RAG] Failed batch {i} after 3 attempts: {e}")
+                    print(f"\n[RAG] Failed stream batch at index {i} after 3 attempts: {e}")
                 else:
-                    print(f"\n[RAG] Retry {attempt + 1} for batch {i}...")
-                    import time
-                    time.sleep(5)
+                    print(f"\n[RAG] Retry {attempt + 1} for batch index {i}...")
+                    time.sleep(2)
 
-    print(f"\n[RAG] Done. {get_collection_count()} chunks stored.")
+    total_time = time.perf_counter() - start_time
+    print(f"\n[RAG] Ingestion completed in {total_time:.2f}s! Total chunks in Qdrant: {get_collection_count()}")
 
 def search_drafts(query: str, n_results: int = 5, category_filter: str = None) -> list:
     try:
