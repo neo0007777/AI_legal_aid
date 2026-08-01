@@ -41,7 +41,7 @@ const Login = () => {
         <div className="login-matrix">
             <div className="login-graphic-panel">
                 <div className="logo-vertical">
-                    <Shield size={64} className="text-blue-500 mb-4" />
+                    <img src="/ai-legal-bg.png" alt="NyayaSetu Logo" className="login-logo-img" />
                     <h1>NyayaSetu</h1>
                     <p>Enterprise Legal Intelligence</p>
                 </div>

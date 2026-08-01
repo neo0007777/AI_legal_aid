@@ -28,7 +28,7 @@ const Navigation = () => {
     return (
         <aside className="sidebar-nav">
             <div className="sidebar-header">
-                <div className="logo-icon"><Scale size={20} /></div>
+                <img src="/ai-legal-bg.png" alt="NyayaSetu Logo" className="sidebar-logo-img" />
                 <div className="logo-text">
                     <h2>NyayaSetu</h2>
                     <span className="badge">PRO</span>
