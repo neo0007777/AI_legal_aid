@@ -1,12 +1,12 @@
-# NyayaSetu — न्यायसेतु
+# LexSetu — न्यायसेतु
 
 **Bridge to Justice** | AI-powered legal assistant for advocates and legal interns
 
 ---
 
-## What is NyayaSetu?
+## What is LexSetu?
 
-NyayaSetu is a free, open-source legal AI platform built for Indian legal professionals. It helps advocates and interns:
+LexSetu is a free, open-source legal AI platform built for Indian legal professionals. It helps advocates and interns:
 
 - **Find real cases** — Search actual Indian court judgments with proper citations
 - **Draft documents** — Generate error-free legal drafts from a library of 1841 templates

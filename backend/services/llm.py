@@ -41,6 +41,8 @@ def call_ollama(system_prompt: str, user_message: str, json_mode: bool = False) 
 
 
 def call_llm(system_prompt: str, user_message: str, json_mode: bool = False) -> str:
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
     groq_key = os.getenv("GROQ_API_KEY", "")
     use_groq = groq_key and groq_key != "your_groq_api_key_here"
 

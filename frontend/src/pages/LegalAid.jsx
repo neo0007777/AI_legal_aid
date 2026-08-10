@@ -142,7 +142,7 @@ const LegalAid = () => {
                     {messages.length === 0 ? (
                         <div className="empty-sandbox-state animate-fade-in">
                             <Sparkles size={48} className="text-primary mb-4 opacity-50 mx-auto" />
-                            <h2>How can NyayaSetu help you today?</h2>
+                            <h2>How can LexSetu help you today?</h2>
                             <div className="suggestion-chips-grid">
                                 {SUGGESTIONS.map((sug, idx) => (
                                     <button key={idx} className="suggestion-chip" onClick={() => handleSend(sug.text)}>

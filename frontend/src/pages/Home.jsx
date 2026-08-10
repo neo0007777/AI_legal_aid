@@ -200,7 +200,7 @@ const Home = () => {
                     </h1>
 
                     <p className="hero-subtitle">
-                        NyayaSetu cross-references 50M+ precedents and maps Indian Contract Act nuances in seconds.
+                        LexSetu cross-references 50M+ precedents and maps Indian Contract Act nuances in seconds.
                     </p>
 
                     <div className="hero-search-container search-container-relative">

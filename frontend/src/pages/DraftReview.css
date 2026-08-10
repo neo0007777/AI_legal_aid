@@ -1,0 +1,484 @@
+/* DraftReview.css — LexSetu PRO AI Legal Draft Review Engine */
+
+.review-wrapper {
+    padding: 2rem 2.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.review-header {
+    margin-bottom: 2rem;
+}
+
+.review-header h2 {
+    font-family: var(--font-heading);
+    font-size: 2.2rem;
+    color: #63120e;
+    margin-bottom: 0.5rem;
+}
+
+.review-header .subtitle {
+    color: #8c3a2a;
+    font-size: 0.95rem;
+    max-width: 700px;
+}
+
+.badge-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f1d1a6;
+    color: #63120e;
+    padding: 0.4rem 0.9rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    border: 1px solid #dfa46f;
+}
+
+/* Grid Layout */
+.review-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.review-input-card,
+.review-results-card {
+    background: #fcf6ed;
+    border: 1.5px solid #dfa46f;
+    border-radius: 16px;
+    padding: 1.75rem;
+    box-shadow: 0 4px 16px rgba(140, 58, 42, 0.08);
+}
+
+.review-input-card h3 {
+    font-family: var(--font-heading);
+    color: #63120e;
+    font-size: 1.15rem;
+    margin-bottom: 1rem;
+}
+
+/* File Drop Zone */
+.file-upload-box {
+    margin-bottom: 1.25rem;
+}
+
+.file-drop-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.75rem;
+    border: 2px dashed #dfa46f;
+    border-radius: 12px;
+    background: #f6e2c6;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.file-drop-area:hover {
+    border-color: #c98659;
+    background: #f1d1a6;
+}
+
+.upload-icon {
+    color: #c98659;
+    margin-bottom: 0.5rem;
+}
+
+.drop-title {
+    color: #63120e;
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.drop-sub {
+    color: #8c3a2a;
+    font-size: 0.8rem;
+    margin: 0.25rem 0 0 0;
+}
+
+.selected-file-info {
+    color: #63120e;
+}
+
+.selected-file-info strong {
+    display: block;
+    font-size: 0.95rem;
+}
+
+.selected-file-info span {
+    font-size: 0.8rem;
+    color: #8c3a2a;
+}
+
+.divider-text {
+    text-align: center;
+    position: relative;
+    margin: 1.25rem 0;
+}
+
+.divider-text::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #dfa46f;
+    z-index: 1;
+}
+
+.divider-text span {
+    position: relative;
+    z-index: 2;
+    background: #fcf6ed;
+    padding: 0 0.75rem;
+    font-size: 0.72rem;
+    color: #c98659;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.draft-textarea {
+    width: 100%;
+    background: #fff8ef;
+    border: 1.5px solid #dfa46f;
+    border-radius: 10px;
+    padding: 1rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    color: #3d1a0a;
+    line-height: 1.6;
+    outline: none;
+    resize: vertical;
+    margin-bottom: 1.25rem;
+}
+
+.draft-textarea:focus {
+    border-color: #8c3a2a;
+}
+
+.run-review-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.9rem;
+    font-size: 1rem;
+}
+
+/* Right Results Panel */
+.empty-review-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 380px;
+    color: #c98659;
+    text-align: center;
+    gap: 0.75rem;
+}
+
+.empty-review-placeholder h4 {
+    color: #63120e;
+    margin: 0;
+}
+
+.empty-review-placeholder p {
+    font-size: 0.88rem;
+    color: #8c3a2a;
+    max-width: 320px;
+}
+
+.review-analyzing-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 380px;
+    text-align: center;
+    gap: 1rem;
+}
+
+.review-analyzing-state h4 {
+    color: #63120e;
+    font-family: var(--font-heading);
+}
+
+.review-analyzing-state p {
+    color: #8c3a2a;
+    font-size: 0.9rem;
+}
+
+/* Report Banner */
+.report-summary-banner {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: #f6e2c6;
+    border: 1.5px solid #dfa46f;
+    border-radius: 14px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.score-circle-wrapper {
+    flex-shrink: 0;
+}
+
+.score-circle {
+    width: 75px;
+    height: 75px;
+    border-radius: 50%;
+    border: 4px solid #10B981;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #fff8ef;
+}
+
+.score-num {
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.score-denom {
+    font-size: 0.65rem;
+    color: #8c3a2a;
+    font-weight: 600;
+}
+
+.summary-top-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.doc-type-tag {
+    background: #63120e;
+    color: #f9eedc;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.badge-risk {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.badge-risk.low { background: #D1FAE5; color: #065F46; }
+.badge-risk.medium { background: #FEF3C7; color: #92400E; }
+.badge-risk.high { background: #FEE2E2; color: #991B1B; }
+
+.summary-text {
+    color: #63120e;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin: 0;
+    font-weight: 500;
+}
+
+/* Missing Elements */
+.missing-elements-section {
+    margin-bottom: 1.5rem;
+}
+
+.missing-card {
+    background: #f1d1a6;
+    border: 1px solid #dfa46f;
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+}
+
+.missing-card h5 {
+    color: #63120e;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.tags-flex {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tag-missing-sec {
+    background: #8c3a2a;
+    color: #f9eedc;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.tag-missing-field {
+    background: #c98659;
+    color: #fff8ef;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Issues List */
+.issues-list-wrapper h4 {
+    color: #63120e;
+    font-size: 1rem;
+    font-family: var(--font-heading);
+    margin-bottom: 1rem;
+}
+
+.issue-item {
+    background: #fff8ef;
+    border: 1px solid #dfa46f;
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.85rem;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.issue-item.critical { border-left: 4px solid #EF4444; }
+.issue-item.warning { border-left: 4px solid #F59E0B; }
+.issue-item.suggestion { border-left: 4px solid #3B82F6; }
+
+.issue-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+}
+
+.issue-badge.red { background: #FEE2E2; color: #991B1B; }
+.issue-badge.amber { background: #FEF3C7; color: #92400E; }
+.issue-badge.blue { background: #DBEAFE; color: #1E40AF; }
+
+.issue-item h6 {
+    color: #3d1a0a;
+    font-size: 0.9rem;
+    margin: 0 0 0.25rem 0;
+}
+
+.issue-item p {
+    color: #8c3a2a;
+    font-size: 0.83rem;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.5;
+}
+
+.suggested-fix-box {
+    background: #f6e2c6;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    color: #63120e;
+}
+
+.autofix-action-bar {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #dfa46f;
+}
+
+.autofix-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.85rem;
+    font-size: 0.98rem;
+}
+
+/* Corrected Draft View */
+.corrected-draft-view {
+    background: #fcf6ed;
+    border: 1.5px solid #c98659;
+    border-radius: 16px;
+    padding: 1.75rem;
+    box-shadow: 0 6px 24px rgba(140, 58, 42, 0.12);
+}
+
+.corrected-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+}
+
+.corrected-header h3 {
+    color: #63120e;
+    font-family: var(--font-heading);
+    margin: 0;
+}
+
+.changes-summary-box {
+    background: #f1d1a6;
+    border-left: 4px solid #c98659;
+    padding: 0.85rem 1.25rem;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 1.5rem;
+    font-size: 0.88rem;
+    color: #63120e;
+}
+
+.changes-summary-box ul {
+    margin: 0.4rem 0 0 1.25rem;
+    padding: 0;
+}
+
+.split-comparison-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.split-pane h5 {
+    color: #8c3a2a;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.draft-pre-box {
+    background: #fff8ef;
+    border: 1px solid #dfa46f;
+    border-radius: 10px;
+    padding: 1.25rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.85rem;
+    color: #3d1a0a;
+    white-space: pre-wrap;
+    max-height: 500px;
+    overflow-y: auto;
+    line-height: 1.6;
+}
+
+.draft-pre-box.corrected {
+    background: #fdf6ee;
+    border-color: #c98659;
+}
+
+.flex-align {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}

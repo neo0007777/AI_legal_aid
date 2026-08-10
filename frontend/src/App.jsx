@@ -6,6 +6,7 @@ import ServerWakeup from './components/ServerWakeup';
 import Home from './pages/Home';
 import CaseFinder from './pages/CaseFinder';
 import DraftAssistant from './pages/DraftAssistant';
+import DraftReview from './pages/DraftReview';
 import ClauseConflict from './pages/ClauseConflict';
 import LegalAid from './pages/LegalAid';
 import Login from './pages/Login';
@@ -37,6 +38,7 @@ const App = () => {
         <Route index element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="case-finder" element={<ProtectedRoute><CaseFinder /></ProtectedRoute>} />
         <Route path="draft-assistant" element={<ProtectedRoute><DraftAssistant /></ProtectedRoute>} />
+        <Route path="draft-review" element={<ProtectedRoute><DraftReview /></ProtectedRoute>} />
         <Route path="clause-conflict" element={<ProtectedRoute><ClauseConflict /></ProtectedRoute>} />
         <Route path="legal-aid" element={<ProtectedRoute><LegalAid /></ProtectedRoute>} />
       </Route>

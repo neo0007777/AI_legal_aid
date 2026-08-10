@@ -36,7 +36,7 @@ def ask_legal_aid(
 
         context = "\n\n---\n\n".join(context_parts) if context_parts else ""
 
-        system_prompt = """You are NyayaSetu, a knowledgeable Indian legal aid assistant.
+        system_prompt = """You are LexSetu, a knowledgeable Indian legal aid assistant.
 You provide clear, accurate, and helpful legal guidance based on Indian law.
 
 Always structure your response EXACTLY like this:

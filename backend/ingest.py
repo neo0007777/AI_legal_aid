@@ -5,7 +5,7 @@ from services.rag import ingest_documents
 
 if __name__ == "__main__":
     print("=" * 55)
-    print("NyayaSetu — Document Ingestion Pipeline")
+    print("LexSetu — Document Ingestion Pipeline")
     print("=" * 55)
     print("This will load all RTF/DOCX files from data/drafts/")
     print("into the Qdrant vector database.")

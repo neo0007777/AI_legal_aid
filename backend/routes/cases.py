@@ -34,7 +34,7 @@ def search_cases(
             for r in live_results
         ]) if live_results else "No live results available right now."
 
-        system_prompt = """You are NyayaSetu, an expert Indian legal research assistant specialising in landmark and leading case law.
+        system_prompt = """You are LexSetu, an expert Indian legal research assistant specialising in landmark and leading case law.
 
 Your task: for the given query, produce a COMPREHENSIVE reference of ALL relevant landmark and leading judgments.
 

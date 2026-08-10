@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Scale, BookOpen, MessageSquare, Home as HomeIcon, FileSearch, Clock, User, LogOut } from 'lucide-react';
+import { Scale, BookOpen, MessageSquare, Home as HomeIcon, FileSearch, Clock, User, LogOut, FileCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './Navigation.css';
 
@@ -28,9 +28,9 @@ const Navigation = () => {
     return (
         <aside className="sidebar-nav">
             <div className="sidebar-header">
-                <img src="/ai-legal-bg.png" alt="NyayaSetu Logo" className="sidebar-logo-img" />
+                <img src="/ai-legal-bg.png" alt="LexSetu Logo" className="sidebar-logo-img" />
                 <div className="logo-text">
-                    <h2>NyayaSetu</h2>
+                    <h2>LexSetu</h2>
                     <span className="badge">PRO</span>
                 </div>
             </div>
@@ -46,6 +46,9 @@ const Navigation = () => {
                     </NavLink>
                     <NavLink to="/draft-assistant" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
                         <BookOpen size={18} /> Draft Assistant
+                    </NavLink>
+                    <NavLink to="/draft-review" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                        <FileCheck size={18} /> Draft Review
                     </NavLink>
                     <NavLink to="/clause-conflict" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
                         <FileSearch size={18} /> Contract Analysis

@@ -62,6 +62,16 @@ def ensure_collection():
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
         )
+    # Ensure keyword index on "category" payload field for filtered queries
+    try:
+        from qdrant_client.models import PayloadSchemaType
+        client.create_payload_index(
+            collection_name=COLLECTION_NAME,
+            field_name="category",
+            field_schema=PayloadSchemaType.KEYWORD,
+        )
+    except Exception:
+        pass
 
 
 def get_collection_count() -> int:
@@ -136,10 +146,8 @@ def ingest_documents(stream_batch_size: int = 128):
         total_batches = (total_chunks + stream_batch_size - 1) // stream_batch_size
         print(f"[RAG] Embedding batch {batch_num}/{total_batches} ({len(batch_texts)} chunks)...", flush=True)
 
-        # 1. Embed current batch (using 32 for ONNX CPU L2/L3 cache optimization)
         batch_embeddings = get_embeddings(batch_texts, batch_size=32)
 
-        # 2. Build Qdrant points
         points = [
             PointStruct(
                 id=batch_items[j]["id"],
@@ -152,7 +160,6 @@ def ingest_documents(stream_batch_size: int = 128):
             for j in range(len(batch_items))
         ]
 
-        # 3. Stream upsert immediately to Qdrant
         for attempt in range(3):
             try:
                 client.upsert(collection_name=COLLECTION_NAME, points=points)
@@ -176,6 +183,7 @@ def ingest_documents(stream_batch_size: int = 128):
     total_time = time.perf_counter() - start_time
     print(f"\n[RAG] Ingestion completed in {total_time:.2f}s! Total chunks in Qdrant: {get_collection_count()}")
 
+
 def search_drafts(query: str, n_results: int = 5, category_filter: str = None) -> list:
     try:
         ensure_collection()
@@ -191,13 +199,23 @@ def search_drafts(query: str, n_results: int = 5, category_filter: str = None) -
                 must=[FieldCondition(key="category", match=MatchValue(value=category_filter))]
             )
 
-        results = get_qdrant().search(
-            collection_name=COLLECTION_NAME,
-            query_vector=query_embedding,
-            limit=n_results,
-            query_filter=query_filter,
-            with_payload=True,
-        )
+        try:
+            results = get_qdrant().search(
+                collection_name=COLLECTION_NAME,
+                query_vector=query_embedding,
+                limit=n_results,
+                query_filter=query_filter,
+                with_payload=True,
+            )
+        except Exception as filter_err:
+            # Fallback to search without filter if category payload index is not ready
+            print(f"[RAG] Filter search failed ({filter_err}), falling back to un-filtered search...")
+            results = get_qdrant().search(
+                collection_name=COLLECTION_NAME,
+                query_vector=query_embedding,
+                limit=n_results,
+                with_payload=True,
+            )
 
         output = []
         for r in results:

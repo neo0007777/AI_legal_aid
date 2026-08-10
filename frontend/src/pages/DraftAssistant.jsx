@@ -1,10 +1,11 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     FileText, Wand2, RotateCcw, Download, Copy, RefreshCw, Edit3,
     Sparkles, CornerDownRight, Check, Loader2, ShieldAlert, AlertOctagon,
     Scale, BookmarkMinus, Briefcase, Users, Lock, FileSignature,
     UploadCloud, X, AlertTriangle, ListChecks, ArrowRightCircle,
-    ChevronLeft, ChevronRight
+    ChevronLeft, ChevronRight, FileCheck, CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './DraftAssistant.css';
@@ -42,6 +43,7 @@ const TEMPLATE_GROUPS = [
 ];
 
 const DraftAssistant = () => {
+    const navigate = useNavigate();
     const { getAuthHeaders } = useAuth();
     const allTemplates = TEMPLATE_GROUPS.flatMap(g => g.templates);
     const [activeTemplateId, setActiveTemplateId] = useState('bail');
@@ -52,6 +54,7 @@ const DraftAssistant = () => {
     const [hasGenerated, setHasGenerated] = useState(false);
     const [documentContent, setDocumentContent] = useState('');
     const [sources, setSources] = useState([]);
+    const [reviewData, setReviewData] = useState(null);
     const [error, setError] = useState('');
     const [copied, setCopied] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -64,6 +67,7 @@ const DraftAssistant = () => {
         setFormData({});
         setDocumentContent('');
         setSources([]);
+        setReviewData(null);
         setError('');
     };
 
@@ -84,6 +88,7 @@ const DraftAssistant = () => {
     const triggerGeneration = async () => {
         setIsGenerating(true);
         setError('');
+        setReviewData(null);
 
         try {
             const response = await fetch('/api/documents/draft', {
@@ -105,6 +110,7 @@ const DraftAssistant = () => {
             const data = await response.json();
             setDocumentContent(data.draft);
             setSources(data.sources || []);
+            setReviewData(data.review || null);
             setHasGenerated(true);
         } catch (err) {
             setError(err.message);
@@ -124,9 +130,18 @@ const DraftAssistant = () => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${currentTemplate.title.replace(/ /g, '_')}_NyayaSetu.txt`;
+        a.download = `${currentTemplate.title.replace(/ /g, '_')}_LexSetu.txt`;
         a.click();
         URL.revokeObjectURL(url);
+    };
+
+    const handleOpenInReview = () => {
+        navigate('/draft-review', {
+            state: {
+                draft: documentContent,
+                review: reviewData
+            }
+        });
     };
 
     return (
@@ -171,7 +186,7 @@ const DraftAssistant = () => {
                         <div className="standard-form-wrapper">
                             <div className="draft-form-header">
                                 <h2>Draft: {currentTemplate.title}</h2>
-                                <p>Fill in the details below. NyayaSetu AI will generate a complete legal document using 1,841 real Indian legal templates.</p>
+                                <p>Fill in the details below. LexSetu AI will generate a complete legal document using 1,841 real Indian legal templates and automatically run a 2-Pass RAG Review & Auto-Fix Refinement.</p>
                             </div>
                             <div className="draft-form-body">
                                 {error && (
@@ -202,7 +217,7 @@ const DraftAssistant = () => {
                                     ))}
                                 </div>
                                 <button className="smart-generate-btn" onClick={triggerGeneration}>
-                                    <Sparkles size={20} /> Generate Draft with AI
+                                    <Sparkles size={20} /> Generate & Auto-Refine Draft
                                 </button>
                             </div>
                         </div>
@@ -214,15 +229,23 @@ const DraftAssistant = () => {
                         <div className="spinner-ring">
                             <Loader2 size={48} className="spin text-primary" />
                         </div>
-                        <h3>Generating Your Document...</h3>
-                        <p className="loading-stage-text">AI is analyzing 1,841 legal templates and crafting your draft...</p>
+                        <h3>Generating & Auto-Refining Document...</h3>
+                        <p className="loading-stage-text">⚡ 2-Pass Active: Generating Initial Draft → Pass 1 RAG Review & Auto-Fix → Pass 2 RAG Review & Auto-Fix...</p>
                     </div>
                 )}
 
                 {hasGenerated && (
                     <div className="canvas-wrapper">
                         <div className="editor-controls animate-fade-in">
+                            <div className="refinement-status-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: '#f1d1a6', color: '#63120e', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700', border: '1px solid #dfa46f' }}>
+                                <CheckCircle2 size={15} style={{ color: '#10B981' }} />
+                                <span>2-Pass Refined & Auto-Fixed {reviewData?.overall_score ? `(Score: ${reviewData.overall_score}/100)` : '(Verified)'}</span>
+                            </div>
+
                             <div className="editor-actions ml-auto">
+                                <button className="editor-action-btn secondary" onClick={handleOpenInReview}>
+                                    <FileCheck size={15} /> Inspect in Draft Review
+                                </button>
                                 <button className="editor-action-btn secondary" onClick={() => setHasGenerated(false)}>
                                     <Edit3 size={15} /> Edit Details
                                 </button>

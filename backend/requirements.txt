@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════
-# NyayaSetu Backend — Python Dependencies
+# LexSetu Backend — Python Dependencies
 # ═══════════════════════════════════════════════
 
 # Framework

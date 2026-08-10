@@ -41,8 +41,8 @@ const Login = () => {
         <div className="login-matrix">
             <div className="login-graphic-panel">
                 <div className="logo-vertical">
-                    <img src="/ai-legal-bg.png" alt="NyayaSetu Logo" className="login-logo-img" />
-                    <h1>NyayaSetu</h1>
+                    <img src="/ai-legal-bg.png" alt="LexSetu Logo" className="login-logo-img" />
+                    <h1>LexSetu</h1>
                     <p>Enterprise Legal Intelligence</p>
                 </div>
                 <div className="graphic-features">
@@ -78,7 +78,7 @@ const Login = () => {
                     <p className="login-subtitle">
                         {tab === 'login'
                             ? 'Enter your credentials to access the workspace.'
-                            : 'Join NyayaSetu to get started.'}
+                            : 'Join LexSetu to get started.'}
                     </p>
 
                     {error && (

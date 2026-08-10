@@ -5,13 +5,13 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 from models.database import create_tables, SessionLocal
 from services.compliance_fetcher import refresh_compliance_alerts
-from routes import auth, workflow, compliance, documents, cases, legal_aid
+from routes import auth, workflow, compliance, documents, cases, legal_aid, review
 
 load_dotenv()
 
 app = FastAPI(
-    title="NyayaSetu API",
-    description="AI-powered legal assistant — Auth, Workflow, Compliance, Documents, Case Search, Legal Aid",
+    title="LexSetu API",
+    description="AI-powered legal assistant — Auth, Workflow, Compliance, Documents, Case Search, Legal Aid, Review Engine",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -35,8 +35,8 @@ scheduler = BackgroundScheduler()
 @app.on_event("startup")
 def on_startup():
     create_tables()
-    print("[NyayaSetu] Database tables ready.")
-    print("[NyayaSetu] Server ready.")
+    print("[LexSetu] Database tables ready.")
+    print("[LexSetu] Server ready.")
 
     def scheduled_refresh():
         db = SessionLocal()
@@ -47,14 +47,14 @@ def on_startup():
 
     scheduler.add_job(scheduled_refresh, "interval", hours=12, id="compliance_refresh")
     scheduler.start()
-    print("[NyayaSetu] Compliance auto-refresh every 12 hours.")
-    print("[NyayaSetu] Server ready at http://localhost:8000/docs")
+    print("[LexSetu] Compliance auto-refresh every 12 hours.")
+    print("[LexSetu] Server ready at http://localhost:8000/docs")
 
 
 @app.on_event("shutdown")
 def on_shutdown():
     scheduler.shutdown()
-    print("[NyayaSetu] Scheduler stopped.")
+    print("[LexSetu] Scheduler stopped.")
 
 
 @app.exception_handler(Exception)
@@ -72,12 +72,13 @@ app.include_router(compliance.router, prefix="/compliance", tags=["Compliance Mo
 app.include_router(documents.router,  prefix="/documents",  tags=["Document Automation"])
 app.include_router(cases.router,      prefix="/cases",      tags=["Case Search"])
 app.include_router(legal_aid.router,  prefix="/legal-aid",  tags=["Legal Aid"])
+app.include_router(review.router,     prefix="/review",     tags=["Legal Draft Review"])
 
 
 @app.get("/", tags=["Health"])
 def root():
     return {
-        "app": "NyayaSetu",
+        "app": "LexSetu",
         "tagline": "Bridge to Justice",
         "status": "running",
         "version": "1.0.0",
