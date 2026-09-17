@@ -22,5 +22,7 @@ chroma_db/
 node_modules/
 frontend/dist/
 
-# OS
+# OS & Office temp
 .DS_Store
+~$*
+*.tmp

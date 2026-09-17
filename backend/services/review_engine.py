@@ -153,14 +153,7 @@ def run_hybrid_review(draft: str, document_hint: Optional[str] = None) -> Review
         for kw in ["signature", "signed", "in witness whereof", "executed by", "deponent"]
     )
 
-    if needs_execution_block and not has_execution:
-        warning_issues.append(ReviewIssue(
-            id="MISSING_EXECUTION",
-            category="warning",
-            title="Missing Execution / Signature Block",
-            description="The document lacks a formal signature or execution block, which is required for this document type.",
-            suggested_fix="Add execution block with signature lines for parties and witnesses."
-        ))
+
 
     # 5. LLM Comparison & Legal Quality Reasoning
     system_prompt = f"""You are a Senior Indian Legal Reviewer performing a comprehensive review of a {doc_type}.
@@ -198,10 +191,10 @@ CRITICAL CONSTRAINTS:
     user_msg = f"""Document Type: {doc_type}
 
 User Draft to Review:
-{draft[:3500]}
+{draft[:2500]}
 
-Top-5 Reference Templates from Qdrant:
-{ref_templates_text[:4000]}"""
+Reference Structure Highlights:
+{ref_templates_text[:1200]}"""
 
     summary_text = ""
     missing_sections = []
@@ -210,7 +203,7 @@ Top-5 Reference Templates from Qdrant:
     suggestion_issues: List[ReviewIssue] = []
 
     # Check execution block deterministically if missing
-    if not has_execution:
+    if needs_execution_block and not has_execution:
         warning_issues.append(ReviewIssue(
             id="MISSING_EXECUTION",
             category="warning",
@@ -273,14 +266,38 @@ Top-5 Reference Templates from Qdrant:
     )
 
 
-def auto_fix_draft(draft: str, issues: List[Dict[str, Any]], missing_sections: List[str], missing_fields: List[Dict[str, Any]]) -> FixResponse:
+def auto_fix_draft(
+    draft: str,
+    issues: List[Dict[str, Any]],
+    missing_sections: List[str],
+    missing_fields: List[Dict[str, Any]],
+    doc_type: Optional[str] = None
+) -> FixResponse:
     """
     Step 7: Auto-fixes ONLY detected issues while preserving original draft structure, clause numbering, and headings.
     """
     if not draft or not draft.strip():
         return FixResponse(corrected_draft=draft, changes_made=["Draft was empty."])
 
-    system_prompt = """You are a senior Indian legal document editor.
+    # Infer document type if not explicitly passed
+    if not doc_type:
+        doc_type = classify_document_type(draft)
+
+    # 1. Retrieve real case law from Indian Kanoon / CommonLII via scraper if needed
+    case_law_text = "No additional case law retrieved."
+    if missing_sections:
+        case_query = f"{doc_type} {' '.join(missing_sections[:2])}".strip()
+        try:
+            from services.scraper import search_cases
+            case_results = search_cases(case_query, max_results=2)
+            if case_results:
+                case_law_text = "\n".join(
+                    f"- {c['title']} — {c['link']}" for c in case_results
+                )
+        except Exception as e:
+            print(f"[ReviewEngine] Case law retrieval notice: {e}")
+
+    system_prompt = f"""You are a senior Indian legal document editor.
 
 Your task is to fix ONLY the reported defects in the legal draft provided below.
 
@@ -305,7 +322,7 @@ STRICT LAWS OF MODIFICATION
 
 1. Modify ONLY the incorrect, missing, or defective sections listed in the issues report.
 2. Preserve all existing correct text, formatting, clause numbering, and headings.
-3. Do NOT replace [Not Provided] placeholders with invented values — leave them as-is.
+3. Do NOT replace [NOT PROVIDED] placeholders with invented values — leave them as-is.
 4. Insert missing required sections in their proper legal placement.
 5. Do NOT rewrite or rephrase clauses that are already legally sound.
 6. Output the COMPLETE corrected document, ready for advocate review.
@@ -322,7 +339,7 @@ Do NOT invent or fabricate:
 - charge-sheet status or criminal antecedents
 - court findings or evidence
 
-If a fact is missing, write [Not Provided]. Do NOT guess.
+If a fact is missing, write [NOT PROVIDED]. Do NOT guess.
 
 =========================================================
 DOCUMENT TYPE INTEGRITY
@@ -330,7 +347,68 @@ DOCUMENT TYPE INTEGRITY
 
 Do NOT add sections that do not belong to the document type.
 Bail Applications must NOT receive: WHEREAS, execution blocks, notary clauses, witness tables.
-Sale Deeds must NOT receive: bail prayer, criminal grounds."""
+Sale Deeds must NOT receive: bail prayer, criminal grounds.
+
+=========================================================
+DUPLICATE CONTENT CHECK
+=========================================================
+Scan all sections for paragraphs that are substantively identical or
+near-identical to another paragraph elsewhere in the document (e.g.
+"Detailed Facts" repeating "Brief Facts" almost word-for-word).
+- Keep the fullest, most legally appropriate version in its correct section.
+- Never repeat the same paragraph verbatim under a second heading. If a
+  second heading legally requires its own content (e.g. "Brief Facts" as
+  a short summary vs "Detailed Facts" as full narrative), rewrite the
+  shorter one as an actual condensed summary — distinct wording, distinct
+  length, not a copy.
+
+=========================================================
+PLACEHOLDER FORMAT — MANDATORY
+=========================================================
+Every unfilled fact must be written EXACTLY as: [NOT PROVIDED]
+Uppercase, square brackets, no variation. Normalize any inconsistent
+placeholder you find — "[Date Not Provided]", "[Father's Name]",
+"[PS Not Provided]", "[Age]", "[Address]", "[Place]" — to this exact
+format. Normalizing the format is not the same as filling it in; do
+NOT invent a value.
+
+=========================================================
+PARAGRAPH NUMBERING AND VERIFICATION CONSISTENCY
+=========================================================
+Number every substantive body paragraph sequentially (1, 2, 3, ...),
+excluding headings, lettered prayer items, and the verification section.
+In VERIFICATION, replace placeholder ranges like "[1 to X]" / "[Y to Z]"
+with the real paragraph numbers:
+- First range = paragraphs stating facts within the applicant's personal
+  knowledge (arrest, custody, personal circumstances).
+- Second range = paragraphs based on legal advice or case-record review
+  (legal arguments, grounds for bail, procedural history).
+If a paragraph can't be confidently classified, do not guess — mark it
+[VERIFY PARAGRAPH CLASSIFICATION] instead of assigning a wrong range.
+
+=========================================================
+GROUNDS FOR BAIL — SUBSTANTIVE, NOT BOILERPLATE
+=========================================================
+Do not leave "Grounds for Bail" as a restatement of facts already given
+elsewhere. Expand each ground into a distinct legal argument using ONLY
+facts already present in the draft or issues report — never invent new
+facts. Where accurate, frame grounds using the standard bail triple test:
+1. Risk of the applicant absconding / flight risk
+2. Risk of tampering with evidence or influencing witnesses
+3. Necessity of continued custody given the nature/severity of the offence
+Cite the applicable BNSS bail provision (see Governing Law section above)
+explicitly in at least one ground.
+
+=========================================================
+RETRIEVED CASE LAW
+=========================================================
+Below is a list of case law results retrieved for this matter. You may
+cite from this list ONLY — never fabricate a case name, citation, or
+holding that isn't in it. If the list is empty or none are relevant,
+state "[NOT PROVIDED]" under Relevant Case Laws and Precedents rather
+than inventing one.
+
+{case_law_text}"""
 
 
     issues_str = json.dumps({
@@ -365,10 +443,8 @@ Original Draft:
 
 def run_two_pass_refinement(initial_draft: str, category_hint: Optional[str] = None) -> Dict[str, Any]:
     """
-    Executes 2-Pass Review & Auto-Fix Refinement Loop:
-    Pass 1: Review initial draft -> Auto-Fix detected issues -> Pass 1 Draft
-    Pass 2: Review Pass 1 Draft -> Auto-Fix detected issues -> Best Refined Final Draft
-    Returns dictionary with initial draft, pass 1/2 scores, final review report, and best refined draft.
+    Executes Review & Auto-Fix Refinement Loop:
+    Evaluates initial draft, auto-fixes any detected defects, and returns the polished final draft and review.
     """
     if not initial_draft or not initial_draft.strip():
         return {
@@ -379,44 +455,34 @@ def run_two_pass_refinement(initial_draft: str, category_hint: Optional[str] = N
             "review": None
         }
 
-    print("[TwoPassRefinement] Starting Pass 1 Review & Auto-Fix...")
+    print("[TwoPassRefinement] Starting Review & Analysis...")
     # PASS 1 REVIEW
     review_p1 = run_hybrid_review(initial_draft, category_hint)
     all_issues_p1 = [i.model_dump() for i in review_p1.critical + review_p1.warnings + review_p1.suggestions]
     missing_sec_p1 = review_p1.missing_sections
     missing_fields_p1 = [f.model_dump() for f in review_p1.missing_fields]
 
-    # PASS 1 AUTO-FIX
-    if all_issues_p1 or missing_sec_p1 or missing_fields_p1 or review_p1.overall_score < 95:
-        print("[TwoPassRefinement] Pass 1 issues detected. Executing Pass 1 Auto-Fix...")
-        fix_res_p1 = auto_fix_draft(initial_draft, all_issues_p1, missing_sec_p1, missing_fields_p1)
-        draft_p1 = fix_res_p1.corrected_draft
+    # Only auto-fix if critical issues or missing sections exist, or score is below 90
+    if (review_p1.critical or missing_sec_p1 or review_p1.overall_score < 90) and len(initial_draft) > 50:
+        print("[TwoPassRefinement] Deficiencies detected. Executing Auto-Fix...")
+        try:
+            fix_res = auto_fix_draft(initial_draft, all_issues_p1, missing_sec_p1, missing_fields_p1, doc_type=review_p1.document_type)
+            final_draft = fix_res.corrected_draft if fix_res and fix_res.corrected_draft else initial_draft
+            final_review = run_hybrid_review(final_draft, category_hint)
+        except Exception as fix_err:
+            print(f"[TwoPassRefinement] Auto-fix error: {fix_err}")
+            final_draft = initial_draft
+            final_review = review_p1
     else:
-        print("[TwoPassRefinement] Pass 1 clean (Score 95+).")
-        draft_p1 = initial_draft
+        print("[TwoPassRefinement] Initial draft is solid (Score 90+).")
+        final_draft = initial_draft
+        final_review = review_p1
 
-    # PASS 2 REVIEW
-    print("[TwoPassRefinement] Starting Pass 2 Review & Auto-Fix...")
-    review_p2 = run_hybrid_review(draft_p1, category_hint)
-    all_issues_p2 = [i.model_dump() for i in review_p2.critical + review_p2.warnings + review_p2.suggestions]
-    missing_sec_p2 = review_p2.missing_sections
-    missing_fields_p2 = [f.model_dump() for f in review_p2.missing_fields]
-
-    # PASS 2 AUTO-FIX
-    if (all_issues_p2 or missing_sec_p2 or missing_fields_p2) and review_p2.overall_score < 98:
-        print("[TwoPassRefinement] Pass 2 issues detected. Executing Pass 2 Auto-Fix...")
-        fix_res_p2 = auto_fix_draft(draft_p1, all_issues_p2, missing_sec_p2, missing_fields_p2)
-        best_final_draft = fix_res_p2.corrected_draft
-        final_review = run_hybrid_review(best_final_draft, category_hint)
-    else:
-        best_final_draft = draft_p1
-        final_review = review_p2
-
-    print(f"[TwoPassRefinement] Completed! Pass 1 Score: {review_p1.overall_score} -> Pass 2 Final Score: {final_review.overall_score}")
+    print(f"[TwoPassRefinement] Completed! Pass 1 Score: {review_p1.overall_score} -> Final Score: {final_review.overall_score}")
 
     return {
         "initial_draft": initial_draft,
-        "final_draft": best_final_draft,
+        "final_draft": final_draft,
         "pass1_score": review_p1.overall_score,
         "pass2_score": final_review.overall_score,
         "review": final_review.model_dump()

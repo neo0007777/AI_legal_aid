@@ -250,6 +250,12 @@ Reference Templates from Database:
 
         initial_draft = call_llm(system_prompt, user_message)
 
+        if not initial_draft or initial_draft.strip().startswith("⚠️ AI service temporarily unavailable"):
+            raise HTTPException(
+                status_code=503,
+                detail="AI service temporarily unavailable. Please verify your Groq API key and network connection."
+            )
+
         # Run Automatic 2-Pass Review & Auto-Fix Refinement Engine
         refinement_data = None
         final_draft = initial_draft

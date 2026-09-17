@@ -219,7 +219,7 @@ def search_drafts(query: str, n_results: int = 5, category_filter: str = None) -
 
         output = []
         for r in results:
-            if r.score < 0.15:
+            if r.score < 0.35:
                 continue
             output.append({
                 "text": r.payload.get("text", ""),

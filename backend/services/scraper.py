@@ -270,10 +270,12 @@ def search_cases(query: str, max_results: int = 5, db=None) -> list:
 
     token = os.getenv("INDIAN_KANOON_TOKEN", "").strip()
 
-    # Bias the IK search towards landmark / Supreme Court results.
-    # Cache is still keyed on the original query so the user's exact phrasing
-    # hits cache correctly on repeat searches.
-    landmark_query = f"{query} landmark judgment Supreme Court"
+    # Bias search results based on query context.
+    lower_court_terms = ("sessions", "district", "magistrate", "bail", "anticipatory bail")
+    if any(term in query.lower() for term in lower_court_terms):
+        landmark_query = f"{query} landmark judgment High Court"
+    else:
+        landmark_query = f"{query} landmark judgment Supreme Court"
 
     # 2. Indian Kanoon API
     if token:
