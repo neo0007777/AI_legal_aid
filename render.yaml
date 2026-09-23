@@ -8,9 +8,23 @@ services:
     envVars:
       - key: GROQ_API_KEY
         sync: false
-      - key: SECRET_KEY
+      - key: JWT_SECRET_KEY
         sync: false
       - key: ENCRYPTION_KEY
         sync: false
       - key: INDIAN_KANOON_TOKEN
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: INDIACODE_API_BASE
+        sync: false
+      - key: JWT_ALGORITHM
+        sync: false
+      - key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        sync: false
+      - key: DATABASE_URL
         sync: false

@@ -1,7 +1,9 @@
+import io
 import os
 from pathlib import Path
 from striprtf.striprtf import rtf_to_text
 from docx import Document
+from pypdf import PdfReader
 
 
 def load_rtf(filepath: str) -> str:
@@ -21,6 +23,11 @@ def load_docx(filepath: str) -> str:
     return "\n".join(
         p.text.strip() for p in doc.paragraphs if p.text.strip()
     )
+
+
+def load_pdf_bytes(data: bytes) -> str:
+    reader = PdfReader(io.BytesIO(data))
+    return "\n".join(page.extract_text() or "" for page in reader.pages).strip()
 
 
 def load_document(filepath: str) -> str:

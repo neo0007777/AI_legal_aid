@@ -1,0 +1,39 @@
+.local-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.6rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    background: rgba(249, 238, 220, 0.08);
+    border: 1px solid rgba(249, 238, 220, 0.2);
+    color: #f9eedc;
+    transform: none;
+}
+
+/* Out-specificities the global button:hover:not(.outline) rule (0,2,1) --
+   see the same fix in VerifyFiling.css for the confirmed bug this pattern causes. */
+.sidebar-nav .local-mode-toggle:hover {
+    background: rgba(249, 238, 220, 0.16);
+    transform: none;
+}
+
+.local-mode-toggle.local {
+    border-color: #ecbf89;
+    color: #ecbf89;
+}
+
+.local-mode-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-left: auto;
+    background: #10B981;
+}
+
+.local-mode-toggle.local .local-mode-dot {
+    background: #F59E0B;
+}

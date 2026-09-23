@@ -32,7 +32,7 @@ def call_groq(system_prompt: str, user_message: str, json_mode: bool = False, mo
     # Respect free tier token limits (qwen has a strict 1000 OTPM limit on free tier)
     tokens_limit = 750 if "qwen" in target_model.lower() else 2048
 
-    response = client.chat.completions.create(
+    kwargs = dict(
         model=target_model,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -41,6 +41,10 @@ def call_groq(system_prompt: str, user_message: str, json_mode: bool = False, mo
         temperature=0.1,
         max_tokens=tokens_limit,
     )
+    if json_mode:
+        kwargs["response_format"] = {"type": "json_object"}
+
+    response = client.chat.completions.create(**kwargs)
     _ACTIVE_GROQ_MODEL = target_model
     return response.choices[0].message.content.strip()
 
@@ -63,11 +67,16 @@ def call_ollama(system_prompt: str, user_message: str, json_mode: bool = False) 
     return response["message"]["content"].strip()
 
 
-def call_llm(system_prompt: str, user_message: str, json_mode: bool = False) -> str:
+def call_llm(system_prompt: str, user_message: str, json_mode: bool = False, force_local: bool = False) -> str:
     from dotenv import load_dotenv
     load_dotenv(override=True)
     groq_key = os.getenv("GROQ_API_KEY", "")
-    use_groq = groq_key and groq_key != "your_groq_api_key_here"
+    # S3 Task 4 (local-only mode): force_local skips Groq entirely regardless of
+    # whether a valid key is configured, so the frontend's local-only toggle is a
+    # real behavior switch, not cosmetic. Only applies to call_llm's cascade
+    # (draft generation, etc) -- citation entailment is pinned to Groq by
+    # deliberate S2 design and is not routed through this function's fallback.
+    use_groq = (not force_local) and groq_key and groq_key != "your_groq_api_key_here"
 
     if use_groq:
         preferred_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")

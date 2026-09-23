@@ -1,0 +1,30 @@
+.persona-switcher {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.persona-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: transparent;
+    border: 1.5px solid #dfa46f;
+    color: #8c3a2a;
+    padding: 0.45rem 0.9rem;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transform: none;
+}
+
+.persona-pill:hover:not(.active) {
+    background: #f6e2c6;
+    transform: none;
+}
+
+.persona-pill.active {
+    background: #63120e;
+    border-color: #63120e;
+    color: #f9eedc;
+}

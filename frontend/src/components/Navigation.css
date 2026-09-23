@@ -10,6 +10,44 @@
     flex-shrink: 0;
 }
 
+.mobile-nav-toggle {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .mobile-nav-toggle {
+        display: inline-flex;
+        position: fixed;
+        top: 0.85rem;
+        left: 0.85rem;
+        z-index: 60;
+        padding: 0.55rem;
+        border-radius: 8px;
+        background: var(--sidebar-bg, #63120e);
+        color: #f9eedc;
+    }
+
+    .mobile-nav-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 40;
+    }
+
+    .sidebar-nav {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 50;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .sidebar-nav.mobile-open {
+        transform: translateX(0);
+    }
+}
+
 .sidebar-header {
     display: flex;
     align-items: center;
@@ -110,6 +148,13 @@
     color: #63120e;
     font-weight: 700;
     box-shadow: 0 4px 12px rgba(236, 191, 137, 0.3);
+}
+
+/* Flagship feature (S3 UX item 6): discoverable, not buried behind draft
+   generation -- a visible accent border distinguishes it at a glance. */
+.nav-link-flagship:not(.active) {
+    border: 1px solid rgba(236, 191, 137, 0.4);
+    font-weight: 700;
 }
 
 .mt-auto {

@@ -18,6 +18,9 @@ nyayasetu.db
 qdrant_db/
 chroma_db/
 
+# Judgment corpus cache (raw parquet downloads, S1)
+data/judgments/
+
 # Node
 node_modules/
 frontend/dist/

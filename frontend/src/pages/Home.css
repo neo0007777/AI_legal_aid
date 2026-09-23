@@ -84,6 +84,13 @@
     padding-top: 1.5rem;
     position: relative;
     z-index: 1;
+    /* Grid items default to min-width:auto, which refuses to shrink below the
+       content's min-content size -- a wide search input inside was forcing
+       this whole column (and everything in it) to 592px on a 390px viewport.
+       This is what my earlier overflow-x:hidden fix was masking rather than
+       fixing: content was being silently clipped, not actually laid out to
+       fit. min-width:0 is the standard fix for this grid-item sizing trap. */
+    min-width: 0;
 }
 
 /* Badge chip */
@@ -782,5 +789,30 @@
 
     .bg-decorations-layer {
         display: none;
+    }
+}
+
+/* Caught in UX audit: at phone width (390px) the existing 1024px breakpoint
+   wasn't enough -- the hero title's fixed 3.1rem font-size and the badge
+   chip both overflowed past the right edge. */
+@media (max-width: 480px) {
+    .hero-title {
+        font-size: 2rem;
+        overflow-wrap: break-word;
+    }
+
+    .hero-subtitle {
+        max-width: 100%;
+        overflow-wrap: break-word;
+    }
+
+    .badge-new {
+        max-width: 100%;
+        white-space: normal;
+    }
+
+    .dashboard-wrapper {
+        overflow-x: hidden;
+        padding: 1.25rem 0.85rem;
     }
 }

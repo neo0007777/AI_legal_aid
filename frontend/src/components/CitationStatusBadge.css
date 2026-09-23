@@ -1,0 +1,37 @@
+.citation-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.citation-status-badge.verified { background: #D1FAE5; color: #065F46; }
+.citation-status-badge.mismatch { background: #FEF3C7; color: #92400E; }
+.citation-status-badge.not-found { background: #E5E7EB; color: #374151; }
+
+.confidence-bars {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: #8c3a2a;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.technical-failure-note {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #E5E7EB;
+    color: #374151;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    margin: 0.5rem 0 0.75rem;
+}

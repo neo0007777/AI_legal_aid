@@ -9,6 +9,7 @@ import DraftAssistant from './pages/DraftAssistant';
 import DraftReview from './pages/DraftReview';
 import ClauseConflict from './pages/ClauseConflict';
 import LegalAid from './pages/LegalAid';
+import VerifyFiling from './pages/VerifyFiling';
 import Login from './pages/Login';
 
 import './App.css';
@@ -36,6 +37,7 @@ const App = () => {
       {/* Protected Layout */}
       <Route path="/" element={<AppShell />}>
         <Route index element={<ProtectedRoute><Home /></ProtectedRoute>} />
+        <Route path="verify-filing" element={<ProtectedRoute><VerifyFiling /></ProtectedRoute>} />
         <Route path="case-finder" element={<ProtectedRoute><CaseFinder /></ProtectedRoute>} />
         <Route path="draft-assistant" element={<ProtectedRoute><DraftAssistant /></ProtectedRoute>} />
         <Route path="draft-review" element={<ProtectedRoute><DraftReview /></ProtectedRoute>} />

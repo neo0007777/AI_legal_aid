@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
 from models.database import get_db, User, QueryLog
 from models.schemas import (
@@ -18,9 +18,16 @@ router = APIRouter()
 @router.post("/draft", response_model=DraftResponse)
 def generate_draft(
     req: DraftRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # S3 Task 4 (local-only mode): a real behavior switch, not cosmetic. When set,
+    # skip Groq for the initial draft (force_local -> straight to Ollama) and skip
+    # the 2-pass refinement engine entirely, since review_engine.py's own call_llm
+    # calls aren't threaded with this flag -- honestly reporting "refinement
+    # skipped in local-only mode" beats silently letting refinement hit Groq anyway.
+    local_only = request.headers.get("x-local-only", "").lower() == "true"
     if not req.description.strip():
         raise HTTPException(status_code=400, detail="Description cannot be empty")
 
@@ -248,25 +255,31 @@ Do not mention AI."""
 Reference Templates from Database:
 {context}"""
 
-        initial_draft = call_llm(system_prompt, user_message)
+        initial_draft = call_llm(system_prompt, user_message, force_local=local_only)
 
         if not initial_draft or initial_draft.strip().startswith("⚠️ AI service temporarily unavailable"):
-            raise HTTPException(
-                status_code=503,
-                detail="AI service temporarily unavailable. Please verify your Groq API key and network connection."
+            detail = (
+                "Local Ollama is unavailable (local-only mode is on, so Groq was not used). "
+                "Make sure Ollama is running locally."
+                if local_only else
+                "AI service temporarily unavailable. Please verify your Groq API key and network connection."
             )
+            raise HTTPException(status_code=503, detail=detail)
 
         # Run Automatic 2-Pass Review & Auto-Fix Refinement Engine
         refinement_data = None
         final_draft = initial_draft
         review_report = None
 
-        try:
-            refinement_data = run_two_pass_refinement(initial_draft, req.category)
-            final_draft = refinement_data.get("final_draft", initial_draft)
-            review_report = refinement_data.get("review")
-        except Exception as ref_err:
-            print(f"[Documents] 2-pass refinement fallback error: {ref_err}")
+        if local_only:
+            print("[Documents] Local-only mode: skipping 2-pass Groq-backed refinement.")
+        else:
+            try:
+                refinement_data = run_two_pass_refinement(initial_draft, req.category)
+                final_draft = refinement_data.get("final_draft", initial_draft)
+                review_report = refinement_data.get("review")
+            except Exception as ref_err:
+                print(f"[Documents] 2-pass refinement fallback error: {ref_err}")
 
         try:
             db.add(QueryLog(

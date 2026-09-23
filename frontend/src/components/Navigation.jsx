@@ -1,14 +1,25 @@
 import { useState, useRef, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { Scale, BookOpen, MessageSquare, Home as HomeIcon, FileSearch, Clock, User, LogOut, FileCheck } from 'lucide-react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Scale, BookOpen, MessageSquare, Home as HomeIcon, FileSearch, Clock, User, LogOut, FileCheck, ShieldCheck, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import LocalModeToggle from './LocalModeToggle';
 import './Navigation.css';
 
 const Navigation = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [mobileOpen, setMobileOpen] = useState(false);
     const dropdownRef = useRef(null);
+
+    // No responsive behavior existed anywhere in this app before (confirmed
+    // via mobile-viewport testing for S3: the fixed 280px sidebar just
+    // crushes every page's content into a ~110px sliver on a phone). This is
+    // the minimal fix -- off-canvas sidebar + hamburger toggle -- applied
+    // once at the shared shell level so every page benefits, not just the
+    // new Verify-a-Filing screens the UX pass specifically calls out.
+    useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -26,7 +37,12 @@ const Navigation = () => {
     };
 
     return (
-        <aside className="sidebar-nav">
+        <>
+        <button className="mobile-nav-toggle" onClick={() => setMobileOpen(v => !v)} aria-label={mobileOpen ? 'Close menu' : 'Open menu'}>
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        {mobileOpen && <div className="mobile-nav-backdrop" onClick={() => setMobileOpen(false)} />}
+        <aside className={`sidebar-nav ${mobileOpen ? 'mobile-open' : ''}`}>
             <div className="sidebar-header">
                 <img src="/ai-legal-bg.png" alt="LexSetu Logo" className="sidebar-logo-img" />
                 <div className="logo-text">
@@ -40,6 +56,9 @@ const Navigation = () => {
                 <div className="nav-links">
                     <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
                         <HomeIcon size={18} /> Dashboard
+                    </NavLink>
+                    <NavLink to="/verify-filing" className={({ isActive }) => isActive ? "nav-link active nav-link-flagship" : "nav-link nav-link-flagship"}>
+                        <ShieldCheck size={18} /> Verify a Filing
                     </NavLink>
                     <NavLink to="/case-finder" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
                         <Scale size={18} /> Case Finder
@@ -66,6 +85,10 @@ const Navigation = () => {
                     <div className="recent-item"><Clock size={14} /> Draft Assistant</div>
                     <div className="recent-item"><Clock size={14} /> Legal Aid Q&A</div>
                 </div>
+            </div>
+
+            <div className="sidebar-section">
+                <LocalModeToggle />
             </div>
 
             <div className="sidebar-footer">
@@ -103,6 +126,7 @@ const Navigation = () => {
                 )}
             </div>
         </aside>
+        </>
     );
 };
 

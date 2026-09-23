@@ -482,3 +482,25 @@
     align-items: center;
     gap: 0.5rem;
 }
+
+/* This page had zero responsive breakpoints (confirmed in UX audit: the
+   fixed 2-column .review-grid forced the whole page wider than the
+   viewport at phone width, pushing the subtitle paragraph off-screen). */
+@media (max-width: 900px) {
+    .review-wrapper {
+        padding: 1.25rem;
+    }
+
+    .review-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .review-header .subtitle {
+        max-width: 100%;
+        overflow-wrap: break-word;
+    }
+
+    .split-comparison-grid {
+        grid-template-columns: 1fr;
+    }
+}

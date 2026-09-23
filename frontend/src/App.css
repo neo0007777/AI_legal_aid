@@ -11,3 +11,9 @@
   color: var(--text-primary, #8c3a2a);
   position: relative;
 }
+
+@media (max-width: 768px) {
+  .main-content {
+    padding-top: 4rem; /* clears the fixed hamburger toggle */
+  }
+}

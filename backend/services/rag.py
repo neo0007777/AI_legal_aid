@@ -1,4 +1,5 @@
 import os
+import threading
 import uuid
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
@@ -14,24 +15,35 @@ COLLECTION_NAME = "nyayasetu_legal_docs"
 VECTOR_SIZE = 384
 
 _qdrant_client = None
+_qdrant_lock = threading.Lock()
 _embedding_model = None
+_embedding_lock = threading.Lock()
 
 def get_qdrant():
+    # Double-checked locking: S2's parallel citation checking calls this from multiple
+    # threads at once (asyncio.to_thread). Without the lock, concurrent first-callers
+    # each try to open the local embedded Qdrant path simultaneously, which fails with
+    # "Storage folder already accessed by another instance" (Qdrant's embedded mode
+    # holds an exclusive file lock) -- caught by search_judgments' try/except and
+    # silently misreported as "Not found in indexed corpus". This was caught in S2
+    # end-to-end testing, not theoretical.
     global _qdrant_client
     if _qdrant_client is None:
-        qdrant_url = os.getenv("QDRANT_URL")
-        qdrant_api_key = os.getenv("QDRANT_API_KEY")
-        
-        if qdrant_url and qdrant_api_key and not qdrant_url.startswith("your_"):
-            try:
-                client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key, timeout=10)
-                client.get_collections()
-                _qdrant_client = client
-            except Exception:
-                print("[RAG] Cloud Qdrant connection failed. Falling back to local embedded Qdrant.")
-                _qdrant_client = QdrantClient(path=QDRANT_PATH)
-        else:
-            _qdrant_client = QdrantClient(path=QDRANT_PATH)
+        with _qdrant_lock:
+            if _qdrant_client is None:
+                qdrant_url = os.getenv("QDRANT_URL")
+                qdrant_api_key = os.getenv("QDRANT_API_KEY")
+
+                if qdrant_url and qdrant_api_key and not qdrant_url.startswith("your_"):
+                    try:
+                        client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key, timeout=10)
+                        client.get_collections()
+                        _qdrant_client = client
+                    except Exception:
+                        print("[RAG] Cloud Qdrant connection failed. Falling back to local embedded Qdrant.")
+                        _qdrant_client = QdrantClient(path=QDRANT_PATH)
+                else:
+                    _qdrant_client = QdrantClient(path=QDRANT_PATH)
     return _qdrant_client
 
 
@@ -42,10 +54,12 @@ def get_embeddings(texts: list, batch_size: int = 32) -> list:
     from fastembed import TextEmbedding
     global _embedding_model
     if _embedding_model is None:
-        num_threads = max(2, (os.cpu_count() or 8) // 2)
-        _embedding_model = TextEmbedding("BAAI/bge-small-en-v1.5", threads=num_threads)
-        print(f"[RAG] FastEmbed model initialized with {num_threads} threads.", flush=True)
-    
+        with _embedding_lock:
+            if _embedding_model is None:
+                num_threads = max(2, (os.cpu_count() or 8) // 2)
+                _embedding_model = TextEmbedding("BAAI/bge-small-en-v1.5", threads=num_threads)
+                print(f"[RAG] FastEmbed model initialized with {num_threads} threads.", flush=True)
+
     all_embeddings = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]

@@ -8,6 +8,7 @@ import {
     ChevronLeft, ChevronRight, FileCheck, CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLocalMode } from '../context/LocalModeContext';
 import './DraftAssistant.css';
 
 const TEMPLATE_GROUPS = [
@@ -45,6 +46,7 @@ const TEMPLATE_GROUPS = [
 const DraftAssistant = () => {
     const navigate = useNavigate();
     const { getAuthHeaders } = useAuth();
+    const { localOnly } = useLocalMode();
     const allTemplates = TEMPLATE_GROUPS.flatMap(g => g.templates);
     const [activeTemplateId, setActiveTemplateId] = useState('bail');
     const currentTemplate = allTemplates.find(t => t.id === activeTemplateId);
@@ -93,7 +95,7 @@ const DraftAssistant = () => {
         try {
             const response = await fetch('/api/documents/draft', {
                 method: 'POST',
-                headers: getAuthHeaders(),
+                headers: { ...getAuthHeaders(), 'X-Local-Only': String(localOnly) },
                 body: JSON.stringify({
                     description: buildDescription(),
                     category: currentTemplate.category,
@@ -237,9 +239,13 @@ const DraftAssistant = () => {
                 {hasGenerated && (
                     <div className="canvas-wrapper">
                         <div className="editor-controls animate-fade-in">
-                            <div className="refinement-status-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: '#f1d1a6', color: '#63120e', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700', border: '1px solid #dfa46f' }}>
-                                <CheckCircle2 size={15} style={{ color: '#10B981' }} />
-                                <span>2-Pass Refined & Auto-Fixed {reviewData?.overall_score ? `(Score: ${reviewData.overall_score}/100)` : '(Verified)'}</span>
+                            <div className="refinement-status-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: localOnly ? '#FEF3C7' : '#f1d1a6', color: localOnly ? '#92400E' : '#63120e', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700', border: localOnly ? '1px solid #F59E0B' : '1px solid #dfa46f' }}>
+                                <CheckCircle2 size={15} style={{ color: localOnly ? '#92400E' : '#10B981' }} />
+                                <span>
+                                    {localOnly
+                                        ? 'Generated locally (Ollama) — 2-Pass refinement skipped in local-only mode'
+                                        : `2-Pass Refined & Auto-Fixed ${reviewData?.overall_score ? `(Score: ${reviewData.overall_score}/100)` : '(Verified)'}`}
+                                </span>
                             </div>
 
                             <div className="editor-actions ml-auto">

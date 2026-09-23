@@ -2,8 +2,19 @@
 
 .intelligence-workspace-layout {
     display: flex;
-    height: 100vh;
-    width: 100vw;
+    /* height: 100vh measures the full browser viewport, ignoring that this
+       element sits inside .main-content's padding-top (added for the mobile
+       hamburger toggle) -- the 100vh box was taller than the visible content
+       area, and the resulting overflow/scroll offset pulled this page's own
+       header up so it rendered partially above the viewport (y:-20 measured
+       directly), crowding the hamburger. 100% respects the parent box, same
+       fix as the width:100vw issue below. */
+    height: 100%;
+    /* width: 100vw measures the full browser viewport, ignoring that this
+       element sits inside the already-padded .main-content -- caught in UX
+       audit as severe layout breakage at phone width (heading covered,
+       cards overlapping the notice banner). 100% respects the parent box. */
+    width: 100%;
     font-family: var(--font-main);
     background: #f9eedc;
 }
@@ -36,7 +47,7 @@
     display: flex;
     flex-direction: column;
     background: #f9eedc;
-    height: 100vh;
+    height: 100%;
 }
 
 /* Header UI */
@@ -565,5 +576,25 @@
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .intelligence-sidebar {
+        display: none;
+    }
+
+    .feed-app-header {
+        padding: 1.5rem 1.25rem 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .suggestion-chips-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-intelligence-card {
+        width: 100%;
     }
 }

@@ -1,0 +1,109 @@
+.walkthrough-shell {
+    max-width: 640px;
+    margin: 0 auto;
+}
+
+.walkthrough-progress {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #8c3a2a;
+    margin-bottom: 0.5rem;
+}
+
+.walkthrough-progress-track {
+    height: 6px;
+    background: #f1d1a6;
+    border-radius: 4px;
+    margin-top: 0.4rem;
+    overflow: hidden;
+}
+
+.walkthrough-progress-fill {
+    height: 100%;
+    background: #c98659;
+    transition: width 0.3s ease;
+}
+
+.walkthrough-card {
+    background: #fcf6ed;
+    border: 1.5px solid #dfa46f;
+    border-radius: 16px;
+    padding: 1.75rem;
+    box-shadow: 0 4px 16px rgba(140, 58, 42, 0.08);
+    min-height: 320px;
+}
+
+.walkthrough-card-top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.walkthrough-card h3 {
+    font-family: var(--font-heading);
+    color: #63120e;
+    font-size: 1.15rem;
+    margin-bottom: 0.35rem;
+}
+
+.walkthrough-meta {
+    color: #8c3a2a;
+    font-size: 0.82rem;
+    margin-bottom: 1.25rem;
+}
+
+.walkthrough-claim h6 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8c3a2a;
+    margin-bottom: 0.4rem;
+}
+
+.walkthrough-claim p {
+    background: #fff8ef;
+    border: 1px solid #dfa46f;
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    color: #3d1a0a;
+    font-size: 0.92rem;
+    line-height: 1.6;
+}
+
+.walkthrough-not-found-note {
+    margin-top: 1rem;
+    background: #E5E7EB;
+    color: #374151;
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.walkthrough-diff-btn {
+    margin-top: 1rem;
+}
+
+.walkthrough-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1.25rem;
+}
+
+.walkthrough-end-signal {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f1d1a6;
+    color: #63120e;
+    font-weight: 700;
+    padding: 0.75rem 1.1rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 600px) {
+    .walkthrough-card { padding: 1.25rem; }
+}
