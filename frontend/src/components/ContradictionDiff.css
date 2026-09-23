@@ -135,6 +135,16 @@
     text-transform: capitalize;
 }
 
+.diff-adjustment-row {
+    margin-top: 0.85rem;
+}
+
+.diff-flag-row {
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px dashed #dfa46f;
+}
+
 @media (max-width: 720px) {
     .diff-split-grid {
         grid-template-columns: 1fr;

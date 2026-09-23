@@ -8,6 +8,9 @@ import { useLocalMode } from '../context/LocalModeContext';
 import { usePersona } from '../context/PersonaContext';
 import PersonaSwitcher from '../components/PersonaSwitcher';
 import CitationStatusBadge, { ConfidenceBars, TechnicalFailureNote } from '../components/CitationStatusBadge';
+import CitationStageList from '../components/CitationStageList';
+import AdjustmentBadge from '../components/AdjustmentBadge';
+import FlagCorrectionButton from '../components/FlagCorrectionButton';
 import CitationWalkthrough from '../components/CitationWalkthrough';
 import ContradictionDiff from '../components/ContradictionDiff';
 import './VerifyFiling.css';
@@ -69,16 +72,21 @@ const VerifyFiling = () => {
     const [verifying, setVerifying] = useState(false);
     const [citationsFound, setCitationsFound] = useState([]);
     const [citationResults, setCitationResults] = useState({});
+    const [citationStages, setCitationStages] = useState({});
     const [completedCount, setCompletedCount] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
     const [doneReport, setDoneReport] = useState(null);
     const [reportId, setReportId] = useState(null);
     const [errorMsg, setErrorMsg] = useState(null);
     const [viewMode, setViewMode] = useState(persona.defaultView);
-    const [diffTarget, setDiffTarget] = useState(null);
+    const [diffTarget, setDiffTargetRaw] = useState(null); // { citation, index }
+    const openDiff = (citation, index) => setDiffTargetRaw({ citation, index });
     const [expandedIdx, setExpandedIdx] = useState(null);
     const [exporting, setExporting] = useState(null); // 'csv' | 'pdf' | null
     const [inputExpanded, setInputExpanded] = useState(true);
+    const [renderLanguage, setRenderLanguage] = useState('en');
+    const [renderedCitations, setRenderedCitations] = useState(null);
+    const [rendering, setRendering] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -97,10 +105,13 @@ const VerifyFiling = () => {
         setReportId(null);
         setCitationsFound([]);
         setCitationResults({});
+        setCitationStages({});
         setCompletedCount(0);
         setTotalCount(0);
         setExpandedIdx(null);
         setInputExpanded(true);
+        setRenderLanguage('en');
+        setRenderedCitations(null);
     };
 
     const runVerification = async (fileToVerify) => {
@@ -123,6 +134,14 @@ const VerifyFiling = () => {
                 if (event.type === 'citations_found') {
                     setCitationsFound(event.citations);
                     setTotalCount(event.total);
+                } else if (event.type === 'stage') {
+                    setCitationStages((prev) => ({
+                        ...prev,
+                        [event.citation_index]: {
+                            ...prev[event.citation_index],
+                            [event.stage]: { status: event.status, reason: event.reason },
+                        },
+                    }));
                 } else if (event.type === 'result') {
                     setCompletedCount(event.completed);
                     setCitationResults((prev) => ({ ...prev, [event.citation_index]: event.citation }));
@@ -163,6 +182,71 @@ const VerifyFiling = () => {
         }
     };
 
+    // A tighten flag takes effect on the pipeline immediately (proven server-side);
+    // optimistically reflect that in the CURRENTLY displayed report too, so the
+    // person flagging sees the change without needing to re-run the whole filing.
+    // A loosen flag stays untouched here -- it must NOT visibly change anything
+    // until an admin confirms it; FlagCorrectionButton's own inline feedback
+    // ("Submitted for review...") is the only thing that changes for that case.
+    const handleFlagged = (idx, response) => {
+        if (response.direction !== 'tighten') return;
+        setDoneReport((prev) => {
+            if (!prev) return prev;
+            const citations = prev.citations.map((c, i) => {
+                if (i !== idx) return c;
+                // Match what the real short-circuited pipeline actually returns
+                // (services/citation_verifier.py: resolve_case/search/entailment
+                // are skipped entirely) -- leaving the old matched_case/matched_text/
+                // entailment in place would show a stale "High Confidence" tag and
+                // the ORIGINAL matched passage next to a verdict that no longer has
+                // any retrieval or entailment behind it. Caught via browser testing.
+                return {
+                    ...c,
+                    status: response.correct_output,
+                    matched_case: null,
+                    paragraph_display: null,
+                    matched_text: null,
+                    entailment: null,
+                    adjusted_from_correction: true,
+                    correction_meta: { system_output: c.status, flagged_at: new Date().toISOString() },
+                };
+            });
+            return { ...prev, citations };
+        });
+    };
+
+    // Harness-sprint Part E: a rendering step over the ALREADY-verified report --
+    // never re-runs verification, never feeds Hindi/Hinglish back into the
+    // pipeline. Falls back to English on any failure rather than showing a
+    // half-translated or broken state.
+    const changeLanguage = async (lang) => {
+        setRenderLanguage(lang);
+        if (lang === 'en' || !reportId) {
+            setRenderedCitations(null);
+            return;
+        }
+        setRendering(true);
+        try {
+            const res = await fetch(`/api/citations/${reportId}/render`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ language: lang }),
+            });
+            if (!res.ok) {
+                const e = await res.json().catch(() => ({}));
+                throw new Error(e.detail || 'Translation failed.');
+            }
+            const data = await res.json();
+            setRenderedCitations(data.citations);
+        } catch (err) {
+            setErrorMsg(err.message);
+            setRenderLanguage('en');
+            setRenderedCitations(null);
+        } finally {
+            setRendering(false);
+        }
+    };
+
     // Plain <a href="/api/citations/export/...">.csv/.pdf never worked -- the
     // JWT lives in localStorage, so a bare browser navigation carries no
     // Authorization header and the export just opened a tab showing a raw
@@ -198,7 +282,24 @@ const VerifyFiling = () => {
         return result ? { ...found, ...result } : found ? { ...found, pending: true } : null;
     });
     const finalCitations = doneReport?.citations || null;
-    const displayCitations = finalCitations || orderedCitations;
+    const baseCitations = finalCitations || orderedCitations;
+    // Harness-sprint Part E: merge translated display text onto the SAME
+    // canonical citation objects -- status/case_name/etc are untouched, only
+    // rendered_claimed_content / entailment.rendered_reasoning are added, so
+    // export and flag-correction (which read the English fields) are
+    // completely unaffected by which language is currently displayed.
+    const displayCitations = baseCitations.map((c, i) => {
+        if (!c || !renderedCitations) return c;
+        const r = renderedCitations[i];
+        if (!r) return c;
+        return {
+            ...c,
+            rendered_claimed_content: r.rendered_claimed_content,
+            entailment: c.entailment
+                ? { ...c.entailment, rendered_reasoning: r.entailment?.rendered_reasoning }
+                : c.entailment,
+        };
+    });
 
     return (
         <div className="verify-wrapper animate-fade-in">
@@ -321,18 +422,34 @@ const VerifyFiling = () => {
                     )}
 
                     {doneReport && (
-                        <div className="view-mode-toggle" role="tablist">
-                            <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>
-                                <LayoutList size={15} /> All results
-                            </button>
-                            <button className={viewMode === 'walkthrough' ? 'active' : ''} onClick={() => setViewMode('walkthrough')}>
-                                <ListOrdered size={15} /> Step-by-step walkthrough
-                            </button>
+                        <div className="view-mode-row">
+                            <div className="view-mode-toggle" role="tablist">
+                                <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>
+                                    <LayoutList size={15} /> All results
+                                </button>
+                                <button className={viewMode === 'walkthrough' ? 'active' : ''} onClick={() => setViewMode('walkthrough')}>
+                                    <ListOrdered size={15} /> Step-by-step walkthrough
+                                </button>
+                            </div>
+
+                            <div className="language-toggle" role="tablist">
+                                {[['en', 'English'], ['hindi', 'हिंदी'], ['hinglish', 'Hinglish']].map(([code, label]) => (
+                                    <button key={code} className={renderLanguage === code ? 'active' : ''} onClick={() => changeLanguage(code)} disabled={rendering}>
+                                        {rendering && renderLanguage === code ? <Loader2 size={13} className="spin" /> : null} {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {renderLanguage !== 'en' && renderedCitations && (
+                        <div className="translation-notice">
+                            <Info size={14} /> Translated from a result verified in English — the verdicts and citation data themselves are unchanged, only this text.
                         </div>
                     )}
 
                     {doneReport && viewMode === 'walkthrough' && (
-                        <CitationWalkthrough citations={displayCitations} onOpenDiff={setDiffTarget} />
+                        <CitationWalkthrough citations={displayCitations} onOpenDiff={openDiff} />
                     )}
 
                     {(!doneReport || viewMode === 'list') && (
@@ -341,9 +458,14 @@ const VerifyFiling = () => {
                                 <CitationCard
                                     key={i}
                                     citation={c}
+                                    stages={citationStages[i]}
                                     expanded={expandedIdx === i}
                                     onToggle={() => setExpandedIdx(expandedIdx === i ? null : i)}
-                                    onOpenDiff={setDiffTarget}
+                                    onOpenDiff={openDiff}
+                                    reportId={reportId}
+                                    citationIndex={i}
+                                    token={token}
+                                    onFlagged={handleFlagged}
                                 />
                             ))}
                         </div>
@@ -359,23 +481,25 @@ const VerifyFiling = () => {
                 </div>
             )}
 
-            {diffTarget && <ContradictionDiff citation={diffTarget} onClose={() => setDiffTarget(null)} />}
+            {diffTarget && (
+                <ContradictionDiff
+                    citation={diffTarget.citation}
+                    onClose={() => setDiffTargetRaw(null)}
+                    reportId={reportId}
+                    citationIndex={diffTarget.index}
+                    token={token}
+                    onFlagged={handleFlagged}
+                />
+            )}
         </div>
     );
 };
 
-const CitationCard = ({ citation, expanded, onToggle, onOpenDiff }) => {
-    if (!citation) {
+const CitationCard = ({ citation, stages, expanded, onToggle, onOpenDiff, reportId, citationIndex, token, onFlagged }) => {
+    if (!citation || citation.pending) {
         return (
             <div className="citation-card pending-card">
-                <Loader2 size={16} className="spin" /> Checking…
-            </div>
-        );
-    }
-    if (citation.pending) {
-        return (
-            <div className="citation-card pending-card">
-                <Loader2 size={16} className="spin" /> Checking <strong>{citation.case_name}</strong>…
+                <CitationStageList stages={stages} caseName={citation?.case_name} />
             </div>
         );
     }
@@ -392,6 +516,7 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff }) => {
                     )}
                 </div>
                 <div className="citation-card-right">
+                    <AdjustmentBadge interactive={false} correctionMeta={citation.adjusted_from_correction ? citation.correction_meta : null} />
                     <CitationStatusBadge status={citation.status} />
                     <ChevronDown size={16} className={`chevron ${expanded ? 'rotated' : ''}`} />
                 </div>
@@ -400,7 +525,9 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff }) => {
             {expanded && (
                 <div className="citation-card-detail animate-fade-in">
                     <p className="detail-label">Claimed in the filing</p>
-                    <p className="detail-claim">{citation.claimed_content || citation.context_snippet}</p>
+                    <p className="detail-claim" lang={citation.rendered_claimed_content ? 'hi' : 'en'}>
+                        {citation.rendered_claimed_content || citation.claimed_content || citation.context_snippet}
+                    </p>
 
                     {citation.status === 'Not found in indexed corpus' && (
                         <p className="detail-not-found">
@@ -418,16 +545,34 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff }) => {
 
                     {citation.entailment?.technical_failure && <TechnicalFailureNote />}
 
+                    {citation.adjusted_from_correction && (
+                        <div className="detail-adjustment-row">
+                            <AdjustmentBadge correctionMeta={citation.correction_meta} />
+                        </div>
+                    )}
+
                     <div className="detail-footer">
                         {citation.entailment?.confidence && !citation.entailment?.technical_failure && (
                             <ConfidenceBars confidence={citation.entailment.confidence} />
                         )}
                         {citation.status === 'Mismatch' && (
-                            <button className="outline btn-sm" onClick={() => onOpenDiff(citation)}>
+                            <button className="outline btn-sm" onClick={() => onOpenDiff(citation, citationIndex)}>
                                 {citation.entailment?.technical_failure ? 'View details' : 'View contradiction'}
                             </button>
                         )}
                     </div>
+
+                    {reportId && (
+                        <div className="detail-flag-row">
+                            <FlagCorrectionButton
+                                reportId={reportId}
+                                citationIndex={citationIndex}
+                                currentStatus={citation.status}
+                                token={token}
+                                onFlagged={onFlagged}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
         </div>

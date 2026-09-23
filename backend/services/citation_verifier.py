@@ -302,17 +302,74 @@ def _paragraph_display(chunk_metadata: dict) -> str:
     return "paragraph not detected — matched passage shown below"
 
 
-def verify_citation(citation: dict) -> dict:
-    """The full per-citation chain: resolve -> retrieve (case-scoped) -> entailment ->
-    cautious-bias three-state mapping. Runs synchronously/blocking; the route layer
-    parallelizes N of these across threads."""
+def _check_correction_memory(case_name: str, citation_string: str):
+    # Short-lived session created and closed within this one call -- safe to call
+    # from a worker thread (each thread gets its own session, never shared).
+    from models.database import SessionLocal
+    from services.correction_memory import check_correction
+    db = SessionLocal()
+    try:
+        return check_correction(db, case_name, citation_string)
+    finally:
+        db.close()
+
+
+def verify_citation(citation: dict, stage_callback=None) -> dict:
+    """The full per-citation chain: correction memory -> resolve -> retrieve
+    (case-scoped) -> entailment -> cautious-bias three-state mapping. Runs
+    synchronously/blocking; the route layer parallelizes N of these across threads.
+
+    stage_callback(stage, status, reason=None), if given, is called at each named
+    stage transition (harness-sprint Part B's pipeline trace) -- started/done for
+    stages that actually run, skipped with a reason for stages that don't. Never
+    faked: a stage is only reported done after the real work for it has happened."""
+    def emit(stage, status, reason=None):
+        if stage_callback:
+            stage_callback(stage, status, reason)
+
     case_name = citation["case_name"]
     citation_string = citation.get("citation_string", "")
     claimed_content = citation.get("claimed_content") or case_name
 
+    # Correction memory (harness-sprint Part A): exact-match short-circuit, checked
+    # BEFORE resolve_case() and the entailment call run at all. Does NOT touch the
+    # entailment model or the cautious-bias mapping below -- it sits in front of the
+    # pipeline, never inside it. Only a status='confirmed' correction is ever
+    # returned here; see services/correction_memory.py for the proof that an
+    # unconfirmed (loosen) flag can never reach this point.
+    emit("checking_correction_memory", "started")
+    correction = _check_correction_memory(case_name, citation_string)
+    emit("checking_correction_memory", "done")
+
+    if correction:
+        emit("resolving_citation", "skipped", "matched a known correction")
+        emit("retrieving_judgment", "skipped", "matched a known correction")
+        emit("running_entailment", "skipped", "matched a known correction")
+        emit("applying_verdict", "done")
+        return {
+            "status": correction.correct_output,
+            "matched_case": None,
+            "paragraph_display": None,
+            "matched_text": None,
+            "entailment": None,
+            "source_link": None,
+            "adjusted_from_correction": True,
+            "correction_meta": {
+                "flagged_by": correction.flagged_by,
+                "flagged_at": correction.flagged_at.isoformat(),
+                "note": correction.note,
+                "system_output": correction.system_output,
+            },
+        }
+
+    emit("resolving_citation", "started")
     case_meta = resolve_case(case_name, citation_string)
+    emit("resolving_citation", "done")
 
     if case_meta is None:
+        emit("retrieving_judgment", "skipped", "case not found in corpus")
+        emit("running_entailment", "skipped", "case not found in corpus")
+        emit("applying_verdict", "done")
         return {
             "status": "Not found in indexed corpus",
             "matched_case": None,
@@ -320,15 +377,20 @@ def verify_citation(citation: dict) -> dict:
             "matched_text": None,
             "entailment": None,
             "source_link": None,
+            "adjusted_from_correction": False,
         }
 
     # Layer 1 (primary): retrieve within THIS case only, then run entailment.
     # Deliberately does not depend on paragraph_numbers at all.
+    emit("retrieving_judgment", "started")
     case_hits = search_judgments(claimed_content, top_k=3, case_id_filter=case_meta["case_id"])
     if not case_hits:
         case_hits = search_judgments(case_name, top_k=1, case_id_filter=case_meta["case_id"])
+    emit("retrieving_judgment", "done")
 
     if not case_hits:
+        emit("running_entailment", "skipped", "no retrievable passage found")
+        emit("applying_verdict", "done")
         return {
             "status": "Mismatch",
             "matched_case": case_meta,
@@ -336,12 +398,16 @@ def verify_citation(citation: dict) -> dict:
             "matched_text": None,
             "entailment": {"verdict": "unclear", "confidence": "low", "reasoning": "Case identified but no retrievable passage found.", "technical_failure": False},
             "source_link": None,
+            "adjusted_from_correction": False,
         }
 
     best_hit = case_hits[0]
     retrieved_text = "\n\n".join(h["text"] for h in case_hits)
+    emit("running_entailment", "started")
     entailment = _run_entailment(claimed_content, retrieved_text)
+    emit("running_entailment", "done")
 
+    emit("applying_verdict", "started")
     # Cautious-bias rule (deterministic, not left to the model): Verified requires
     # entailed AND high confidence. Everything else - contradicted, unclear, or any
     # non-high confidence - defaults to Mismatch. A false Verified is the failure this
@@ -353,6 +419,7 @@ def verify_citation(citation: dict) -> dict:
 
     # Layer 2 (secondary, display-only): never used above to decide the verdict.
     paragraph_display = _paragraph_display(best_hit["metadata"])
+    emit("applying_verdict", "done")
 
     return {
         "status": status,
@@ -361,12 +428,8 @@ def verify_citation(citation: dict) -> dict:
         "matched_text": best_hit["text"][:1000],
         "entailment": entailment,
         "source_link": f"/judgments/{case_meta['case_id']}",
+        "adjusted_from_correction": False,
     }
-
-
-async def _verify_indexed(idx: int, citation: dict) -> tuple:
-    result = await asyncio.to_thread(verify_citation, citation)
-    return idx, citation, result
 
 
 async def verify_filing_stream(filing_text: str):
@@ -415,20 +478,58 @@ async def _verify_filing_stream_inner(filing_text: str):
 
     results = [None] * total
     completed = 0
-    tasks = [asyncio.ensure_future(_verify_indexed(i, c)) for i, c in enumerate(citations)]
 
-    for fut in asyncio.as_completed(tasks):
-        idx, citation, result = await fut
-        completed += 1
-        merged = {**citation, **result}
-        results[idx] = merged
-        yield {
-            "type": "result",
-            "completed": completed,
-            "total": total,
-            "citation_index": idx,
-            "citation": merged,
-        }
+    # Part B (pipeline stage trace): verify_citation runs in a worker thread
+    # (asyncio.to_thread) and reports stage transitions via stage_callback. That
+    # callback fires from the WORKER thread, so it hands events to the event loop
+    # via call_soon_threadsafe rather than awaiting directly -- both stage events
+    # and final "result" events land on the same queue, so a single consumer loop
+    # yields everything in true arrival order, interleaved across all citations
+    # running in parallel (not batched per-citation, not faked/delayed).
+    loop = asyncio.get_running_loop()
+    event_queue: asyncio.Queue = asyncio.Queue()
+
+    def _make_stage_callback(idx):
+        def _callback(stage, status, reason=None):
+            loop.call_soon_threadsafe(
+                event_queue.put_nowait,
+                {"type": "stage", "citation_index": idx, "stage": stage, "status": status, "reason": reason},
+            )
+        return _callback
+
+    async def _run_one(idx, citation):
+        result = await asyncio.to_thread(verify_citation, citation, _make_stage_callback(idx))
+        await event_queue.put({"type": "result_ready", "citation_index": idx, "citation": citation, "result": result})
+
+    tasks = [asyncio.ensure_future(_run_one(i, c)) for i, c in enumerate(citations)]
+
+    finished = 0
+    while finished < total:
+        event = await event_queue.get()
+        if event["type"] == "stage":
+            yield {
+                "type": "stage",
+                "citation_index": event["citation_index"],
+                "total": total,
+                "stage": event["stage"],
+                "status": event["status"],
+                "reason": event["reason"],
+            }
+        else:  # result_ready
+            idx = event["citation_index"]
+            merged = {**event["citation"], **event["result"]}
+            results[idx] = merged
+            completed += 1
+            finished += 1
+            yield {
+                "type": "result",
+                "completed": completed,
+                "total": total,
+                "citation_index": idx,
+                "citation": merged,
+            }
+
+    await asyncio.gather(*tasks)  # propagate any task exception; all are already done here
 
     summary = {
         "total": total,
@@ -436,6 +537,7 @@ async def _verify_filing_stream_inner(filing_text: str):
         "mismatch": sum(1 for r in results if r["status"] == "Mismatch"),
         "not_found": sum(1 for r in results if r["status"] == "Not found in indexed corpus"),
         "technical_failures": sum(1 for r in results if (r.get("entailment") or {}).get("technical_failure")),
+        "adjusted_from_correction": sum(1 for r in results if r.get("adjusted_from_correction")),
     }
 
     yield {
@@ -447,4 +549,72 @@ async def _verify_filing_stream_inner(filing_text: str):
             "summary": summary,
             "coverage_banner": get_coverage_banner(),
         },
+    }
+
+
+# Harness-sprint Part E: Hindi/Hinglish is a RENDERING step over an
+# already-verified result, never an input to verification -- no citation is ever
+# (re-)checked in Hindi. Only free-text display fields (the claim as stated in
+# the filing, and the entailment reasoning) get translated; every structured
+# field (status, case_name, dates, direction, etc.) is copied through
+# untouched, so the underlying verdict data is byte-identical to the English
+# version -- only display text changes. No Hindi/Hinglish INPUT understanding
+# is attempted here, per the brief's explicit scope boundary.
+TRANSLATION_LABEL = "Translated from a result verified in English"
+
+_RENDER_LANGUAGE_INSTRUCTIONS = {
+    "hindi": "Translate into formal Hindi, written in the Devanagari script.",
+    "hinglish": "Translate into Hinglish -- colloquial Hindi written in the Roman/Latin alphabet, the way Indian speakers commonly write it in chat/text (not Devanagari).",
+}
+
+
+def render_report_in_language(report: dict, language: str) -> dict:
+    if language not in _RENDER_LANGUAGE_INSTRUCTIONS:
+        raise ValueError(f"Unsupported language: {language!r}. Use 'hindi' or 'hinglish'.")
+
+    citations = report.get("citations", [])
+    # Collect the free-text fields worth translating, keyed by citation index
+    # so the response can be mapped back unambiguously.
+    texts = {}
+    for i, c in enumerate(citations):
+        claim = c.get("claimed_content") or c.get("context_snippet") or ""
+        if claim:
+            texts[f"{i}_claim"] = claim
+        reasoning = (c.get("entailment") or {}).get("reasoning") or ""
+        if reasoning:
+            texts[f"{i}_reasoning"] = reasoning
+
+    translated = {}
+    if texts:
+        system_prompt = (
+            f"{_RENDER_LANGUAGE_INSTRUCTIONS[language]} You will receive a JSON object mapping "
+            "keys to short English legal-filing text snippets. Translate each value. Keep case "
+            "names, court names, section numbers, and Act names in their original English/Latin "
+            "form (do not transliterate proper nouns or legal citations) -- translate only the "
+            "surrounding descriptive language. Respond with ONLY a JSON object using the exact "
+            "same keys, each mapped to its translated value."
+        )
+        raw = call_llm(system_prompt, json.dumps(texts), json_mode=True)
+        parsed = _parse_json_object(raw)
+        if isinstance(parsed, dict):
+            translated = parsed
+
+    rendered_citations = []
+    for i, c in enumerate(citations):
+        # Structured fields copied through untouched -- this is what makes the
+        # acceptance test's "byte-identical underlying data" claim true, not
+        # just documented intent.
+        rendered = dict(c)
+        claim_key, reasoning_key = f"{i}_claim", f"{i}_reasoning"
+        if claim_key in translated:
+            rendered["rendered_claimed_content"] = translated[claim_key]
+        if reasoning_key in translated and rendered.get("entailment"):
+            rendered["entailment"] = {**rendered["entailment"], "rendered_reasoning": translated[reasoning_key]}
+        rendered_citations.append(rendered)
+
+    return {
+        **report,
+        "citations": rendered_citations,
+        "rendered_language": language,
+        "translation_label": TRANSLATION_LABEL,
     }

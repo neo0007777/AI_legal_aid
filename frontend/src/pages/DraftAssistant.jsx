@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
+import VoiceInputButton from '../components/VoiceInputButton';
 import './DraftAssistant.css';
 
 const TEMPLATE_GROUPS = [
@@ -201,12 +202,20 @@ const DraftAssistant = () => {
                                         <div key={field.id} className={`form-group-premium ${field.type === 'textarea' ? 'full-width' : ''}`}>
                                             <label>{field.label}</label>
                                             {field.type === 'textarea' ? (
-                                                <textarea
-                                                    rows="3"
-                                                    placeholder={field.placeholder}
-                                                    value={formData[field.id] || ''}
-                                                    onChange={(e) => handleInputChange(field.id, e.target.value)}
-                                                />
+                                                <div className="textarea-with-voice">
+                                                    <textarea
+                                                        rows="3"
+                                                        placeholder={field.placeholder}
+                                                        value={formData[field.id] || ''}
+                                                        onChange={(e) => handleInputChange(field.id, e.target.value)}
+                                                    />
+                                                    <VoiceInputButton
+                                                        onTranscript={(text) => handleInputChange(
+                                                            field.id,
+                                                            (formData[field.id] ? formData[field.id] + ' ' : '') + text
+                                                        )}
+                                                    />
+                                                </div>
                                             ) : (
                                                 <input
                                                     type="text"

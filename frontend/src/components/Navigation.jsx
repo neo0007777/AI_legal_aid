@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Scale, BookOpen, MessageSquare, Home as HomeIcon, FileSearch, Clock, User, LogOut, FileCheck, ShieldCheck, Menu, X } from 'lucide-react';
+import { Scale, BookOpen, MessageSquare, Home as HomeIcon, FileSearch, Clock, User, LogOut, FileCheck, ShieldCheck, Menu, X, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import LocalModeToggle from './LocalModeToggle';
 import './Navigation.css';
@@ -75,6 +75,11 @@ const Navigation = () => {
                     <NavLink to="/legal-aid" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
                         <MessageSquare size={18} /> AI Legal Aid
                     </NavLink>
+                    {user?.plan === 'admin' && (
+                        <NavLink to="/admin/corrections" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                            <ShieldAlert size={18} /> Correction Memory
+                        </NavLink>
+                    )}
                 </div>
             </div>
 

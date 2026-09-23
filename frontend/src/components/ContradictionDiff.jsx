@@ -1,11 +1,15 @@
 import { createPortal } from 'react-dom';
 import { X, AlertTriangle, Quote, RefreshCw } from 'lucide-react';
+import AdjustmentBadge from './AdjustmentBadge';
+import FlagCorrectionButton from './FlagCorrectionButton';
 import './ContradictionDiff.css';
 
 // S3 Task 3: an actual side-by-side comparison, not a text dump. The one-line
 // entailment.reasoning is the lede (surfaced first, large) so a first-time
 // viewer sees WHY it's a mismatch before reading either full passage.
-const ContradictionDiff = ({ citation, onClose }) => {
+// Harness-sprint Part A: also hosts "Flag this result" -- the brief names both
+// the citation trail AND this diff view as required flag entry points.
+const ContradictionDiff = ({ citation, onClose, reportId, citationIndex, token, onFlagged }) => {
     if (!citation) return null;
 
     const claim = citation.claimed_content || citation.context_snippet || '(no claim text captured)';
@@ -72,6 +76,24 @@ const ContradictionDiff = ({ citation, onClose }) => {
                     Model verdict: <strong>{verdict}</strong>
                     {citation.paragraph_display && <span> · {citation.paragraph_display}</span>}
                 </div>
+
+                {citation.adjusted_from_correction && (
+                    <div className="diff-adjustment-row">
+                        <AdjustmentBadge correctionMeta={citation.correction_meta} />
+                    </div>
+                )}
+
+                {reportId && citationIndex != null && (
+                    <div className="diff-flag-row">
+                        <FlagCorrectionButton
+                            reportId={reportId}
+                            citationIndex={citationIndex}
+                            currentStatus={citation.status}
+                            token={token}
+                            onFlagged={onFlagged}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     ), document.body);

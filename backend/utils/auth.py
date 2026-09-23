@@ -64,3 +64,11 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="User not found or deactivated")
 
     return user
+
+
+def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    # Reuses the existing `role` field rather than a real roles/permissions system --
+    # explicitly out of scope for this sprint per the brief.
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user

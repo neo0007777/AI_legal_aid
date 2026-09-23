@@ -57,7 +57,7 @@ const CitationWalkthrough = ({ citations, onOpenDiff }) => {
                 )}
 
                 {citation.status === 'Mismatch' && (
-                    <button className="outline walkthrough-diff-btn" onClick={() => onOpenDiff(citation)}>
+                    <button className="outline walkthrough-diff-btn" onClick={() => onOpenDiff(citation, index)}>
                         <ExternalLink size={15} /> {citation.entailment?.technical_failure ? 'View details' : 'View contradiction'}
                     </button>
                 )}
