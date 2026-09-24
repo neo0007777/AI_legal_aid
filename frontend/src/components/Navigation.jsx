@@ -78,7 +78,7 @@ const Navigation = () => {
                     <NavLink to="/legal-aid" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
                         <MessageSquare size={18} /> AI Legal Aid
                     </NavLink>
-                    {user?.role === 'admin' && (
+                    {(user?.role === 'admin' || user?.role === 'advocate') && (
                         <NavLink to="/admin/corrections" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
                             <ShieldAlert size={18} /> Correction Memory
                         </NavLink>
