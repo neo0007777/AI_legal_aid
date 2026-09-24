@@ -84,6 +84,28 @@ class QueryLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Correction(Base):
+    """Correction Memory: a deterministic, auditable log of
+    human-flagged verdict corrections, checked BEFORE the normal verification
+    pipeline runs. Direction is NOT symmetric -- see services/correction_memory.py
+    for why 'tighten' (toward Mismatch/Not-found) takes effect immediately while
+    'loosen' (toward Verified) requires explicit admin confirmation first."""
+    __tablename__ = "corrections"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    trigger_type = Column(String, nullable=False)  # citation_verdict | case_resolution
+    input_signature = Column(String, nullable=False, index=True)  # normalized case_name + citation_string, exact-match only
+    system_output = Column(String, nullable=False)
+    correct_output = Column(String, nullable=False)
+    direction = Column(String, nullable=False)  # tighten | loosen
+    status = Column(String, default="pending_review", index=True)  # confirmed | pending_review | rejected
+    flagged_by = Column(String, ForeignKey("users.id"), nullable=False)
+    flagged_at = Column(DateTime, default=datetime.utcnow)
+    note = Column(Text, nullable=True)
+    reviewed_by = Column(String, ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+
+
 class SearchCache(Base):
     __tablename__ = "search_cache"
 

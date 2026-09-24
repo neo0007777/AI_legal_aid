@@ -182,6 +182,16 @@
     letter-spacing: 0.5px;
 }
 
+.textarea-with-voice {
+    position: relative;
+}
+
+.textarea-with-voice .voice-input-btn {
+    position: absolute;
+    right: 0.6rem;
+    bottom: 0.6rem;
+}
+
 .form-group-premium input,
 .form-group-premium textarea {
     width: 100%;

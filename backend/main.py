@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 from models.database import create_tables, SessionLocal
 from services.compliance_fetcher import refresh_compliance_alerts
-from routes import auth, workflow, compliance, documents, cases, legal_aid, review, citations, statutes
+from routes import auth, workflow, compliance, documents, cases, legal_aid, review, citations, statutes, admin
 
 load_dotenv()
 
@@ -75,6 +75,7 @@ app.include_router(legal_aid.router,  prefix="/legal-aid",  tags=["Legal Aid"])
 app.include_router(review.router,     prefix="/review",     tags=["Legal Draft Review"])
 app.include_router(citations.router,  prefix="/citations",  tags=["Citation Verification"])
 app.include_router(statutes.router,   prefix="/statutes",   tags=["Statutes & India Code"])
+app.include_router(admin.router,      prefix="/admin",      tags=["Admin"])
 
 
 @app.get("/", tags=["Health"])

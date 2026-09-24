@@ -390,6 +390,29 @@ def verify_citation(citation: dict) -> dict:
 
     parsed = parse_citation(case_name, citation_string, context_snippet)
 
+    # ── CORRECTION MEMORY PRE-CHECK ──
+    adjusted_from_correction = False
+    correction_meta = None
+    try:
+        from models.database import SessionLocal
+        from services.correction_memory import check_correction
+        _db = SessionLocal()
+        try:
+            corr = check_correction(_db, case_name, citation_string)
+            if corr:
+                adjusted_from_correction = True
+                correction_meta = {
+                    "system_output": corr.system_output,
+                    "correct_output": corr.correct_output,
+                    "direction": corr.direction,
+                    "flagged_at": corr.flagged_at.isoformat() if corr.flagged_at else None,
+                    "note": corr.note,
+                }
+        finally:
+            _db.close()
+    except Exception as e:
+        print(f"[CitationVerifier] Correction check notice: {e}")
+
     # Variables for Stage 10 result model
     identity_status = "NOT_FOUND_IN_INDEXED_CORPUS"
     matched_authority = None
@@ -509,6 +532,9 @@ def verify_citation(citation: dict) -> dict:
     else:
         display_status = "Not Indexed / Not Found"
 
+    if adjusted_from_correction and correction_meta:
+        display_status = correction_meta["correct_output"]
+
     # ── STAGE 10: Assemble Complete Result Model ─────────────────────────────
     source_name = "Indexed corpus (Supreme Court)" if retrieval_source == "internal" else (
         "Indian Kanoon" if retrieval_source == "external" else None
@@ -553,6 +579,8 @@ def verify_citation(citation: dict) -> dict:
         "matched_case": matched_authority,
         "paragraph_display": paragraph_display,
         "matched_text": evidence_passage[:1200] if evidence_passage else None,
+        "adjusted_from_correction": adjusted_from_correction,
+        "correction_meta": correction_meta,
         "entailment": {
             "verdict": "entailed" if proposition_status == "SUPPORTED" else (
                 "contradicted" if proposition_status == "CONTRADICTED" else "unclear"
@@ -643,6 +671,7 @@ async def _verify_filing_stream_inner(filing_text: str):
         "not_found": sum(1 for r in results if r["status"] in ("Not Indexed / Not Found", "Possible Fabrication", "Unverified Citation")),
         "external_error": sum(1 for r in results if r["status"] == "External Source Error"),
         "technical_failures": sum(1 for r in results if (r.get("proposition_verification") or {}).get("technical_failure")),
+        "adjusted_from_correction": sum(1 for r in results if r.get("adjusted_from_correction")),
     }
 
     yield {
@@ -654,4 +683,78 @@ async def _verify_filing_stream_inner(filing_text: str):
             "summary": summary,
             "coverage_banner": get_coverage_banner(),
         },
+    }
+
+
+# ── Report Rendering (Hindi / Hinglish Translation) ───────────────────────────
+TRANSLATION_LABEL = "Translated from a result verified in English"
+
+_RENDER_LANGUAGE_INSTRUCTIONS = {
+    "hindi": "Translate into formal Hindi, written in the Devanagari script.",
+    "hinglish": "Translate into Hinglish -- colloquial Hindi written in the Roman/Latin alphabet, the way Indian speakers commonly write it in chat/text (not Devanagari).",
+}
+
+
+def render_report_in_language(report: dict, language: str) -> dict:
+    if language not in _RENDER_LANGUAGE_INSTRUCTIONS:
+        raise ValueError(f"Unsupported language: {language!r}. Use 'hindi' or 'hinglish'.")
+
+    citations = report.get("citations", [])
+    texts = {}
+    for i, c in enumerate(citations):
+        claim = c.get("claimed_content") or c.get("context_snippet") or ""
+        if claim:
+            texts[f"{i}_claim"] = claim
+        prop_ver = c.get("proposition_verification") or {}
+        reasoning = prop_ver.get("reasoning") or (c.get("entailment") or {}).get("reasoning") or ""
+        if reasoning:
+            texts[f"{i}_reasoning"] = reasoning
+
+    translated = {}
+    if texts:
+        system_prompt = (
+            f"{_RENDER_LANGUAGE_INSTRUCTIONS[language]} You will receive a JSON object mapping "
+            "keys to short English legal-filing text snippets. Translate each value. Keep case "
+            "names, court names, section numbers, and Act names in their original English/Latin "
+            "form (do not transliterate proper nouns or legal citations) -- translate only the "
+            "surrounding descriptive language. Respond with ONLY a JSON object using the exact "
+            "same keys, each mapped to its translated value."
+        )
+        try:
+            raw = call_llm(system_prompt, json.dumps(texts), json_mode=True)
+            clean = raw.strip()
+            if "```json" in clean:
+                clean = clean.split("```json")[1].split("```")[0].strip()
+            elif "```" in clean:
+                clean = clean.split("```")[1].strip()
+            parsed = json.loads(clean)
+            if isinstance(parsed, dict):
+                translated = parsed
+        except Exception as e:
+            print(f"[CitationVerifier] Translation error: {e}")
+
+    rendered_citations = []
+    for i, c in enumerate(citations):
+        rendered = dict(c)
+        claim_key, reasoning_key = f"{i}_claim", f"{i}_reasoning"
+        if claim_key in translated:
+            rendered["rendered_claimed_content"] = translated[claim_key]
+        if reasoning_key in translated:
+            if rendered.get("proposition_verification"):
+                rendered["proposition_verification"] = {
+                    **rendered["proposition_verification"],
+                    "rendered_reasoning": translated[reasoning_key],
+                }
+            if rendered.get("entailment"):
+                rendered["entailment"] = {
+                    **rendered["entailment"],
+                    "rendered_reasoning": translated[reasoning_key],
+                }
+        rendered_citations.append(rendered)
+
+    return {
+        **report,
+        "citations": rendered_citations,
+        "rendered_language": language,
+        "translation_label": TRANSLATION_LABEL,
     }

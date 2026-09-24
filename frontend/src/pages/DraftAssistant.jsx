@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
+import VoiceInputButton from '../components/VoiceInputButton';
 import './DraftAssistant.css';
 
 // Material fields per template — these are flagged if missing
@@ -286,12 +287,20 @@ const DraftAssistant = () => {
                                                 {field.material && <span className="material-badge" title="Important for accuracy">Required</span>}
                                             </label>
                                             {field.type === 'textarea' ? (
-                                                <textarea
-                                                    rows="3"
-                                                    placeholder={field.placeholder}
-                                                    value={formData[field.id] || ''}
-                                                    onChange={(e) => handleInputChange(field.id, e.target.value)}
-                                                />
+                                                <div className="textarea-with-voice">
+                                                    <textarea
+                                                        rows="3"
+                                                        placeholder={field.placeholder}
+                                                        value={formData[field.id] || ''}
+                                                        onChange={(e) => handleInputChange(field.id, e.target.value)}
+                                                    />
+                                                    <VoiceInputButton
+                                                        onTranscript={(text) => handleInputChange(
+                                                            field.id,
+                                                            (formData[field.id] ? formData[field.id] + ' ' : '') + text
+                                                        )}
+                                                    />
+                                                </div>
                                             ) : (
                                                 <input
                                                     type="text"

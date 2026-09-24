@@ -6,9 +6,11 @@ import uuid
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 
-from models.database import User
-from services.citation_verifier import verify_filing_stream
+from models.database import User, get_db
+from models.schemas import FlagCorrectionRequest, RenderLanguageRequest
+from services.citation_verifier import verify_filing_stream, render_report_in_language
 from services.judgment_search import get_coverage_stats, get_coverage_banner
 from utils.auth import get_current_user
 from utils.document_loader import load_pdf_bytes
@@ -66,18 +68,80 @@ async def verify_filing(
     async def event_gen():
         async for event in verify_filing_stream(text):
             if event["type"] == "done":
-                _REPORT_STORE[report_id] = {"report": event["report"], "ts": time.time()}
+                _REPORT_STORE[report_id] = {"report": event["report"], "filing_text": text, "ts": time.time()}
                 event = {**event, "report_id": report_id}
             yield f"data: {json.dumps(event)}\n\n"
 
     return StreamingResponse(event_gen(), media_type="text/event-stream")
 
 
-def _get_report(report_id: str) -> dict:
+def _get_entry(report_id: str) -> dict:
     entry = _REPORT_STORE.get(report_id)
     if not entry or (time.time() - entry["ts"]) > _REPORT_TTL_SECONDS:
         raise HTTPException(status_code=404, detail="Report not found or expired. Re-run verify-filing.")
-    return entry["report"]
+    return entry
+
+
+def _get_report(report_id: str) -> dict:
+    return _get_entry(report_id)["report"]
+
+
+@router.post("/{result_id}/flag-correction")
+def flag_correction(
+    result_id: str,
+    body: FlagCorrectionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        report_id, idx_str = result_id.rsplit(":", 1)
+        idx = int(idx_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid result_id format; expected '<report_id>:<citation_index>'.")
+
+    report = _get_report(report_id)
+    citations = report["citations"]
+    if idx < 0 or idx >= len(citations):
+        raise HTTPException(status_code=404, detail="Citation not found in this report.")
+
+    citation = citations[idx]
+    case_name = citation.get("case_name", "")
+    citation_string = citation.get("citation_string", "")
+    system_output = citation.get("status")
+
+    from services import correction_memory as cm
+    if body.correct_output not in cm.STATE_ORDER:
+        raise HTTPException(status_code=400, detail=f"correct_output must be one of {list(cm.STATE_ORDER)}.")
+    if body.correct_output == system_output:
+        raise HTTPException(status_code=400, detail="correct_output must differ from the system's current verdict.")
+
+    row = cm.create_correction(
+        db, trigger_type="citation_verdict", case_name=case_name, citation_string=citation_string,
+        system_output=system_output, correct_output=body.correct_output,
+        flagged_by=current_user.id, note=body.note,
+    )
+    return {
+        "id": row.id,
+        "direction": row.direction,
+        "status": row.status,
+        "message": (
+            "Applied immediately."
+            if row.direction == "tighten"
+            else "Submitted for review — won't change results until confirmed."
+        ),
+    }
+
+
+@router.post("/{report_id}/render")
+def render_language(report_id: str, body: RenderLanguageRequest, current_user: User = Depends(get_current_user)):
+    if body.language not in ("hindi", "hinglish"):
+        raise HTTPException(status_code=400, detail="language must be 'hindi' or 'hinglish'.")
+    report = _get_report(report_id)
+    try:
+        return render_report_in_language(report, body.language)
+    except Exception as e:
+        print(f"[Citations] render_language failed: {e}")
+        raise HTTPException(status_code=503, detail="Translation service was unavailable. Please try again.")
 
 
 @router.get("/export/{report_id}.csv")
@@ -110,7 +174,9 @@ def export_csv(report_id: str, current_user: User = Depends(get_current_user)):
 
 @router.get("/export/{report_id}.pdf")
 def export_pdf(report_id: str, current_user: User = Depends(get_current_user)):
-    report = _get_report(report_id)
+    entry = _get_entry(report_id)
+    report = entry["report"]
+    filing_text = entry.get("filing_text", "")
     from fpdf import FPDF
 
     pdf = FPDF()
@@ -129,6 +195,16 @@ def export_pdf(report_id: str, current_user: User = Depends(get_current_user)):
     )
     pdf.write(6, _pdf_safe(summary_line) + "\n\n")
 
+    if filing_text:
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.write(7, _pdf_safe("Full Filing Text") + "\n")
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(60, 40, 20)
+        pdf.write(5, _pdf_safe(filing_text[:10000]) + "\n\n")
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.write(7, _pdf_safe("Citations Found in This Filing") + "\n\n")
+
     for c in report["citations"]:
         case = c.get("matched_case") or (c.get("citation_identity") or {}).get("matched_case") or {}
         case_name = case.get("case_name") or c.get("case_name", "")
@@ -141,7 +217,21 @@ def export_pdf(report_id: str, current_user: User = Depends(get_current_user)):
         pdf.write(5, _pdf_safe(
             f"Court: {case.get('court', 'N/A')}   Date: {case.get('date', 'N/A')}   "
             f"Status: {c.get('status', '')}   [Identity: {id_status}, Proposition: {prop_status}]"
-        ) + "\n\n")
+        ) + "\n")
+
+        if c.get("adjusted_from_correction"):
+            meta = c.get("correction_meta") or {}
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.set_text_color(109, 40, 217)
+            footnote = f"* Adjusted from prior human correction"
+            if meta.get("system_output"):
+                footnote += f" (originally: {meta['system_output']})"
+            if meta.get("note"):
+                footnote += f' - "{meta["note"]}"'
+            pdf.write(4, _pdf_safe(footnote) + "\n")
+            pdf.set_text_color(0, 0, 0)
+
+        pdf.write(4, "\n")
 
 
     pdf_bytes = bytes(pdf.output())

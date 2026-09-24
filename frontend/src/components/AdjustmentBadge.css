@@ -1,0 +1,46 @@
+.adjustment-badge-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.adjustment-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: transparent;
+    border: 1.5px dashed #8b5cf6;
+    color: #6d28d9;
+}
+
+.adjustment-badge:hover {
+    background: rgba(139, 92, 246, 0.08);
+    transform: none;
+}
+
+.adjustment-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 20;
+    background: #fff8ef;
+    border: 1px solid #8b5cf6;
+    border-radius: 10px;
+    padding: 0.75rem 0.9rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    min-width: 240px;
+}
+
+.adjustment-popover p {
+    font-size: 0.78rem;
+    color: #3d1a0a;
+    margin: 0 0 0.35rem;
+    line-height: 1.4;
+}
+
+.adjustment-popover p:last-child {
+    margin-bottom: 0;
+}

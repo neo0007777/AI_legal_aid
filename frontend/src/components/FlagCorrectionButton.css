@@ -1,0 +1,59 @@
+.flag-correction-trigger {
+    align-self: flex-start;
+}
+
+.flag-correction-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: #f6e2c6;
+    border: 1px solid #dfa46f;
+    border-radius: 10px;
+    padding: 0.85rem;
+    max-width: 360px;
+}
+
+.flag-correction-form label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #63120e;
+}
+
+.flag-correction-form select,
+.flag-correction-form textarea {
+    width: 100%;
+    font-size: 0.85rem;
+}
+
+.flag-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.flag-error {
+    color: #991B1B;
+    font-size: 0.78rem;
+    margin: 0;
+}
+
+.flag-feedback {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    max-width: 360px;
+}
+
+.flag-feedback.tighten {
+    background: #D1FAE5;
+    color: #065F46;
+}
+
+.flag-feedback.loosen {
+    background: #FEF3C7;
+    color: #92400E;
+}

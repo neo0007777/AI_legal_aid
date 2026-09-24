@@ -14,6 +14,8 @@ import CitationStatusBadge, {
 } from '../components/CitationStatusBadge';
 import CitationWalkthrough from '../components/CitationWalkthrough';
 import ContradictionDiff from '../components/ContradictionDiff';
+import AdjustmentBadge from '../components/AdjustmentBadge';
+import FlagCorrectionButton from '../components/FlagCorrectionButton';
 import './VerifyFiling.css';
 
 
@@ -84,6 +86,9 @@ const VerifyFiling = () => {
     const [expandedIdx, setExpandedIdx] = useState(null);
     const [exporting, setExporting] = useState(null); // 'csv' | 'pdf' | null
     const [inputExpanded, setInputExpanded] = useState(true);
+    const [renderLanguage, setRenderLanguage] = useState('en');
+    const [renderedCitations, setRenderedCitations] = useState(null);
+    const [rendering, setRendering] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -106,6 +111,64 @@ const VerifyFiling = () => {
         setTotalCount(0);
         setExpandedIdx(null);
         setInputExpanded(true);
+        setRenderLanguage('en');
+        setRenderedCitations(null);
+        setRendering(false);
+    };
+
+    const changeLanguage = async (targetLang) => {
+        if (!reportId || targetLang === renderLanguage) return;
+        if (targetLang === 'en') {
+            setRenderLanguage('en');
+            setRenderedCitations(null);
+            return;
+        }
+        setRendering(true);
+        try {
+            const res = await fetch(`/api/citations/${reportId}/render`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ language: targetLang }),
+            });
+            if (!res.ok) throw new Error(`Render failed: ${res.status}`);
+            const data = await res.json();
+            setRenderedCitations(data.citations);
+            setRenderLanguage(targetLang);
+        } catch (err) {
+            console.error('Translation error:', err);
+        } finally {
+            setRendering(false);
+        }
+    };
+
+    const handleFlagged = (idx, newStatus, meta) => {
+        setCitationResults((prev) => {
+            const copy = { ...prev };
+            if (copy[idx]) {
+                copy[idx] = {
+                    ...copy[idx],
+                    status: newStatus,
+                    adjusted_from_correction: true,
+                    correction_meta: meta,
+                };
+            }
+            return copy;
+        });
+        if (doneReport) {
+            setDoneReport((prev) => {
+                if (!prev) return prev;
+                const copyCitations = [...prev.citations];
+                if (copyCitations[idx]) {
+                    copyCitations[idx] = {
+                        ...copyCitations[idx],
+                        status: newStatus,
+                        adjusted_from_correction: true,
+                        correction_meta: meta,
+                    };
+                }
+                return { ...prev, citations: copyCitations };
+            });
+        }
     };
 
     const runVerification = async (fileToVerify) => {
@@ -203,7 +266,8 @@ const VerifyFiling = () => {
         return result ? { ...found, ...result } : found ? { ...found, pending: true } : null;
     });
     const finalCitations = doneReport?.citations || null;
-    const displayCitations = finalCitations || orderedCitations;
+    const baseCitations = finalCitations || orderedCitations;
+    const displayCitations = renderedCitations || baseCitations;
 
     return (
         <div className="verify-wrapper animate-fade-in">
@@ -340,13 +404,34 @@ const VerifyFiling = () => {
                     )}
 
                     {doneReport && (
-                        <div className="view-mode-toggle" role="tablist">
-                            <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>
-                                <LayoutList size={15} /> All results
-                            </button>
-                            <button className={viewMode === 'walkthrough' ? 'active' : ''} onClick={() => setViewMode('walkthrough')}>
-                                <ListOrdered size={15} /> Step-by-step walkthrough
-                            </button>
+                        <div className="view-mode-row">
+                            <div className="view-mode-toggle" role="tablist">
+                                <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>
+                                    <LayoutList size={15} /> All results
+                                </button>
+                                <button className={viewMode === 'walkthrough' ? 'active' : ''} onClick={() => setViewMode('walkthrough')}>
+                                    <ListOrdered size={15} /> Step-by-step walkthrough
+                                </button>
+                            </div>
+
+                            <div className="language-toggle" role="tablist">
+                                {[['en', 'English'], ['hindi', 'हिंदी'], ['hinglish', 'Hinglish']].map(([code, label]) => (
+                                    <button
+                                        key={code}
+                                        className={renderLanguage === code ? 'active' : ''}
+                                        onClick={() => changeLanguage(code)}
+                                        disabled={rendering}
+                                    >
+                                        {rendering && renderLanguage === code ? <Loader2 size={13} className="spin" /> : null} {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {renderLanguage !== 'en' && renderedCitations && (
+                        <div className="translation-notice">
+                            <Info size={14} /> Translated from a result verified in English — the verdicts and citation data themselves are unchanged, only this text.
                         </div>
                     )}
 
@@ -363,6 +448,10 @@ const VerifyFiling = () => {
                                     expanded={expandedIdx === i}
                                     onToggle={() => setExpandedIdx(expandedIdx === i ? null : i)}
                                     onOpenDiff={setDiffTarget}
+                                    reportId={reportId}
+                                    citationIndex={i}
+                                    token={token}
+                                    onFlagged={handleFlagged}
                                 />
                             ))}
                         </div>
@@ -383,7 +472,7 @@ const VerifyFiling = () => {
     );
 };
 
-const CitationCard = ({ citation, expanded, onToggle, onOpenDiff }) => {
+const CitationCard = ({ citation, expanded, onToggle, onOpenDiff, reportId, citationIndex, token, onFlagged }) => {
     if (!citation) {
         return (
             <div className="citation-card pending-card">
@@ -429,6 +518,7 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff }) => {
                     </span>
                 </div>
                 <div className="citation-card-right">
+                    <AdjustmentBadge interactive={false} correctionMeta={citation.adjusted_from_correction ? citation.correction_meta : null} />
                     <RetrievalSourceBadge
                         retrievalSource={citation.retrieval_source}
                         externalLookup={citation.external_lookup}
@@ -614,6 +704,12 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff }) => {
 
                     {citation.entailment?.technical_failure && <TechnicalFailureNote />}
 
+                    {citation.adjusted_from_correction && (
+                        <div className="detail-adjustment-row">
+                            <AdjustmentBadge correctionMeta={citation.correction_meta} />
+                        </div>
+                    )}
+
                     <div className="detail-footer">
                         {citation.entailment?.confidence && !citation.entailment?.technical_failure && (
                             <ConfidenceBars confidence={citation.entailment.confidence} />
@@ -624,6 +720,18 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff }) => {
                             </button>
                         )}
                     </div>
+
+                    {reportId && (
+                        <div className="detail-flag-row">
+                            <FlagCorrectionButton
+                                reportId={reportId}
+                                citationIndex={citationIndex}
+                                currentStatus={citation.status}
+                                token={token}
+                                onFlagged={onFlagged}
+                            />
+                        </div>
+                    )}
                 </div>
             )}
         </div>

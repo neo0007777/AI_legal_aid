@@ -204,3 +204,14 @@ class LegalAidResponse(BaseModel):
     question: str
     answer: str
     sources: List[SearchSource]
+
+
+# ─── Correction Memory & Translation ──────────────────
+
+class FlagCorrectionRequest(BaseModel):
+    correct_output: str  # "Verified" | "Mismatch" | "Not found in indexed corpus"
+    note: Optional[str] = None
+
+
+class RenderLanguageRequest(BaseModel):
+    language: str  # "hindi" | "hinglish"

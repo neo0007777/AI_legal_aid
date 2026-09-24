@@ -1,0 +1,135 @@
+.admin-corrections-wrapper {
+    padding: 2rem 2.5rem;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.admin-header { margin-bottom: 1.5rem; }
+
+.admin-header h2 {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    color: #63120e;
+    margin: 0.4rem 0 0.4rem;
+}
+
+.admin-header .subtitle {
+    color: #8c3a2a;
+    font-size: 0.9rem;
+    max-width: 640px;
+}
+
+.admin-section {
+    margin-bottom: 2rem;
+}
+
+.admin-section h3 {
+    font-family: var(--font-heading);
+    color: #63120e;
+    font-size: 1.1rem;
+    margin-bottom: 0.85rem;
+}
+
+.admin-empty {
+    color: #c98659;
+    font-size: 0.88rem;
+    font-style: italic;
+}
+
+.correction-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.correction-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    background: #fff8ef;
+    border: 1.5px solid #dfa46f;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+}
+
+.correction-row.pending {
+    border-color: #F59E0B;
+    background: #FFFBEB;
+}
+
+.correction-summary {
+    flex: 1;
+    min-width: 0;
+}
+
+.correction-top-line {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.35rem;
+}
+
+.direction-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.direction-tag.tighten { background: #D1FAE5; color: #065F46; }
+.direction-tag.loosen { background: #FEF3C7; color: #92400E; }
+
+.correction-verdicts {
+    font-size: 0.9rem;
+    color: #3d1a0a;
+    font-weight: 600;
+}
+
+.status-tag {
+    padding: 0.2rem 0.55rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.status-tag.confirmed { background: #D1FAE5; color: #065F46; }
+.status-tag.pending_review { background: #FEF3C7; color: #92400E; }
+.status-tag.rejected { background: #E5E7EB; color: #374151; }
+
+.correction-meta-line {
+    font-size: 0.78rem;
+    color: #8c3a2a;
+}
+
+.correction-note {
+    font-size: 0.82rem;
+    color: #63120e;
+    font-style: italic;
+    margin-top: 0.35rem;
+}
+
+.correction-signature {
+    font-size: 0.7rem;
+    color: #c98659;
+    margin-top: 0.35rem;
+    font-family: 'Courier New', monospace;
+}
+
+.correction-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+    .admin-corrections-wrapper { padding: 1.25rem; }
+    .correction-row { flex-direction: column; }
+    .correction-actions { width: 100%; }
+}
