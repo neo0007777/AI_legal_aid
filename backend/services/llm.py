@@ -22,7 +22,7 @@ def get_active_model() -> str:
     return os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 
-def call_groq(system_prompt: str, user_message: str, json_mode: bool = False, model: str = None) -> str:
+def call_groq(system_prompt: str, user_message: str, json_mode: bool = False, model: str = None, max_tokens: int = None) -> str:
     from groq import Groq
     global _ACTIVE_GROQ_MODEL
 
@@ -30,7 +30,10 @@ def call_groq(system_prompt: str, user_message: str, json_mode: bool = False, mo
     target_model = model or get_active_model()
 
     # Respect free tier token limits (qwen has a strict 1000 OTPM limit on free tier)
-    tokens_limit = 750 if "qwen" in target_model.lower() else 2048
+    if max_tokens:
+        tokens_limit = max_tokens
+    else:
+        tokens_limit = 750 if "qwen" in target_model.lower() else 2048
 
     kwargs = dict(
         model=target_model,
@@ -67,7 +70,7 @@ def call_ollama(system_prompt: str, user_message: str, json_mode: bool = False) 
     return response["message"]["content"].strip()
 
 
-def call_llm(system_prompt: str, user_message: str, json_mode: bool = False, force_local: bool = False) -> str:
+def call_llm(system_prompt: str, user_message: str, json_mode: bool = False, force_local: bool = False, max_tokens: int = None) -> str:
     from dotenv import load_dotenv
     load_dotenv(override=True)
     groq_key = os.getenv("GROQ_API_KEY", "")
@@ -84,7 +87,7 @@ def call_llm(system_prompt: str, user_message: str, json_mode: bool = False, for
 
         for target_model in models_to_try:
             try:
-                return call_groq(system_prompt, user_message, json_mode=json_mode, model=target_model)
+                return call_groq(system_prompt, user_message, json_mode=json_mode, model=target_model, max_tokens=max_tokens)
             except Exception as e:
                 err_str = str(e)
                 print(f"[LLM] Groq model '{target_model}' failed: {e}")
@@ -97,7 +100,7 @@ def call_llm(system_prompt: str, user_message: str, json_mode: bool = False, for
                 # For other errors, do a quick retry with backoff
                 time.sleep(1.5)
                 try:
-                    return call_groq(system_prompt, user_message, json_mode=json_mode, model=target_model)
+                    return call_groq(system_prompt, user_message, json_mode=json_mode, model=target_model, max_tokens=max_tokens)
                 except Exception as retry_err:
                     print(f"[LLM] Groq retry for '{target_model}' failed: {retry_err}")
                     continue

@@ -9,9 +9,48 @@
     white-space: nowrap;
 }
 
-.citation-status-badge.verified { background: #D1FAE5; color: #065F46; }
-.citation-status-badge.mismatch { background: #FEF3C7; color: #92400E; }
-.citation-status-badge.not-found { background: #E5E7EB; color: #374151; }
+.citation-status-badge.verified     { background: #D1FAE5; color: #065F46; }
+.citation-status-badge.partial      { background: #FEF9C3; color: #854D0E; }
+.citation-status-badge.mismatch     { background: #FEF3C7; color: #92400E; }
+.citation-status-badge.fabrication  { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+.citation-status-badge.unverified   { background: #FFEDD5; color: #9A3412; }
+.citation-status-badge.not-found    { background: #E5E7EB; color: #374151; }
+.citation-status-badge.ext-error    { background: #FEE2E2; color: #991B1B; }
+
+.stage-sub-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.stage-sub-badge.verified   { background: #D1FAE5; color: #065F46; }
+.stage-sub-badge.supported  { background: #D1FAE5; color: #065F46; }
+.stage-sub-badge.partial    { background: #FEF9C3; color: #854D0E; }
+.stage-sub-badge.mismatch   { background: #FEF3C7; color: #92400E; }
+.stage-sub-badge.contradicted { background: #FEE2E2; color: #991B1B; }
+.stage-sub-badge.fabrication { background: #FEE2E2; color: #991B1B; }
+.stage-sub-badge.unverified { background: #FFEDD5; color: #9A3412; }
+.stage-sub-badge.not-run    { background: #F3F4F6; color: #6B7280; }
+
+
+/* Retrieval source badge — where was the text fetched from? */
+.retrieval-source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.retrieval-source-badge.internal { background: #EDE9FE; color: #5B21B6; }
+.retrieval-source-badge.external { background: #DBEAFE; color: #1E40AF; }
 
 .confidence-bars {
     display: inline-flex;

@@ -86,15 +86,17 @@ def export_csv(report_id: str, current_user: User = Depends(get_current_user)):
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["Case", "Court", "Date", "Paragraph", "Status", "Source Link"])
+    writer.writerow(["Case", "Reported Citation", "Court", "Date", "Status", "Identity Status", "Proposition Status", "Source Link"])
     for c in report["citations"]:
-        case = c.get("matched_case") or {}
+        case = c.get("matched_case") or (c.get("citation_identity") or {}).get("matched_case") or {}
         writer.writerow([
             case.get("case_name") or c.get("case_name", ""),
+            c.get("citation_string", ""),
             case.get("court", ""),
             case.get("date", ""),
-            c.get("paragraph_display") or "",
             c.get("status", ""),
+            (c.get("citation_identity") or {}).get("status", ""),
+            (c.get("proposition_verification") or {}).get("status", ""),
             c.get("source_link") or "",
         ])
 
@@ -111,10 +113,6 @@ def export_pdf(report_id: str, current_user: User = Depends(get_current_user)):
     report = _get_report(report_id)
     from fpdf import FPDF
 
-    # Uses write() throughout, not multi_cell/cell: this fpdf2 version's multi_cell
-    # intermittently raises "Not enough horizontal space" on some strings for reasons
-    # that didn't reproduce with write() in testing -- write() with embedded newlines
-    # covers the same layout need (wrapping title/case blocks) without the bug.
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 14)
@@ -122,21 +120,29 @@ def export_pdf(report_id: str, current_user: User = Depends(get_current_user)):
     pdf.set_font("Helvetica", "", 9)
     pdf.write(6, _pdf_safe(report.get("coverage_banner", "")) + "\n")
     summary = report.get("summary", {})
-    pdf.write(6, _pdf_safe(
-        f"Verified: {summary.get('verified', 0)}  |  Mismatch: {summary.get('mismatch', 0)}  |  "
-        f"Not found in indexed corpus: {summary.get('not_found', 0)}"
-    ) + "\n\n")
+    summary_line = (
+        f"Verified: {summary.get('verified', 0)}  |  "
+        f"Partial Match: {summary.get('partial_match', 0)}  |  "
+        f"Mismatch: {summary.get('mismatch', 0)}  |  "
+        f"Fabrication: {summary.get('possible_fabrication', 0)}  |  "
+        f"Unverified: {summary.get('unverified', 0)}"
+    )
+    pdf.write(6, _pdf_safe(summary_line) + "\n\n")
 
     for c in report["citations"]:
-        case = c.get("matched_case") or {}
+        case = c.get("matched_case") or (c.get("citation_identity") or {}).get("matched_case") or {}
         case_name = case.get("case_name") or c.get("case_name", "")
+        cit_str = c.get("citation_string") or ""
         pdf.set_font("Helvetica", "B", 10)
-        pdf.write(6, _pdf_safe(case_name) + "\n")
+        pdf.write(6, _pdf_safe(f"{case_name} {cit_str}".strip()) + "\n")
         pdf.set_font("Helvetica", "", 9)
+        id_status = (c.get("citation_identity") or {}).get("status", "N/A")
+        prop_status = (c.get("proposition_verification") or {}).get("status", "N/A")
         pdf.write(5, _pdf_safe(
             f"Court: {case.get('court', 'N/A')}   Date: {case.get('date', 'N/A')}   "
-            f"Paragraph: {c.get('paragraph_display') or 'N/A'}   Status: {c.get('status', '')}"
+            f"Status: {c.get('status', '')}   [Identity: {id_status}, Proposition: {prop_status}]"
         ) + "\n\n")
+
 
     pdf_bytes = bytes(pdf.output())
     return StreamingResponse(

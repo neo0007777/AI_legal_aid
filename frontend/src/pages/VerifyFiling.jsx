@@ -2,15 +2,20 @@ import { useState, useEffect } from 'react';
 import {
     UploadCloud, FileCheck2, Loader2, Download, FileDown, ChevronDown,
     LayoutList, ListOrdered, ShieldAlert, AlertCircle, Sparkles, Info,
+    Scale, Hash, ExternalLink, BookmarkCheck, Check, FileText,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
 import { usePersona } from '../context/PersonaContext';
 import PersonaSwitcher from '../components/PersonaSwitcher';
-import CitationStatusBadge, { ConfidenceBars, TechnicalFailureNote } from '../components/CitationStatusBadge';
+import CitationStatusBadge, {
+    ConfidenceBars, TechnicalFailureNote, RetrievalSourceBadge,
+    IdentityBadge, PropositionBadge,
+} from '../components/CitationStatusBadge';
 import CitationWalkthrough from '../components/CitationWalkthrough';
 import ContradictionDiff from '../components/ContradictionDiff';
 import './VerifyFiling.css';
+
 
 const DEMO_FILINGS = [
     {
@@ -306,8 +311,22 @@ const VerifyFiling = () => {
                     {doneReport && (
                         <div className="verify-summary-strip">
                             <span className="summary-count verified">{doneReport.summary.verified} Verified</span>
+                            {doneReport.summary.partial_match > 0 && (
+                                <span className="summary-count partial">{doneReport.summary.partial_match} Partial</span>
+                            )}
                             <span className="summary-count mismatch">{doneReport.summary.mismatch} Mismatch</span>
-                            <span className="summary-count not-found">{doneReport.summary.not_found} Not found</span>
+                            {doneReport.summary.possible_fabrication > 0 && (
+                                <span className="summary-count fabrication">{doneReport.summary.possible_fabrication} Fabrication</span>
+                            )}
+                            {doneReport.summary.unverified > 0 && (
+                                <span className="summary-count unverified">{doneReport.summary.unverified} Unverified</span>
+                            )}
+                            {doneReport.summary.not_found > 0 && !doneReport.summary.possible_fabrication && !doneReport.summary.unverified && (
+                                <span className="summary-count not-found">{doneReport.summary.not_found} Not in Index</span>
+                            )}
+                            {doneReport.summary.external_error > 0 && (
+                                <span className="summary-count ext-error">{doneReport.summary.external_error} Source unavailable</span>
+                            )}
 
                             <div className={`export-actions ${persona.emphasizeExport ? 'emphasized' : ''}`}>
                                 <button className="outline btn-sm" onClick={() => downloadExport('csv')} disabled={exporting === 'csv'}>
@@ -380,18 +399,40 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff }) => {
         );
     }
 
-    const caseName = citation.matched_case?.case_name || citation.case_name;
+    const caseName = citation.citation_identity?.matched_case?.case_name || citation.matched_case?.case_name || citation.case_name;
+    const isVerified     = citation.citation_identity?.status === 'VERIFIED';
+    const isFabrication  = citation.status === 'Possible Fabrication' || citation.citation_identity?.status === 'POSSIBLE_FABRICATION';
+    const isUnverified   = citation.status === 'Unverified Citation' || citation.citation_identity?.status === 'UNVERIFIED_CITATION';
+    const isNotFound     = citation.status === 'Not Indexed / Not Found' || citation.citation_identity?.status === 'NOT_FOUND_IN_INDEXED_CORPUS';
+    const isExtError     = citation.status === 'External Source Error';
+
+    const propStatus = citation.proposition_verification?.status;
+    const rawReasoning = citation.proposition_verification?.reasoning || citation.entailment?.reasoning;
+    const propReasoning = typeof rawReasoning === 'string' ? rawReasoning : (rawReasoning ? JSON.stringify(rawReasoning) : '');
+    const rawEvidence = citation.proposition_verification?.evidence_passage || citation.matched_text;
+    const evidenceText = typeof rawEvidence === 'string' ? rawEvidence : (rawEvidence ? JSON.stringify(rawEvidence) : '');
+    const holdingType = citation.proposition_verification?.holding_type;
+    const rawQuote = citation.proposition_verification?.supporting_quote;
+    const supportingQuote = typeof rawQuote === 'string' ? rawQuote : (rawQuote ? JSON.stringify(rawQuote) : null);
+    const evidencePassageIndex = citation.proposition_verification?.evidence_passage_index || null;
+    const relatedAuthorities = Array.isArray(citation.related_authorities) ? citation.related_authorities : [];
 
     return (
         <div className={`citation-card ${expanded ? 'expanded' : ''}`}>
             <button className="citation-card-header" onClick={onToggle}>
                 <div className="citation-card-title">
                     <span className="case-name">{caseName}</span>
-                    {citation.matched_case && (
-                        <span className="case-meta">{citation.matched_case.court} · {citation.matched_case.date?.slice(0, 10)}</span>
-                    )}
+                    <span className="case-meta">
+                        {citation.citation_string ? `${citation.citation_string} · ` : ''}
+                        {citation.matched_case?.court || citation.citation_identity?.matched_case?.court || 'Court unverified'}
+                        {citation.matched_case?.date ? ` · ${citation.matched_case.date?.slice(0, 10)}` : ''}
+                    </span>
                 </div>
                 <div className="citation-card-right">
+                    <RetrievalSourceBadge
+                        retrievalSource={citation.retrieval_source}
+                        externalLookup={citation.external_lookup}
+                    />
                     <CitationStatusBadge status={citation.status} />
                     <ChevronDown size={16} className={`chevron ${expanded ? 'rotated' : ''}`} />
                 </div>
@@ -399,21 +440,176 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff }) => {
 
             {expanded && (
                 <div className="citation-card-detail animate-fade-in">
-                    <p className="detail-label">Claimed in the filing</p>
-                    <p className="detail-claim">{citation.claimed_content || citation.context_snippet}</p>
 
-                    {citation.status === 'Not found in indexed corpus' && (
-                        <p className="detail-not-found">
-                            No matching source in our indexed corpus. This doesn't mean the citation is fake —
-                            it falls outside our current Supreme Court, 2016–2025 coverage.
-                        </p>
+                    {/* ── STAGE 1: CASE IDENTITY RESOLUTION ── */}
+                    <div className="stage-block">
+                        <div className="stage-block-header">
+                            <span className="stage-block-title">
+                                <BookmarkCheck size={14} /> Stage 1: Case Identity Resolution
+                            </span>
+                            <IdentityBadge status={citation.citation_identity?.status || (citation.matched_case ? 'VERIFIED' : 'UNVERIFIED_CITATION')} />
+                        </div>
+                        <div className="stage-info-grid">
+                            <div className="stage-info-cell">
+                                <strong>Canonical Authority</strong>
+                                <span>{citation.citation_identity?.matched_case?.case_name || citation.matched_case?.case_name || 'Unresolved'}</span>
+                            </div>
+                            <div className="stage-info-cell">
+                                <strong>Reported Citation</strong>
+                                <span>{citation.citation_identity?.matched_case?.citation || citation.citation_string || 'Not provided'}</span>
+                            </div>
+                            <div className="stage-info-cell">
+                                <strong>Court / Date</strong>
+                                <span>
+                                    {citation.citation_identity?.matched_case?.court || 'N/A'}
+                                    {citation.citation_identity?.matched_case?.date ? ` (${citation.citation_identity.matched_case.date})` : ''}
+                                </span>
+                            </div>
+                            <div className="stage-info-cell">
+                                <strong>Resolution Method</strong>
+                                <span style={{ textTransform: 'capitalize' }}>
+                                    {citation.citation_identity?.resolution_method?.replace(/_/g, ' ') || 'None (No match)'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {isFabrication && (
+                            <div className="detail-not-found-block">
+                                <p className="detail-not-found" style={{ background: '#FEE2E2', color: '#991B1B' }}>
+                                    <strong>Authoritative Search Exhausted:</strong> Neither the Indian Kanoon national repository nor official court indices record any judgment for this citation and parties. This authority appears to be fabricated or fictitious.
+                                </p>
+                            </div>
+                        )}
+
+                        {isUnverified && !isFabrication && (
+                            <div className="detail-not-found-block">
+                                <p className="detail-not-found">
+                                    <strong>Identity Unverified:</strong> The exact reported authority could not be resolved from authoritative records. Semantic similarity or citing judgments were not accepted as substitutes. Manual verification is required.
+                                </p>
+                            </div>
+                        )}
+
+                        {isNotFound && !isFabrication && !isUnverified && (
+                            <div className="detail-not-found-block">
+                                <p className="detail-not-found">
+                                    Not found in the local indexed corpus. External search returned no authoritative match.
+                                </p>
+                            </div>
+                        )}
+
+                        {isExtError && (
+                            <div className="detail-not-found-block">
+                                <p className="detail-not-found">
+                                    External source search encountered network/timeout issues. Identity could not be checked right now.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── STAGE 4, 5, 6: SUBSTANTIVE PROPOSITION & ENTAILMENT ── */}
+                    <div className="stage-block">
+                        <div className="stage-block-header">
+                            <span className="stage-block-title">
+                                <Scale size={14} /> Stage 2: Substantive Proposition & Entailment
+                            </span>
+                            <PropositionBadge status={propStatus || (isVerified ? 'SUPPORTED' : 'NOT_RUN')} />
+                        </div>
+
+                        <p className="detail-label" style={{ marginTop: '0.4rem' }}>Filing Claim (Verbatim)</p>
+                        <p className="detail-claim">{citation.claimed_content || citation.context_snippet}</p>
+
+                        {isVerified && evidenceText ? (
+                            <>
+                                <p className="detail-label">
+                                    Evidence from Actual Cited Judgment
+                                    {citation.paragraph_display ? ` (${citation.paragraph_display})` : ''}
+                                    <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', fontWeight: 500, color: '#6b7280', background: '#f3f4f6', borderRadius: '4px', padding: '1px 5px' }}>
+                                        semantic top-5
+                                    </span>
+                                    {holdingType && (
+                                        <span style={{ marginLeft: '0.5rem', fontWeight: 600, color: '#63120e' }}>
+                                            [{holdingType.replace(/_/g, ' ')}]
+                                        </span>
+                                    )}
+                                </p>
+                                <p className="detail-source">{evidenceText}</p>
+
+                                {/* Extractive supporting quote — verbatim from the judgment */}
+                                {supportingQuote && (
+                                    <div className="supporting-quote-block">
+                                        <div className="supporting-quote-label">
+                                            <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#0f766e' }}>
+                                                📌 Grounding Sentence
+                                                {evidencePassageIndex ? ` [P${evidencePassageIndex}]` : ''}
+                                            </span>
+                                        </div>
+                                        <blockquote className="supporting-quote-text">
+                                            &ldquo;{supportingQuote}&rdquo;
+                                        </blockquote>
+                                    </div>
+                                )}
+
+                                {propReasoning && (
+                                    <div className="reasoning-box">
+                                        <strong>Entailment Assessment: </strong>{propReasoning}
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="detail-not-found-block" style={{ marginTop: '0.5rem' }}>
+                                <p className="detail-not-found" style={{ fontStyle: 'italic' }}>
+                                    Proposition verification withheld: Case identity must be established before running NLI. Never evaluate entailment against an unverified authority or unrelated judgment.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── STAGE 2 & 8: RELATED AUTHORITIES (CITING CASES) ── */}
+                    {relatedAuthorities.length > 0 && (
+                        <div className="related-cases-box">
+                            <div className="related-cases-header">
+                                <span className="related-cases-title">
+                                    <FileText size={14} /> Related Cases ({relatedAuthorities.length})
+                                </span>
+                            </div>
+                            <p className="related-disclaimer">
+                                These judgments discuss or cite the claimed authority, but are <strong>NOT</strong> the cited authority itself. They were strictly excluded from proposition verification.
+                            </p>
+                            <div className="related-cases-list">
+                                {relatedAuthorities.map((ra, idx) => (
+                                    <div key={idx} className="related-case-row">
+                                        <span className="related-case-name">{ra.case_name}</span>
+                                        <div className="related-case-meta">
+                                            <span className="related-case-rel">{ra.relationship}</span>
+                                            {ra.court && <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>({ra.court})</span>}
+                                            {ra.source_url && (
+                                                <a href={ra.source_url} target="_blank" rel="noopener noreferrer" className="related-case-link" title="Open in Indian Kanoon">
+                                                    <ExternalLink size={13} />
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     )}
 
-                    {citation.matched_case && (
-                        <>
-                            <p className="detail-label">Matched passage {citation.paragraph_display ? `(${citation.paragraph_display})` : ''}</p>
-                            <p className="detail-source">{citation.matched_text}</p>
-                        </>
+                    {/* ── STAGE 3 & 10: SOURCE & AUDIT METADATA ── */}
+                    {citation.source?.source_url && (
+                        <p className="detail-external-link">
+                            Primary Authority Source:{' '}
+                            <a href={citation.source.source_url} target="_blank" rel="noopener noreferrer">
+                                {citation.source.source_name || 'Authoritative Source'}
+                            </a>
+                            {citation.source.canonical_case_id && (
+                                <span> &nbsp;·&nbsp; ID: <code>{citation.source.canonical_case_id}</code></span>
+                            )}
+                            {citation.source.document_hash && (
+                                <span title={`SHA-256: ${citation.source.document_hash}`}>
+                                    {' '}&nbsp;·&nbsp; Hash: <code>{String(citation.source.document_hash).slice(0, 10)}…</code>
+                                </span>
+                            )}
+                        </p>
                     )}
 
                     {citation.entailment?.technical_failure && <TechnicalFailureNote />}
@@ -422,7 +618,7 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff }) => {
                         {citation.entailment?.confidence && !citation.entailment?.technical_failure && (
                             <ConfidenceBars confidence={citation.entailment.confidence} />
                         )}
-                        {citation.status === 'Mismatch' && (
+                        {(citation.status === 'Mismatch' || propStatus === 'CONTRADICTED') && (
                             <button className="outline btn-sm" onClick={() => onOpenDiff(citation)}>
                                 {citation.entailment?.technical_failure ? 'View details' : 'View contradiction'}
                             </button>

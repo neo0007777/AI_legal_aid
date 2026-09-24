@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from sqlalchemy import (
     create_engine, Column, String, DateTime,
-    Boolean, Text, Integer, ForeignKey
+    Boolean, Text, Integer, ForeignKey, Float, UniqueConstraint
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -93,6 +93,115 @@ class SearchCache(Base):
     results_json = Column(Text, nullable=False)
     source = Column(String(50), nullable=False)  # ik_api | ik_scrape | commonlii
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class Act(Base):
+    """
+    Structured store for Act metadata fetched from India Code API.
+    Retains canonical provenance, raw response, and dual SHA-256 hashes.
+    """
+    __tablename__ = "acts"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_act_id = Column(String, unique=True, nullable=False, index=True)  # e.g. "bns", "ipc"
+    title = Column(String, nullable=False)
+    long_title = Column(Text, nullable=True)
+    year = Column(Integer, nullable=True)
+    act_number = Column(String, nullable=True)
+    ministry = Column(String, nullable=True)
+    department = Column(String, nullable=True)
+    jurisdiction = Column(String, nullable=True)
+    unit = Column(String, default="section")  # section | article
+    section_count = Column(Integer, nullable=True)
+    in_force = Column(Boolean, nullable=True)
+    spent = Column(Boolean, default=False)
+    spent_note = Column(String, nullable=True)
+    source_url = Column(String, nullable=True)  # Canonical URL returned by source
+    source_api = Column(String, default="indiacode.ecourtsindia.com")
+    source_type = Column(String, default="INDIA_CODE_API")
+    source_authority = Column(String, default="INDIA_CODE_CORPUS")
+    retrieved_at = Column(DateTime, default=datetime.utcnow)
+    raw_response_sha256 = Column(String(64), nullable=True)
+    content_sha256 = Column(String(64), nullable=True)
+    raw_json = Column(Text, nullable=True)  # Retained for auditability per retention policy
+
+
+class Provision(Base):
+    """
+    Verbatim statutory provision (section / article) storage.
+    Provision number is strictly a string (e.g. '103', '124A', '65B').
+    Text is stored verbatim without alterations.
+    """
+    __tablename__ = "provisions"
+    __table_args__ = (
+        UniqueConstraint("act_source_id", "provision_number", name="uq_act_provision"),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_provision_id = Column(String, nullable=True)
+    act_id = Column(String, ForeignKey("acts.id", ondelete="CASCADE"), nullable=True)
+    act_source_id = Column(String, index=True, nullable=False)
+    provision_type = Column(String, default="section")
+    provision_number = Column(String, index=True, nullable=False)  # Strictly string
+    heading = Column(String, nullable=True)
+    raw_text = Column(Text, nullable=True)  # Exact verbatim legal text from source
+    html = Column(Text, nullable=True)
+    words = Column(Integer, nullable=True)
+    source_url = Column(String, nullable=True)
+    source_api = Column(String, default="indiacode.ecourtsindia.com")
+    source_type = Column(String, default="INDIA_CODE_API")
+    source_authority = Column(String, default="INDIA_CODE_CORPUS")
+    retrieved_at = Column(DateTime, default=datetime.utcnow)
+    raw_response_sha256 = Column(String(64), nullable=True)
+    content_sha256 = Column(String(64), nullable=True)
+    raw_json = Column(Text, nullable=True)  # Retained for auditability per retention policy
+
+
+class StatuteMapping(Base):
+    """
+    Statutory transition correspondences published by the source API (e.g. IPC -> BNS).
+    Explicitly treated as source-listed correspondences, NOT legal conclusions of applicability.
+    """
+    __tablename__ = "statute_mappings"
+    __table_args__ = (
+        UniqueConstraint("pair", "from_act", "from_provision", "to_act", "to_provision", "relation", name="uq_statute_mapping"),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    pair = Column(String, index=True, nullable=False)  # e.g. "ipc-bns"
+    from_act = Column(String, index=True, nullable=False)
+    from_provision = Column(String, index=True, nullable=True)
+    from_heading = Column(String, nullable=True)
+    to_act = Column(String, index=True, nullable=False)
+    to_provision = Column(String, index=True, nullable=True)
+    to_heading = Column(String, nullable=True)
+    relation = Column(String, nullable=True)  # official | official-none | near-identical | close | weak | none
+    score = Column(Float, nullable=True)
+    from_url = Column(String, nullable=True)
+    to_url = Column(String, nullable=True)
+    source_api = Column(String, default="indiacode.ecourtsindia.com")
+    source_type = Column(String, default="INDIA_CODE_API")
+    source_authority = Column(String, default="INDIA_CODE_CORPUS")
+    retrieved_at = Column(DateTime, default=datetime.utcnow)
+    raw_json = Column(Text, nullable=True)
+
+
+class IngestionLog(Base):
+    """
+    Audit log for ingestion operations, tracking provenance, endpoints, and integrity hashes.
+    """
+    __tablename__ = "ingestion_logs"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    run_id = Column(String, index=True, nullable=False)
+    target = Column(String, nullable=False)
+    status = Column(String, nullable=False)  # SUCCESS | FAILED | PARTIAL
+    records_count = Column(Integer, default=0)
+    source_url = Column(String, nullable=True)
+    raw_response_sha256 = Column(String(64), nullable=True)
+    content_sha256 = Column(String(64), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 def create_tables():

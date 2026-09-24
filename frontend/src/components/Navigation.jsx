@@ -72,6 +72,9 @@ const Navigation = () => {
                     <NavLink to="/clause-conflict" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
                         <FileSearch size={18} /> Contract Analysis
                     </NavLink>
+                    <NavLink to="/statutes" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                        <Scale size={18} /> Bare Acts & Statutes
+                    </NavLink>
                     <NavLink to="/legal-aid" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
                         <MessageSquare size={18} /> AI Legal Aid
                     </NavLink>

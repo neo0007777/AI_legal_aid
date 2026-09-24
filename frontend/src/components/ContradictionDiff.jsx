@@ -8,10 +8,13 @@ import './ContradictionDiff.css';
 const ContradictionDiff = ({ citation, onClose }) => {
     if (!citation) return null;
 
-    const claim = citation.claimed_content || citation.context_snippet || '(no claim text captured)';
-    const source = citation.matched_text || null;
-    const reasoning = citation.entailment?.reasoning || '';
-    const verdict = citation.entailment?.verdict || 'unclear';
+    const rawClaim = citation.claimed_content || citation.context_snippet;
+    const claim = typeof rawClaim === 'string' ? rawClaim : (rawClaim ? JSON.stringify(rawClaim) : '(no claim text captured)');
+    const rawSource = citation.proposition_verification?.evidence_passage || citation.matched_text;
+    const source = typeof rawSource === 'string' ? rawSource : (rawSource ? JSON.stringify(rawSource) : null);
+    const rawReasoning = citation.proposition_verification?.reasoning || citation.entailment?.reasoning;
+    const reasoning = typeof rawReasoning === 'string' ? rawReasoning : (rawReasoning ? JSON.stringify(rawReasoning) : '');
+    const verdict = citation.proposition_verification?.verdict || citation.entailment?.verdict || 'unclear';
     const caseName = citation.matched_case?.case_name || citation.case_name;
     // technical_failure: the entailment CALL failed (rate limit, timeout) --
     // this is not a real contradiction finding, so it must never be framed as

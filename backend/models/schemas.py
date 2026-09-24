@@ -133,12 +133,19 @@ class DraftRequest(BaseModel):
     description: str
     category: Optional[str] = None
     n_results: Optional[int] = 5
+    structured_input: Optional[dict] = None    # Structured field data from frontend
+    template_id: Optional[str] = None          # Template ID (e.g. "bail", "rent")
 
 
 class DraftResponse(BaseModel):
     description: str
     draft: str
     sources: List[SearchSource]
+    review: Optional[dict] = None              # 2-pass review report
+    fact_manifest: Optional[dict] = None       # What was provided vs. missing
+    provenance_report: Optional[dict] = None   # Provenance of each assertion
+    procedural_posture: Optional[dict] = None  # Verified procedural posture & governing provision
+    ground_traceability: Optional[List[dict]] = None # Internal ground-by-ground verification record
 
 
 class ContradictionRequest(BaseModel):

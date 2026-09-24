@@ -181,9 +181,10 @@
     font-weight: 700;
 }
 
-.summary-count.verified { background: #D1FAE5; color: #065F46; }
-.summary-count.mismatch { background: #FEF3C7; color: #92400E; }
-.summary-count.not-found { background: #E5E7EB; color: #374151; }
+.summary-count.verified   { background: #D1FAE5; color: #065F46; }
+.summary-count.mismatch   { background: #FEF3C7; color: #92400E; }
+.summary-count.not-found  { background: #E5E7EB; color: #374151; }
+.summary-count.ext-error  { background: #FEE2E2; color: #991B1B; }
 
 .export-actions {
     display: flex;
@@ -347,14 +348,33 @@
     color: #3d1a0a;
 }
 
-.detail-not-found {
+.detail-not-found-block {
     margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.detail-not-found {
+    margin: 0;
     background: #E5E7EB;
     color: #374151;
     border-radius: 8px;
     padding: 0.75rem 0.9rem;
     font-size: 0.85rem;
     line-height: 1.5;
+}
+
+.detail-external-link {
+    margin-top: 0.6rem;
+    font-size: 0.82rem;
+    color: #6B7280;
+}
+
+.detail-external-link a {
+    color: #1E40AF;
+    text-decoration: underline;
+    font-weight: 600;
 }
 
 .detail-footer {
@@ -377,9 +397,190 @@
 .verify-empty-state h4 { color: #63120e; margin: 0; }
 .verify-empty-state p { color: #8c3a2a; font-size: 0.88rem; max-width: 380px; }
 
+.summary-count.partial      { background: #FEF9C3; color: #854D0E; }
+.summary-count.fabrication  { background: #FEE2E2; color: #991B1B; font-weight: 700; }
+.summary-count.unverified   { background: #FFEDD5; color: #9A3412; }
+
+/* ── STAGE 10 Structured Sections ─────────────────────────── */
+.stage-block {
+    margin-top: 0.9rem;
+    background: #fffcf8;
+    border: 1px solid #f1d1a6;
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+}
+
+.stage-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px dashed #f1d1a6;
+}
+
+.stage-block-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #8c3a2a;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.stage-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.stage-info-cell {
+    background: #fdf5ea;
+    padding: 0.4rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid #fae6cf;
+}
+
+.stage-info-cell strong {
+    display: block;
+    font-size: 0.7rem;
+    color: #8c3a2a;
+    text-transform: uppercase;
+    margin-bottom: 0.15rem;
+    letter-spacing: 0.03em;
+}
+
+.reasoning-box {
+    margin-top: 0.6rem;
+    background: #fdf8f0;
+    border-left: 3px solid #dfa46f;
+    padding: 0.6rem 0.8rem;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.85rem;
+    color: #3d1a0a;
+    line-height: 1.5;
+}
+
+.reasoning-box strong {
+    color: #63120e;
+}
+
+/* ── Extractive Supporting Quote (Stage 6 output) ─────────── */
+.supporting-quote-block {
+    margin-top: 0.75rem;
+    margin-bottom: 0.4rem;
+    border-left: 3px solid #0d9488;
+    background: #f0fdfa;
+    border-radius: 0 8px 8px 0;
+    padding: 0.55rem 0.9rem;
+}
+
+.supporting-quote-label {
+    margin-bottom: 0.3rem;
+}
+
+.supporting-quote-text {
+    margin: 0;
+    padding: 0;
+    font-size: 0.84rem;
+    line-height: 1.55;
+    color: #134e4a;
+    font-style: italic;
+    quotes: none;
+}
+
+/* ── STAGE 8: Related Authorities Section ─────────────────── */
+.related-cases-box {
+    margin-top: 1rem;
+    background: #f9f9fb;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+}
+
+.related-cases-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.35rem;
+}
+
+.related-cases-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #4b5563;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    letter-spacing: 0.04em;
+}
+
+.related-disclaimer {
+    font-size: 0.76rem;
+    color: #6b7280;
+    font-style: italic;
+    margin-bottom: 0.65rem;
+    line-height: 1.4;
+}
+
+.related-cases-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.related-case-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.82rem;
+}
+
+.related-case-name {
+    font-weight: 600;
+    color: #1f2937;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.related-case-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.related-case-rel {
+    font-size: 0.73rem;
+    color: #4b5563;
+    background: #f3f4f6;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.related-case-link {
+    color: #2563EB;
+    display: inline-flex;
+    align-items: center;
+}
+
 @media (max-width: 720px) {
     .verify-wrapper { padding: 1.25rem; }
     .demo-filing-grid { grid-template-columns: 1fr; }
     .citation-card-header { flex-wrap: wrap; }
     .export-actions { margin-left: 0; width: 100%; }
+    .related-case-row { flex-direction: column; align-items: flex-start; }
 }
+

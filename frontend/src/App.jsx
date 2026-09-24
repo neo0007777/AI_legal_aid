@@ -10,6 +10,7 @@ import DraftReview from './pages/DraftReview';
 import ClauseConflict from './pages/ClauseConflict';
 import LegalAid from './pages/LegalAid';
 import VerifyFiling from './pages/VerifyFiling';
+import Statutes from './pages/Statutes';
 import Login from './pages/Login';
 
 import './App.css';
@@ -42,6 +43,7 @@ const App = () => {
         <Route path="draft-assistant" element={<ProtectedRoute><DraftAssistant /></ProtectedRoute>} />
         <Route path="draft-review" element={<ProtectedRoute><DraftReview /></ProtectedRoute>} />
         <Route path="clause-conflict" element={<ProtectedRoute><ClauseConflict /></ProtectedRoute>} />
+        <Route path="statutes" element={<ProtectedRoute><Statutes /></ProtectedRoute>} />
         <Route path="legal-aid" element={<ProtectedRoute><LegalAid /></ProtectedRoute>} />
       </Route>
     </Routes>

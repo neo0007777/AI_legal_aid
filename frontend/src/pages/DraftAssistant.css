@@ -938,3 +938,165 @@
     margin-left: auto;
     margin-right: auto;
 }
+
+/* ===========================
+   MATERIAL FIELD BADGE
+=========================== */
+.material-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #b91c1c;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    border-radius: 4px;
+    vertical-align: middle;
+    letter-spacing: 0.02em;
+}
+
+/* ===========================
+   MISSING FIELDS WARNING
+=========================== */
+.missing-fields-warning {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.missing-warning-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #92400e;
+    margin-bottom: 0.5rem;
+}
+
+.missing-fields-warning p {
+    font-size: 0.85rem;
+    color: #78350f;
+    margin: 0 0 0.5rem 0;
+}
+
+.missing-fields-warning code {
+    background: #fde68a;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    color: #92400e;
+}
+
+.missing-fields-warning ul {
+    margin: 0.4rem 0 0.5rem 1.25rem;
+    padding: 0;
+}
+
+.missing-fields-warning li {
+    font-size: 0.85rem;
+    color: #92400e;
+    padding: 2px 0;
+}
+
+/* ===========================
+   PROVENANCE PANEL
+=========================== */
+.provenance-section {
+    margin-bottom: 1rem;
+}
+
+.provenance-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #63120e;
+    margin: 0 0 0.75rem 0;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid #e5d5c0;
+}
+
+.provenance-group {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    border-radius: 8px;
+}
+
+.provenance-group h5 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+}
+
+.provenance-provided {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+}
+
+.provenance-provided h5 {
+    color: #065f46;
+}
+
+.provenance-missing-material {
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+}
+
+.provenance-missing-material h5 {
+    color: #92400e;
+}
+
+.provenance-missing-optional {
+    background: #f0f4ff;
+    border: 1px solid #c7d2fe;
+}
+
+.provenance-missing-optional h5 {
+    color: #3730a3;
+}
+
+.provenance-note {
+    font-size: 0.75rem;
+    color: #78350f;
+    margin: 0 0 0.5rem 0;
+    font-style: italic;
+}
+
+.provenance-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.3rem 0;
+    font-size: 0.8rem;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+
+.provenance-item:last-child {
+    border-bottom: none;
+}
+
+.provenance-label {
+    color: #374151;
+    font-weight: 500;
+    flex: 1;
+}
+
+.provenance-value {
+    color: #065f46;
+    font-weight: 600;
+    text-align: right;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.provenance-status {
+    color: #b45309;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.72rem;
+}

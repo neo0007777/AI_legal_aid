@@ -1,93 +1,79 @@
+"""
+citation_verifier.py
+====================
+CRITICAL CITATION-INTEGRITY PIPELINE
+
+Separates:
+1. CASE IDENTITY MATCHING
+from
+2. SUBSTANTIVE PROPOSITION / ENTAILMENT MATCHING
+
+Hard Rule:
+A judgment that merely CITES or DISCUSSES an authority is NOT the authority.
+Never allow semantic similarity or a related judgment to substitute for the exact cited authority.
+IDENTITY FIRST.
+ENTAILMENT SECOND.
+RELATED CASES THIRD.
+
+10-STAGE ARCHITECTURE:
+Stage 1: Citation Identity Resolution (Priority A-F, NO semantic similarity)
+Stage 2: Related Case Detection (Classified separately as RELATED_AUTHORITY)
+Stage 3: Retrieve the Actual Cited Judgment Only
+Stage 4: Proposition Extraction (Verbatim claim preserved)
+Stage 5: Evidence Retrieval (From actual cited judgment only, distinguish holding vs submission)
+Stage 6: Entailment / NLI (SUPPORTED, PARTIALLY_SUPPORTED, NOT_SUPPORTED, CONTRADICTED)
+Stage 7: Case Identity Failure (NOT_FOUND_IN_INDEXED_CORPUS -> external verification -> UNVERIFIED_CITATION / POSSIBLE_FABRICATION)
+Stage 8: Related Judgments reported separately
+Stage 9: Website Content Filtering (Chrome stripped)
+Stage 10: Final Result Model (citation_identity, proposition_verification, source, related_authorities)
+"""
+
 import asyncio
+import hashlib
 import json
 import re
 import threading
 import time
 from difflib import SequenceMatcher
 
-from services.judgment_search import search_judgments, get_coverage_banner
+from services.judgment_search import (
+    search_judgments,
+    get_coverage_banner,
+    resolve_internal_case_identity,
+    get_parent_judgment,
+)
 from services.llm import call_llm, call_groq
+from services.citation_parser import (
+    parse_citation,
+    calculate_name_similarity,
+    normalize_case_name,
+    normalize_citation_string,
+)
+from services.external_case_lookup import (
+    lookup_and_resolve_external_case,
+    ExternalResolutionResult,
+    canonicalize_party_name,
+)
 
-# S2 brief: pin entailment to gpt-oss-120b specifically. No cascade fallback — if this
-# model call fails, the cautious-bias rule below treats it as "unclear" (-> Mismatch)
-# rather than silently retrying on a weaker model that could produce a false Verified.
 ENTAILMENT_MODEL = "openai/gpt-oss-120b"
-
-# Groq's free tier caps gpt-oss-120b at 8000 tokens/minute. Firing every citation's
-# entailment call at once (observed with 5 concurrent citations in testing) blows
-# through that budget and produces real 429s -- which the cautious-bias rule then
-# turns into Mismatch en masse, even for citations that are actually correct. This
-# throttles only the Groq-calling step (Qdrant search stays fully concurrent), which
-# keeps checking genuinely parallel while staying under the rate limit.
 _ENTAILMENT_CONCURRENCY = 3
 _entailment_semaphore = threading.Semaphore(_ENTAILMENT_CONCURRENCY)
-
 _RETRY_AFTER_PATTERN = re.compile(r"try again in ([\d.]+)s", re.IGNORECASE)
 
-# Case-identity match uses string similarity on names, not vector score, since Qdrant's
-# score reflects semantic similarity of chunk TEXT, not whether it's the same case.
-CASE_NAME_MATCH_THRESHOLD = 0.55
+# ── STAGE 4: Citation & Verbatim Proposition Extraction ───────────────────────
 
-_SUFFIX_WORDS = {"ors", "anr", "others", "another", "etc", "and", "the", "vs", "versus", "v"}
-
-# Generic party words (govt/institutional litigants) that recur across thousands of
-# unrelated Indian cases ("X v. State of Rajasthan", "Y v. Union of India"...). Overlap
-# on these alone must never be enough to call two citations the same case -- see the
-# false match caught in testing: a fabricated "Ramesh Kumar v. State of Rajasthan"
-# otherwise scored above threshold against an unrelated real "... v. State of Rajasthan".
-_GENERIC_PARTY_WORDS = {
-    "state", "union", "india", "government", "govt", "central", "board", "corporation",
-    "authority", "commissioner", "secretary", "director", "territory", "nct", "of",
-    "municipal", "council", "department", "ministry",
-    # State/UT names: boilerplate respondents ("X v. State of Rajasthan") recur across
-    # thousands of unrelated cases, so the state name alone must never count as the
-    # "distinctive" token that makes two citations look like the same case.
-    "andhra", "pradesh", "arunachal", "assam", "bihar", "chhattisgarh", "goa", "gujarat",
-    "haryana", "himachal", "jharkhand", "karnataka", "kerala", "madhya", "maharashtra",
-    "manipur", "meghalaya", "mizoram", "nagaland", "odisha", "orissa", "punjab",
-    "rajasthan", "sikkim", "tamil", "nadu", "telangana", "tripura", "uttar", "uttarakhand",
-    "bengal", "west", "delhi", "andaman", "nicobar", "chandigarh", "dadra", "nagar",
-    "haveli", "daman", "diu", "lakshadweep", "puducherry", "jammu", "kashmir", "ladakh",
-}
-
-
-def _normalize_name(name: str) -> str:
-    name = re.sub(r"[^a-z0-9\s]", " ", (name or "").lower())
-    tokens = [t for t in name.split() if t not in _SUFFIX_WORDS]
-    return " ".join(tokens)
-
-
-def _name_similarity(a: str, b: str) -> float:
-    na, nb = _normalize_name(a), _normalize_name(b)
-    if not na or not nb:
-        return 0.0
-    ratio = SequenceMatcher(None, na, nb).ratio()
-    set_a, set_b = set(na.split()), set(nb.split())
-    jaccard = len(set_a & set_b) / len(set_a | set_b) if (set_a or set_b) else 0.0
-    score = max(ratio, jaccard)
-
-    # Require the two names to share at least one DISTINCTIVE token (not a bare
-    # generic-party word) -- otherwise two different cases against "the State" can
-    # score high purely on the shared boilerplate respondent.
-    distinctive_overlap = {t for t in (set_a & set_b) if t not in _GENERIC_PARTY_WORDS and len(t) > 3}
-    if not distinctive_overlap:
-        score = min(score, 0.4)
-
-    return score
-
-
-CITATION_EXTRACTION_SYSTEM_PROMPT = """You extract case-law citations from Indian legal filings.
+CITATION_EXTRACTION_SYSTEM_PROMPT = """You extract case-law citations and their exact claimed legal propositions from Indian legal filings.
 
 For every place the filing cites or relies on a court judgment, extract:
-- "case_name": the party names as written in the filing (e.g. "Swiss Ribbons Pvt. Ltd. v. Union of India"). Copy it VERBATIM from the text — do not correct, expand, or normalize it.
-- "citation_string": the reporter/neutral citation if given (e.g. "(2019) 4 SCC 17", "2019 INSC 95"), else "".
-- "claimed_content": the specific proposition, holding, or quoted text the filing attributes to this case — the actual legal claim being made, in the filing's own words. This is what gets fact-checked, so be precise and include the surrounding sentence(s), not just the case name.
+- "case_name": the party names as written in the filing (e.g. "Arnesh Kumar v. State of Bihar"). Copy it VERBATIM from the text — do not correct, expand, or normalize it.
+- "citation_string": the reporter/neutral citation if given (e.g. "(2014) 8 SCC 273", "2019 INSC 95"), else "".
+- "claimed_content": the EXACT substantive proposition, holding, or quoted text the filing attributes to this case — the actual legal claim being made, in the filing's own words. Do NOT paraphrase or replace it with a generic summary. Keep the exact filing claim.
 - "context_snippet": a short verbatim excerpt (under 200 chars) from the filing surrounding the citation, for anchoring.
 
 Rules:
-- Only extract citations that ACTUALLY APPEAR in the given text. Never invent a citation, case name, or claim that isn't in the input.
+- Only extract citations that ACTUALLY APPEAR in the given text.
 - If the same case is cited more than once with different claims, extract each occurrence separately.
-- If a case is named but no specific claim/holding is attributed to it (just a bare mention), still extract it with claimed_content describing what point it's cited for, as best you can tell from context.
+- Preserve the exact words used in the filing.
 
 Respond with ONLY a JSON object: {"citations": [{"case_name": "...", "citation_string": "...", "claimed_content": "...", "context_snippet": "..."}]}
 If there are no citations, respond {"citations": []}.
@@ -128,16 +114,18 @@ def _parse_json_object(raw: str) -> dict:
     return {}
 
 
-def extract_citations(filing_text: str) -> tuple:
-    """Citation classifier. Uses the default LLM cascade (call_llm) — unlike entailment,
-    extraction quality degrading gracefully across the cascade is acceptable here since
-    every extracted citation is verified against the source text below before being trusted.
+def _appears_in_text(case_name: str, text: str) -> bool:
+    norm = normalize_case_name(case_name)
+    tokens = [t for t in norm.split() if len(t) > 3]
+    if not tokens:
+        return case_name.lower() in text.lower()
+    text_lower = text.lower()
+    hits = sum(1 for t in tokens if t in text_lower)
+    return hits >= max(1, len(tokens) // 3)
 
-    Returns (citations, incomplete) -- incomplete=True if any chunk's extraction call
-    failed outright (e.g. every cascade model + Ollama fallback unavailable), so the
-    caller can warn the user rather than silently presenting a partial citation list
-    as if it were the complete one. Caught in UX audit: under Groq quota exhaustion, a
-    multi-chunk filing silently lost citations from the failed chunk with no signal."""
+
+def extract_citations(filing_text: str) -> tuple:
+    """Stage 4 — Extract citations and verbatim claimed propositions from filing text."""
     all_citations = []
     seen = set()
     incomplete = False
@@ -145,19 +133,12 @@ def extract_citations(filing_text: str) -> tuple:
     for chunk in _chunk_text(filing_text):
         raw = call_llm(CITATION_EXTRACTION_SYSTEM_PROMPT, chunk, json_mode=True)
         data = _parse_json_object(raw)
-        # A weaker cascade model (more likely under Groq quota pressure, when
-        # the pinned model falls back further down CANDIDATE_GROQ_MODELS) can
-        # ignore the "wrap in {citations: [...]}" instruction and return a
-        # bare JSON array instead -- this crashed with AttributeError on
-        # data.get(...) before this guard, caught via live re-testing.
         if isinstance(data, list):
             data = {"citations": data}
         if not isinstance(data, dict):
-            print(f"[CitationVerifier] Citation extraction returned unexpected JSON shape for one chunk: {raw[:200]!r}")
             incomplete = True
             continue
         if "error" in data and "citations" not in data:
-            print(f"[CitationVerifier] Citation extraction failed for one chunk: {data.get('error')}")
             incomplete = True
             continue
         for c in data.get("citations", []):
@@ -166,19 +147,12 @@ def extract_citations(filing_text: str) -> tuple:
             case_name = (c.get("case_name") or "").strip()
             if not case_name:
                 continue
-
-            # Anti-hallucination guard: the extracted case name must actually appear
-            # (fuzzily) in the source chunk, or we drop it. An LLM inventing a citation
-            # that isn't in the filing would corrupt the whole report.
             if not _appears_in_text(case_name, chunk):
-                print(f"[CitationVerifier] Dropped unverifiable extraction (not found in source text): {case_name}")
                 continue
-
-            key = _normalize_name(case_name) + "|" + (c.get("citation_string") or "").strip().lower()
+            key = normalize_case_name(case_name) + "|" + (c.get("citation_string") or "").strip().lower()
             if key in seen:
                 continue
             seen.add(key)
-
             all_citations.append({
                 "case_name": case_name,
                 "citation_string": (c.get("citation_string") or "").strip(),
@@ -189,193 +163,423 @@ def extract_citations(filing_text: str) -> tuple:
     return all_citations, incomplete
 
 
-def _appears_in_text(case_name: str, text: str) -> bool:
-    # Require at least one distinctive (>3 char) token from the case name to appear
-    # verbatim in the source text — cheap, robust guard against wholesale invention.
-    tokens = [t for t in _normalize_name(case_name).split() if len(t) > 3]
-    if not tokens:
-        return case_name.lower() in text.lower()
-    text_lower = text.lower()
-    hits = sum(1 for t in tokens if t in text_lower)
-    return hits >= max(1, len(tokens) // 3)
+# ── STAGE 5 & 6: Entailment (NLI) on the Actual Cited Judgment ────────────────
 
+_TOP_N_EVIDENCE = 5   # Number of semantically ranked paragraphs to pass to NLI
+_MIN_PARA_CHARS = 40  # Discard boilerplate (headers, page numbers, etc.)
 
-def resolve_case(case_name: str, citation_string: str) -> dict:
-    """Layer 1, step 1: identify which indexed judgment (if any) this citation refers to.
-    Returns None (-> 'Not found in indexed corpus') if nothing in the corpus is
-    confidently the same case — this is what correctly handles both fabricated case
-    names AND real-but-out-of-corpus citations (pre-2016, non-SC, etc.)."""
-    query = f"{case_name} {citation_string}".strip()
-    hits = search_judgments(query, top_k=5)
-    if not hits:
-        return None
+ENTAILMENT_SYSTEM_PROMPT = """You are an expert legal citation verifier. Your task: decide whether passages from an ACTUAL CITED JUDGMENT support a specific legal proposition claimed in a court filing.
 
-    best_hit, best_score = None, 0.0
-    for h in hits:
-        sim = _name_similarity(case_name, h["metadata"]["case_name"])
-        if sim > best_score:
-            best_score, best_hit = sim, h
+You are given:
+1. CLAIM: The exact proposition asserted in the filing.
+2. EVIDENCE PASSAGES [P1]…[P5]: The top-5 most semantically relevant paragraphs from the cited judgment, retrieved via embedding similarity. They are listed in descending relevance order.
 
-    if best_hit is None or best_score < CASE_NAME_MATCH_THRESHOLD:
-        return None
+CRITICAL LEGAL DISTINCTIONS:
+- Holding vs. Submission: A lawyer's argument RECORDED in the judgment is NOT the court's holding.
+- Holding vs. Quotation: The court quoting another precedent is NOT the court's own holding.
+- Holding vs. Obiter: An incidental remark is not a binding principle.
 
-    return {**best_hit["metadata"], "_name_match_score": best_score}
+VERDICT OPTIONS:
+- "SUPPORTED": The judgment's actual holding directly and clearly supports the claimed proposition.
+- "PARTIALLY_SUPPORTED": The judgment supports the general principle but not the full or specific claim.
+- "NOT_SUPPORTED": None of the retrieved passages state or support the claimed proposition. Use this honestly — do NOT force-fit a verdict onto an unrelated paragraph.
+- "CONTRADICTED": The judgment's holding contradicts or rejects the claimed proposition.
 
+EXTRACTIVE JUSTIFICATION (MANDATORY):
+You MUST quote the exact sentence(s) from the evidence that ground your verdict in the field "supporting_quote". Copy verbatim from one of the [P1]-[P5] passages. If no passage contains a grounding sentence, set "supporting_quote" to null and your verdict MUST be "NOT_SUPPORTED".
 
-ENTAILMENT_SYSTEM_PROMPT = """You are checking whether a real Supreme Court of India judgment actually supports a claim a legal filing attributes to it.
-
-You will be given:
-1. CLAIM — what the filing says this case holds/says.
-2. RETRIEVED TEXT — actual excerpted text from the real judgment (the best-matching passage(s) found for this claim within this specific case).
-
-Decide:
-- "entailed": the retrieved text clearly supports/states the claim.
-- "contradicted": the retrieved text clearly says something different from or opposite to the claim.
-- "unclear": the retrieved text is on-topic but doesn't clearly confirm or deny the specific claim (e.g. the relevant passage wasn't retrieved, or the claim is more specific than what's shown).
-
-Also give a confidence: "high" only if you are highly certain given the retrieved text; "medium" or "low" otherwise. Retrieved text is a partial excerpt, not the full judgment — when in doubt, prefer "unclear" and lower confidence over guessing.
-
-Respond with ONLY JSON: {"verdict": "entailed"|"contradicted"|"unclear", "confidence": "high"|"medium"|"low", "reasoning": "one or two sentences"}
+Respond with ONLY valid JSON:
+{
+  "verdict": "SUPPORTED" | "PARTIALLY_SUPPORTED" | "NOT_SUPPORTED" | "CONTRADICTED",
+  "confidence": "high" | "medium" | "low",
+  "holding_type": "holding" | "observation" | "factual_background" | "counsel_submission" | "citation_to_other_authority" | "unclear",
+  "supporting_quote": "<verbatim sentence from one of the passages, or null>",
+  "evidence_passage_index": <1-5 indicating which passage, or null>,
+  "reasoning": "2-3 sentences explaining your verdict, referencing where in the evidence (e.g. 'P2 states...') and noting holding vs submission distinction where relevant."
+}
 """
 
 
-def _run_entailment(claimed_content: str, retrieved_text: str) -> dict:
-    user_message = f"CLAIM:\n{claimed_content}\n\nRETRIEVED TEXT:\n{retrieved_text[:4000]}"
+def _semantic_rank_paragraphs(
+    paragraphs: list[str], claim: str, top_n: int = _TOP_N_EVIDENCE
+) -> list[tuple[float, int, str]]:
+    """
+    Rank paragraphs against the claim using BGE-small-en cosine similarity.
+    Returns list of (score, original_index, paragraph_text) in descending score order.
+    Falls back to keyword overlap if the embedding model is unavailable.
+    """
+    # Filter out very short/boilerplate paragraphs first
+    candidates = [(i, p) for i, p in enumerate(paragraphs) if len(p.strip()) >= _MIN_PARA_CHARS]
+    if not candidates:
+        return []
+
+    try:
+        from services.rag import get_embeddings
+        texts_to_embed = [claim] + [p for _, p in candidates]
+        embeddings = get_embeddings(texts_to_embed)
+        claim_vec = embeddings[0]
+        para_vecs = embeddings[1:]
+
+        def _cosine(a: list, b: list) -> float:
+            dot = sum(x * y for x, y in zip(a, b))
+            na = sum(x * x for x in a) ** 0.5
+            nb = sum(x * x for x in b) ** 0.5
+            if na == 0 or nb == 0:
+                return 0.0
+            return dot / (na * nb)
+
+        scored = [
+            (_cosine(claim_vec, para_vecs[j]), candidates[j][0], candidates[j][1])
+            for j in range(len(candidates))
+        ]
+        scored.sort(key=lambda x: x[0], reverse=True)
+        print(f"[CitationVerifier][Stage5] Semantic ranking: top scores = {[round(s[0], 3) for s in scored[:top_n]]}")
+        return scored[:top_n]
+
+    except Exception as emb_err:
+        # Graceful fallback: keyword overlap (original logic)
+        print(f"[CitationVerifier][Stage5] Embedding unavailable ({emb_err}), falling back to keyword overlap.")
+        stop_words = {"and", "the", "be", "to", "in", "of", "a", "is", "for", "that", "this", "it", "as", "by", "with"}
+        claim_words = {w for w in re.findall(r"\w+", claim.lower()) if len(w) > 2 and w not in stop_words}
+        scored = []
+        for orig_i, p in candidates:
+            p_words = set(re.findall(r"\w+", p.lower()))
+            score = float(len(claim_words & p_words))
+            scored.append((score, orig_i, p))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return scored[:top_n]
+
+
+def _build_evidence_block(ranked: list[tuple[float, int, str]]) -> str:
+    """
+    Format the top-N ranked paragraphs into a numbered evidence block for the LLM.
+    Each passage is labelled [P1], [P2], … for the LLM to reference in its quote.
+    """
+    parts = []
+    for rank, (score, orig_idx, text) in enumerate(ranked, start=1):
+        parts.append(f"[P{rank}] (paragraph {orig_idx + 1}, similarity={score:.3f})\n{text.strip()}")
+    return "\n\n".join(parts)
+
+
+def _extract_evidence_from_paragraphs(
+    paragraphs: list[str], claim: str
+) -> tuple[str, str, list[tuple[float, int, str]]]:
+    """
+    Stage 5 — Semantic Evidence Retrieval from the actual cited judgment.
+
+    Uses BGE-small-en embeddings (via the existing RAG infrastructure) to rank every
+    paragraph of the judgment against the filing's claim, then returns the top-N
+    passages for the NLI model.
+
+    Returns:
+        evidence_block  — formatted string with [P1]…[PN] labels for the entailment prompt
+        paragraph_label — human-readable label for the best matching paragraph (UI display)
+        ranked          — raw ranked list for downstream use
+    """
+    if not paragraphs:
+        return "", None, []
+
+    ranked = _semantic_rank_paragraphs(paragraphs, claim, top_n=_TOP_N_EVIDENCE)
+    if not ranked:
+        return "", None, []
+
+    evidence_block = _build_evidence_block(ranked)
+
+    # Derive a display label from the best-matching paragraph
+    best_score, best_orig_idx, best_p = ranked[0]
+    p_num_match = re.search(r"^\s*(\d{1,3})\.\s+", best_p)
+    if p_num_match:
+        paragraph_label = f"paragraph {p_num_match.group(1)}"
+    else:
+        paragraph_label = f"passage (section {best_orig_idx + 1})"
+
+    return evidence_block, paragraph_label, ranked
+
+
+def _run_entailment(claimed_content: str, evidence_block: str) -> dict:
+    """Stage 6 — Run NLI against the top-N semantically retrieved passages from the actual cited judgment."""
+    user_message = (
+        f"CLAIM:\n{claimed_content}\n\n"
+        f"EVIDENCE PASSAGES FROM ACTUAL CITED JUDGMENT:\n{evidence_block[:5000]}"
+    )
     last_err = None
 
-    # Throttled to _ENTAILMENT_CONCURRENCY concurrent Groq calls (see module docstring
-    # above) -- this is what keeps "parallel" from tripping the free-tier TPM limit.
     with _entailment_semaphore:
-        # One retry, same pinned model only (never a smaller cascade model, per S2 brief).
-        # On a 429, back off for however long Groq actually says to wait rather than a
-        # fixed short delay -- a fixed 1.5s retry into an still-exhausted TPM budget
-        # just produces a second failure and a false Mismatch on a correct citation.
         for attempt in range(2):
             try:
                 raw = call_groq(ENTAILMENT_SYSTEM_PROMPT, user_message, json_mode=True, model=ENTAILMENT_MODEL)
                 data = _parse_json_object(raw)
-                # _parse_json_object can return any JSON type (list, string, etc), not
-                # just a dict, if the model deviates from the requested shape -- the
-                # same crash class fixed in extract_citations for a bare-list response.
                 if not isinstance(data, dict):
                     raise ValueError(f"Entailment response was not a JSON object: {raw!r}")
-                verdict = data.get("verdict")
-                confidence = data.get("confidence")
-                if verdict not in ("entailed", "contradicted", "unclear") or confidence not in ("high", "medium", "low"):
-                    raise ValueError(f"Malformed entailment response: {raw!r}")
-                return {"verdict": verdict, "confidence": confidence, "reasoning": data.get("reasoning", ""), "technical_failure": False}
+
+                verdict = data.get("verdict", "").upper()
+                if verdict not in ("SUPPORTED", "PARTIALLY_SUPPORTED", "NOT_SUPPORTED", "CONTRADICTED"):
+                    if "ENTAILED" in verdict:
+                        verdict = "SUPPORTED"
+                    elif "CONTRADICT" in verdict:
+                        verdict = "CONTRADICTED"
+                    else:
+                        verdict = "NOT_SUPPORTED"
+
+                # Enforce extractive-justification rule:
+                # if LLM claims SUPPORTED/PARTIALLY but gave no quote, downgrade confidence.
+                supporting_quote = data.get("supporting_quote") or None
+                confidence = data.get("confidence", "medium").lower()
+                if confidence not in ("high", "medium", "low"):
+                    confidence = "medium"
+                if verdict in ("SUPPORTED", "PARTIALLY_SUPPORTED") and not supporting_quote:
+                    confidence = "low"  # can't be high/medium without a grounding quote
+
+                if supporting_quote is not None and not isinstance(supporting_quote, str):
+                    supporting_quote = str(supporting_quote)
+                reasoning = data.get("reasoning", "")
+                if not isinstance(reasoning, str):
+                    reasoning = str(reasoning)
+
+                return {
+                    "verdict": verdict,
+                    "confidence": confidence,
+                    "holding_type": str(data.get("holding_type", "observation")),
+                    "supporting_quote": supporting_quote,
+                    "evidence_passage_index": data.get("evidence_passage_index"),
+                    "reasoning": reasoning,
+                    "technical_failure": False,
+                }
             except Exception as e:
                 last_err = e
-                # Full exception (may include upstream API text, billing links, etc.)
-                # is logged server-side only -- it must never reach the user-facing
-                # reasoning field. An earlier version interpolated str(last_err)
-                # directly into "reasoning", which leaked a raw Groq 429 message
-                # (including a billing-upsell URL) into the UI as if it were the
-                # model's actual analysis of the citation. Caught in UX audit.
-                print(f"[CitationVerifier] Entailment attempt {attempt + 1} failed (pinned to {ENTAILMENT_MODEL}): {e}")
+                print(f"[CitationVerifier] Entailment attempt {attempt + 1} failed: {e}")
                 if attempt == 0:
                     match = _RETRY_AFTER_PATTERN.search(str(e))
                     delay = min(float(match.group(1)), 20.0) + 0.5 if match else 1.5
                     time.sleep(delay)
 
-    # technical_failure=True marks this as "we could not run the check" (infra
-    # failure -- rate limit, timeout, malformed response), distinct from the
-    # model genuinely evaluating the passage and returning "unclear". The
-    # citation still maps to Mismatch below (cautious-bias still applies -- a
-    # false Verified is worse than an unnecessary flag), but the frontend uses
-    # this flag to say "verification incomplete, please retry" rather than
-    # presenting it as a confident contradiction finding.
     return {
-        "verdict": "unclear",
+        "verdict": "NOT_SUPPORTED",
         "confidence": "low",
+        "holding_type": "unclear",
+        "supporting_quote": None,
+        "evidence_passage_index": None,
         "reasoning": "The verification service was temporarily unavailable and this citation could not be checked. Please retry.",
         "technical_failure": True,
     }
 
 
-def _paragraph_display(chunk_metadata: dict) -> str:
-    numbers = chunk_metadata.get("paragraph_numbers") or []
-    if numbers:
-        nums = sorted(set(numbers))
-        label = f"paragraph {nums[0]}" if len(nums) == 1 else f"paragraphs {nums[0]}–{nums[-1]}"
-        return label
-    return "paragraph not detected — matched passage shown below"
-
+# ── MAIN PER-CITATION VERIFICATION (10 STAGES) ───────────────────────────────
 
 def verify_citation(citation: dict) -> dict:
-    """The full per-citation chain: resolve -> retrieve (case-scoped) -> entailment ->
-    cautious-bias three-state mapping. Runs synchronously/blocking; the route layer
-    parallelizes N of these across threads."""
+    """Full 10-stage verification chain for one citation.
+
+    IDENTITY FIRST:
+    1. Parse citation details.
+    2. Try internal corpus identity resolution (strict priority, NO semantic vector matching).
+    3. If internal misses: mark NOT_FOUND_IN_INDEXED_CORPUS, perform external lookup.
+    4. Distinguish identity match from related cases (citing judgments -> RELATED_AUTHORITY).
+    5. Retrieve actual cited judgment only.
+
+    ENTAILMENT SECOND:
+    6. Extract evidence from ACTUAL CITED JUDGMENT only.
+    7. Run NLI with holding/submission distinction.
+
+    RELATED CASES THIRD:
+    8. Populate related_authorities separately.
+    """
     case_name = citation["case_name"]
     citation_string = citation.get("citation_string", "")
     claimed_content = citation.get("claimed_content") or case_name
+    context_snippet = citation.get("context_snippet", "")
 
-    case_meta = resolve_case(case_name, citation_string)
+    parsed = parse_citation(case_name, citation_string, context_snippet)
 
-    if case_meta is None:
-        return {
-            "status": "Not found in indexed corpus",
-            "matched_case": None,
-            "paragraph_display": None,
-            "matched_text": None,
-            "entailment": None,
-            "source_link": None,
+    # Variables for Stage 10 result model
+    identity_status = "NOT_FOUND_IN_INDEXED_CORPUS"
+    matched_authority = None
+    resolution_method = None
+    identity_source = None
+    retrieval_source = None
+    related_authorities = []
+    raw_judgment_text = ""
+    judgment_paragraphs = []
+
+    # ── STAGE 1: Internal Identity Resolution ─────────────────────────────────
+    internal_case = resolve_internal_case_identity(parsed)
+    if internal_case:
+        matched_authority = {
+            "canonical_case_id": internal_case["case_id"],
+            "case_name": internal_case["case_name"],
+            "citation": internal_case["citation"],
+            "court": internal_case["court"],
+            "date": internal_case["date"],
+            "source_url": f"/judgments/{internal_case['case_id']}",
+            "document_hash": hashlib.sha256((internal_case.get("full_text") or "").encode("utf-8")).hexdigest(),
         }
+        identity_status = "VERIFIED"
+        resolution_method = internal_case.get("resolution_method", "internal_match")
+        identity_source = "internal"
+        retrieval_source = "internal"
+        raw_judgment_text = internal_case.get("full_text") or ""
+        judgment_paragraphs = [p.strip() for p in raw_judgment_text.split("\n\n") if p.strip()]
 
-    # Layer 1 (primary): retrieve within THIS case only, then run entailment.
-    # Deliberately does not depend on paragraph_numbers at all.
-    case_hits = search_judgments(claimed_content, top_k=3, case_id_filter=case_meta["case_id"])
-    if not case_hits:
-        case_hits = search_judgments(case_name, top_k=1, case_id_filter=case_meta["case_id"])
+    # ── STAGE 7: External Fallback (if internal missed) ───────────────────────
+    if not matched_authority:
+        print(f"[CitationVerifier] Citation not in internal index: {case_name!r}. Performing external verification...")
+        ext_res: ExternalResolutionResult = lookup_and_resolve_external_case(
+            case_name=case_name,
+            citation_string=citation_string,
+            context=context_snippet,
+        )
+        related_authorities = ext_res.related_authorities
 
-    if not case_hits:
-        return {
-            "status": "Mismatch",
-            "matched_case": case_meta,
-            "paragraph_display": None,
-            "matched_text": None,
-            "entailment": {"verdict": "unclear", "confidence": "low", "reasoning": "Case identified but no retrievable passage found.", "technical_failure": False},
-            "source_link": None,
-        }
+        if ext_res.identity_matched:
+            identity_status = "VERIFIED"
+            resolution_method = ext_res.resolution_method
+            identity_source = "external"
+            retrieval_source = "external"
+            matched_authority = {
+                "canonical_case_id": ext_res.canonical_case_id,
+                "case_name": ext_res.case_name,
+                "citation": ext_res.citation,
+                "court": ext_res.court,
+                "date": ext_res.date,
+                "source_url": ext_res.source_url,
+                "document_hash": ext_res.document_hash,
+            }
+            raw_judgment_text = ext_res.clean_text
+            judgment_paragraphs = ext_res.paragraphs
+        else:
+            # Identity failed externally as well
+            if ext_res.state == "POSSIBLE_FABRICATION":
+                identity_status = "POSSIBLE_FABRICATION"
+            elif ext_res.state == "ERROR":
+                identity_status = "EXTERNAL_SOURCE_ERROR"
+            else:
+                identity_status = "UNVERIFIED_CITATION"
 
-    best_hit = case_hits[0]
-    retrieved_text = "\n\n".join(h["text"] for h in case_hits)
-    entailment = _run_entailment(claimed_content, retrieved_text)
+    # ── STAGE 5 & 6: Substantive Proposition Verification (ONLY if Identity Verified)
+    proposition_status = "NOT_RUN"
+    evidence_passage = ""
+    paragraph_display = None
+    entailment_res = None
+    technical_failure = False
+    holding_type = "unclear"
+    reasoning = ""
+    confidence = "low"
 
-    # Cautious-bias rule (deterministic, not left to the model): Verified requires
-    # entailed AND high confidence. Everything else - contradicted, unclear, or any
-    # non-high confidence - defaults to Mismatch. A false Verified is the failure this
-    # product exists to prevent; an over-cautious Mismatch is a safe place to be wrong.
-    if entailment["verdict"] == "entailed" and entailment["confidence"] == "high":
-        status = "Verified"
+    supporting_quote = None
+    evidence_passage_index = None
+
+    if identity_status == "VERIFIED" and (raw_judgment_text or judgment_paragraphs):
+        # STAGE 5: Semantic Evidence Retrieval — top-N paragraphs via BGE-small embeddings
+        evidence_block, paragraph_display, ranked_paras = _extract_evidence_from_paragraphs(
+            judgment_paragraphs,
+            claimed_content,
+        )
+
+        # Fallback: if no paragraphs could be ranked, use raw text prefix
+        if not evidence_block and raw_judgment_text:
+            evidence_block = f"[P1] (full text fallback)\n{raw_judgment_text[:4000]}"
+            evidence_passage = raw_judgment_text[:4000]
+        else:
+            # Flatten ranked passages for backward-compat display (evidence_passage field)
+            evidence_passage = "\n\n".join(p for _, _, p in ranked_paras) if ranked_paras else ""
+
+        # STAGE 6: Entailment / NLI — LLM receives all top-N passages and must quote its source
+        entailment_res = _run_entailment(claimed_content, evidence_block)
+        proposition_status = entailment_res["verdict"]
+        confidence = entailment_res["confidence"]
+        holding_type = entailment_res.get("holding_type", "observation")
+        reasoning = entailment_res["reasoning"]
+        supporting_quote = entailment_res.get("supporting_quote")
+        evidence_passage_index = entailment_res.get("evidence_passage_index")
+        technical_failure = entailment_res.get("technical_failure", False)
+
+    # ── Overall display status mapping ───────────────────────────────────────
+    if identity_status == "VERIFIED":
+        if proposition_status == "SUPPORTED":
+            display_status = "Verified"
+        elif proposition_status == "PARTIALLY_SUPPORTED":
+            display_status = "Partial Match"
+        else:
+            display_status = "Mismatch"
+    elif identity_status == "POSSIBLE_FABRICATION":
+        display_status = "Possible Fabrication"
+    elif identity_status == "UNVERIFIED_CITATION":
+        display_status = "Unverified Citation"
+    elif identity_status == "EXTERNAL_SOURCE_ERROR":
+        display_status = "External Source Error"
     else:
-        status = "Mismatch"
+        display_status = "Not Indexed / Not Found"
 
-    # Layer 2 (secondary, display-only): never used above to decide the verdict.
-    paragraph_display = _paragraph_display(best_hit["metadata"])
+    # ── STAGE 10: Assemble Complete Result Model ─────────────────────────────
+    source_name = "Indexed corpus (Supreme Court)" if retrieval_source == "internal" else (
+        "Indian Kanoon" if retrieval_source == "external" else None
+    )
 
     return {
-        "status": status,
-        "matched_case": case_meta,
+        # STAGE 10 Core Specification Fields
+        "citation_identity": {
+            "status": identity_status,
+            "matched_case": matched_authority,
+            "resolution_method": resolution_method,
+            "source": identity_source,
+        },
+        "proposition_verification": {
+            "status": proposition_status,
+            "verdict": proposition_status,
+            "confidence": confidence,
+            "holding_type": holding_type,
+            "reasoning": reasoning,
+            "supporting_quote": supporting_quote,           # extractive verbatim quote from the judgment
+            "evidence_passage_index": evidence_passage_index,  # which [P1]-[P5] passage was cited
+            "evidence_passage": evidence_passage,
+            "paragraph_display": paragraph_display,
+            "technical_failure": technical_failure,
+        },
+        "source": {
+            "retrieval_type": retrieval_source,
+            "source_name": source_name,
+            "source_url": matched_authority["source_url"] if matched_authority else None,
+            "canonical_case_id": matched_authority["canonical_case_id"] if matched_authority else None,
+            "document_hash": matched_authority["document_hash"] if matched_authority else None,
+        },
+        "related_authorities": related_authorities,
+
+        # Backward compatibility fields for UI, CSV/PDF export, and tests
+        "case_name": case_name,
+        "citation_string": citation_string,
+        "claimed_content": claimed_content,
+        "context_snippet": context_snippet,
+        "status": display_status,
+        "retrieval_source": retrieval_source,
+        "matched_case": matched_authority,
         "paragraph_display": paragraph_display,
-        "matched_text": best_hit["text"][:1000],
-        "entailment": entailment,
-        "source_link": f"/judgments/{case_meta['case_id']}",
+        "matched_text": evidence_passage[:1200] if evidence_passage else None,
+        "entailment": {
+            "verdict": "entailed" if proposition_status == "SUPPORTED" else (
+                "contradicted" if proposition_status == "CONTRADICTED" else "unclear"
+            ),
+            "confidence": confidence,
+            "reasoning": reasoning,
+            "technical_failure": technical_failure,
+        } if proposition_status != "NOT_RUN" else None,
+        "source_link": matched_authority["source_url"] if matched_authority else None,
+        "external_lookup": {
+            "state": "FOUND" if retrieval_source == "external" else "NOT_FOUND",
+            "source": source_name,
+            "canonical_title": matched_authority["case_name"] if matched_authority else None,
+            "doc_url": matched_authority["source_url"] if matched_authority else None,
+        } if retrieval_source == "external" else None,
     }
 
 
-async def _verify_indexed(idx: int, citation: dict) -> tuple:
+# ── Async streaming pipeline ──────────────────────────────────────────────────
+
+async def _verify_one(idx: int, citation: dict) -> tuple:
     result = await asyncio.to_thread(verify_citation, citation)
     return idx, citation, result
 
 
 async def verify_filing_stream(filing_text: str):
-    """Public entrypoint: wraps the real generator so any unexpected exception
-    yields a clean "error" SSE event instead of silently killing the HTTP
-    stream mid-flight (confirmed live: an unhandled AttributeError here left
-    the frontend hanging until timeout, with no error shown to the user --
-    exactly the "broken state on backend error" class of bug flagged in the
-    UX audit)."""
+    """Public entrypoint for citation verification streaming."""
     try:
         async for event in _verify_filing_stream_inner(filing_text):
             yield event
@@ -388,9 +592,6 @@ async def verify_filing_stream(filing_text: str):
 
 
 async def _verify_filing_stream_inner(filing_text: str):
-    """Async generator: classify once, then verify all citations concurrently
-    (asyncio.to_thread per citation + asyncio.as_completed), yielding an event
-    as each one finishes -- not after the slowest one."""
     start = time.perf_counter()
     citations, extraction_incomplete = extract_citations(filing_text)
     total = len(citations)
@@ -407,15 +608,17 @@ async def _verify_filing_stream_inner(filing_text: str):
             "type": "done",
             "elapsed_seconds": round(time.perf_counter() - start, 2),
             "report": {
-                "citations": [], "extraction_incomplete": extraction_incomplete,
-                "summary": {"verified": 0, "mismatch": 0, "not_found": 0, "total": 0}, "coverage_banner": get_coverage_banner(),
+                "citations": [],
+                "extraction_incomplete": extraction_incomplete,
+                "summary": {"verified": 0, "partial_match": 0, "mismatch": 0, "not_found": 0, "external_error": 0, "total": 0},
+                "coverage_banner": get_coverage_banner(),
             },
         }
         return
 
     results = [None] * total
     completed = 0
-    tasks = [asyncio.ensure_future(_verify_indexed(i, c)) for i, c in enumerate(citations)]
+    tasks = [asyncio.ensure_future(_verify_one(i, c)) for i, c in enumerate(citations)]
 
     for fut in asyncio.as_completed(tasks):
         idx, citation, result = await fut
@@ -433,9 +636,13 @@ async def _verify_filing_stream_inner(filing_text: str):
     summary = {
         "total": total,
         "verified": sum(1 for r in results if r["status"] == "Verified"),
+        "partial_match": sum(1 for r in results if r["status"] == "Partial Match"),
         "mismatch": sum(1 for r in results if r["status"] == "Mismatch"),
-        "not_found": sum(1 for r in results if r["status"] == "Not found in indexed corpus"),
-        "technical_failures": sum(1 for r in results if (r.get("entailment") or {}).get("technical_failure")),
+        "possible_fabrication": sum(1 for r in results if r["status"] == "Possible Fabrication"),
+        "unverified": sum(1 for r in results if r["status"] in ("Unverified Citation", "Not Indexed / Not Found")),
+        "not_found": sum(1 for r in results if r["status"] in ("Not Indexed / Not Found", "Possible Fabrication", "Unverified Citation")),
+        "external_error": sum(1 for r in results if r["status"] == "External Source Error"),
+        "technical_failures": sum(1 for r in results if (r.get("proposition_verification") or {}).get("technical_failure")),
     }
 
     yield {

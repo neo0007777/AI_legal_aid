@@ -104,7 +104,28 @@ def get_judgments_collection_count() -> int:
 
 
 def _parents_db_path() -> str:
-    return os.path.join(JUDGMENTS_DATA_PATH, "parents.db")
+    path = os.path.join(JUDGMENTS_DATA_PATH, "parents.db")
+    if not os.path.exists(path):
+        os.makedirs(JUDGMENTS_DATA_PATH, exist_ok=True)
+        try:
+            conn = sqlite3.connect(path)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS judgments (
+                    case_id TEXT PRIMARY KEY,
+                    case_name TEXT,
+                    court TEXT,
+                    date TEXT,
+                    citation TEXT,
+                    disposition TEXT,
+                    full_text TEXT,
+                    chunk_count INTEGER
+                )
+            """)
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"[JudgmentSearch] Failed to init parents.db: {e}")
+    return path
 
 
 def _init_parents_db() -> sqlite3.Connection:
@@ -127,27 +148,165 @@ def _init_parents_db() -> sqlite3.Connection:
 
 
 def get_parent_judgment(case_id: str) -> dict:
-    conn = sqlite3.connect(_parents_db_path())
     try:
-        row = conn.execute(
-            "SELECT case_id, case_name, court, date, citation, disposition, full_text, chunk_count "
-            "FROM judgments WHERE case_id = ?",
-            (case_id,),
-        ).fetchone()
-    finally:
-        conn.close()
-    if not row:
+        conn = sqlite3.connect(_parents_db_path())
+        try:
+            row = conn.execute(
+                "SELECT case_id, case_name, court, date, citation, disposition, full_text, chunk_count "
+                "FROM judgments WHERE case_id = ?",
+                (case_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return None
+        return {
+            "case_id": row[0],
+            "case_name": row[1],
+            "court": row[2],
+            "date": row[3],
+            "citation": row[4],
+            "disposition": row[5],
+            "full_text": row[6],
+            "chunk_count": row[7],
+        }
+    except Exception as e:
+        print(f"[JudgmentSearch] get_parent_judgment failed: {e}")
         return None
-    return {
-        "case_id": row[0],
-        "case_name": row[1],
-        "court": row[2],
-        "date": row[3],
-        "citation": row[4],
-        "disposition": row[5],
-        "full_text": row[6],
-        "chunk_count": row[7],
-    }
+
+
+def search_by_case_id(case_id: str) -> dict | None:
+    return get_parent_judgment(case_id)
+
+
+def search_by_exact_citation(citation_str: str) -> dict | None:
+    if not citation_str or not citation_str.strip():
+        return None
+    try:
+        conn = sqlite3.connect(_parents_db_path())
+        try:
+            row = conn.execute(
+                "SELECT case_id, case_name, court, date, citation, disposition, full_text, chunk_count "
+                "FROM judgments WHERE citation = ? OR citation LIKE ? LIMIT 1",
+                (citation_str.strip(), f"%{citation_str.strip()}%"),
+            ).fetchone()
+        finally:
+            conn.close()
+        if row:
+            return {
+                "case_id": row[0], "case_name": row[1], "court": row[2],
+                "date": row[3], "citation": row[4], "disposition": row[5],
+                "full_text": row[6], "chunk_count": row[7],
+                "resolution_method": "exact_citation",
+            }
+    except Exception as e:
+        print(f"[JudgmentSearch] search_by_exact_citation failed: {e}")
+    return None
+
+
+def search_by_normalized_citation(norm_cit: str) -> dict | None:
+    if not norm_cit:
+        return None
+    try:
+        conn = sqlite3.connect(_parents_db_path())
+        try:
+            rows = conn.execute("SELECT case_id, case_name, court, date, citation, disposition, full_text, chunk_count FROM judgments WHERE citation != ''").fetchall()
+        finally:
+            conn.close()
+        from services.citation_parser import normalize_citation_string
+        for row in rows:
+            if normalize_citation_string(row[4]) == norm_cit:
+                return {
+                    "case_id": row[0], "case_name": row[1], "court": row[2],
+                    "date": row[3], "citation": row[4], "disposition": row[5],
+                    "full_text": row[6], "chunk_count": row[7],
+                    "resolution_method": "normalized_citation",
+                }
+    except Exception as e:
+        print(f"[JudgmentSearch] search_by_normalized_citation failed: {e}")
+    return None
+
+
+def search_by_case_name_and_year(case_name: str, year: int = None, court: str = None) -> dict | None:
+    if not case_name:
+        return None
+    try:
+        conn = sqlite3.connect(_parents_db_path())
+        try:
+            rows = conn.execute("SELECT case_id, case_name, court, date, citation, disposition, full_text, chunk_count FROM judgments").fetchall()
+        finally:
+            conn.close()
+        from services.citation_parser import calculate_name_similarity
+        best_row, best_sim = None, 0.0
+        for row in rows:
+            r_name = row[1]
+            r_date = row[3]
+            r_year = int(r_date[:4]) if r_date and len(r_date) >= 4 and r_date[:4].isdigit() else None
+            if year and r_year and abs(year - r_year) > 2:
+                continue
+            sim = calculate_name_similarity(case_name, r_name)
+            if sim > best_sim:
+                best_sim, best_row = sim, row
+
+        if best_row and best_sim >= 0.65:
+            return {
+                "case_id": best_row[0], "case_name": best_row[1], "court": best_row[2],
+                "date": best_row[3], "citation": best_row[4], "disposition": best_row[5],
+                "full_text": best_row[6], "chunk_count": best_row[7],
+                "resolution_method": "exact_case_name_and_year" if year else "normalized_case_name",
+                "_name_match_score": best_sim,
+            }
+    except Exception as e:
+        print(f"[JudgmentSearch] search_by_case_name_and_year failed: {e}")
+    return None
+
+
+def resolve_internal_case_identity(parsed: dict) -> dict | None:
+    """STAGE 1: Resolve citation identity in the internal corpus using strict priority.
+    Priority:
+    A. exact citation
+    B. normalized citation
+    C. neutral citation
+    D. canonical case ID
+    E. exact case-name + court + year
+    F. alternate case-name normalization
+    DO NOT use semantic similarity as an identity signal.
+    """
+    cit_str = parsed.get("citation_string", "")
+    norm_cit = parsed.get("normalized_citation", "")
+    neutral = parsed.get("neutral_citation", "")
+    case_name = parsed.get("case_name", "")
+    year = parsed.get("year")
+    court = parsed.get("court")
+
+    # Priority A: exact citation
+    if cit_str:
+        res = search_by_exact_citation(cit_str)
+        if res:
+            return res
+
+    # Priority B: normalized citation
+    if norm_cit:
+        res = search_by_normalized_citation(norm_cit)
+        if res:
+            return res
+
+    # Priority C: neutral citation
+    if neutral:
+        res = search_by_exact_citation(neutral)
+        if res:
+            res["resolution_method"] = "neutral_citation"
+            return res
+
+    # Priority E & F: Case name + year / normalization
+    if case_name:
+        res = search_by_case_name_and_year(case_name, year=year, court=court)
+        if res:
+            return res
+
+    return None
+
+
 
 
 def _download_court_file(filename: str) -> str:
@@ -452,17 +611,21 @@ def search_judgments(query: str, top_k: int = 5, court_filter: str = None, case_
 def get_coverage_stats() -> dict:
     """Real counts/date-range backing the S2 coverage banner — computed from parents.db,
     never hardcoded, so it can't drift from what's actually indexed."""
-    conn = sqlite3.connect(_parents_db_path())
     try:
-        row = conn.execute(
-            "SELECT COUNT(*), MIN(date), MAX(date) FROM judgments WHERE date != ''"
-        ).fetchone()
-    finally:
-        conn.close()
-    count, min_date, max_date = row
-    min_year = min_date[:4] if min_date else None
-    max_year = max_date[:4] if max_date else None
-    return {"case_count": count or 0, "min_year": min_year, "max_year": max_year}
+        conn = sqlite3.connect(_parents_db_path())
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*), MIN(date), MAX(date) FROM judgments WHERE date != ''"
+            ).fetchone()
+        finally:
+            conn.close()
+        count, min_date, max_date = row if row else (0, None, None)
+        min_year = min_date[:4] if min_date else None
+        max_year = max_date[:4] if max_date else None
+        return {"case_count": count or 0, "min_year": min_year, "max_year": max_year}
+    except Exception as e:
+        print(f"[JudgmentSearch] get_coverage_stats error: {e}")
+        return {"case_count": 0, "min_year": None, "max_year": None}
 
 
 def get_coverage_banner() -> str:

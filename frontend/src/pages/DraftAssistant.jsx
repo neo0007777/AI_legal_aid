@@ -1,44 +1,57 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     FileText, Wand2, RotateCcw, Download, Copy, RefreshCw, Edit3,
     Sparkles, CornerDownRight, Check, Loader2, ShieldAlert, AlertOctagon,
     Scale, BookmarkMinus, Briefcase, Users, Lock, FileSignature,
     UploadCloud, X, AlertTriangle, ListChecks, ArrowRightCircle,
-    ChevronLeft, ChevronRight, FileCheck, CheckCircle2
+    ChevronLeft, ChevronRight, FileCheck, CheckCircle2, Info, CircleAlert
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
 import './DraftAssistant.css';
 
+// Material fields per template — these are flagged if missing
+const MATERIAL_FIELDS = {
+    bail: ['accused', 'sections', 'court'],
+    anticipatory: ['apprehended', 'offense', 'court'],
+    plaint: ['plaintiff', 'defendant', 'court', 'cause'],
+    injunction: ['applicant', 'respondent', 'court', 'urgency'],
+    rent: ['landlord', 'tenant', 'property', 'rent'],
+    employment: ['company', 'employee', 'role', 'salary'],
+    nda: ['party1', 'party2', 'purpose'],
+    vakalatnama: ['court', 'client', 'advocate'],
+    affidavit: ['deponent', 'matter'],
+};
+
 const TEMPLATE_GROUPS = [
     {
         groupTitle: 'CRIMINAL',
         templates: [
-            { id: 'bail', title: 'Bail Application', icon: ShieldAlert, category: 'Petition', fields: [{ id: 'accused', label: 'Name of Accused', placeholder: 'e.g. Ramesh Kumar' }, { id: 'fir', label: 'FIR No. / Year', placeholder: 'e.g. 124/2023' }, { id: 'sections', label: 'Relevant Sections', placeholder: 'e.g. 302, 307 IPC' }, { id: 'court', label: 'Jurisdiction / Court', placeholder: 'e.g. Sessions Court, Delhi' }, { id: 'facts', label: 'Brief Defense Facts', placeholder: 'e.g. Falsely implicated...', type: 'textarea' }] },
-            { id: 'anticipatory', title: 'Anticipatory Bail', icon: AlertOctagon, category: 'Petition', fields: [{ id: 'apprehended', label: 'Name of Person', placeholder: 'e.g. Suresh Singh' }, { id: 'ps', label: 'Police Station', placeholder: 'e.g. Vasant Kunj' }, { id: 'offense', label: 'Apprehended Offense', placeholder: 'e.g. 498A IPC' }, { id: 'court', label: 'Court', placeholder: 'e.g. High Court of Delhi' }, { id: 'reasons', label: 'Reasons', placeholder: 'e.g. Matrimonial dispute...', type: 'textarea' }] },
+            { id: 'bail', title: 'Bail Application', icon: ShieldAlert, category: 'Petition', fields: [{ id: 'accused', label: 'Name of Accused', placeholder: 'e.g. Ramesh Kumar', material: true }, { id: 'fir', label: 'FIR No. / Year', placeholder: 'e.g. 124/2023' }, { id: 'sections', label: 'Relevant Sections', placeholder: 'e.g. 302, 307 IPC', material: true }, { id: 'court', label: 'Jurisdiction / Court', placeholder: 'e.g. Sessions Court, Delhi', material: true }, { id: 'facts', label: 'Brief Defense Facts', placeholder: 'e.g. Falsely implicated...', type: 'textarea' }] },
+            { id: 'anticipatory', title: 'Anticipatory Bail', icon: AlertOctagon, category: 'Petition', fields: [{ id: 'apprehended', label: 'Name of Person', placeholder: 'e.g. Suresh Singh', material: true }, { id: 'ps', label: 'Police Station', placeholder: 'e.g. Vasant Kunj' }, { id: 'offense', label: 'Apprehended Offense', placeholder: 'e.g. 498A IPC', material: true }, { id: 'court', label: 'Court', placeholder: 'e.g. High Court of Delhi', material: true }, { id: 'reasons', label: 'Reasons', placeholder: 'e.g. Matrimonial dispute...', type: 'textarea' }] },
         ]
     },
     {
         groupTitle: 'CIVIL',
         templates: [
-            { id: 'plaint', title: 'Civil Suit / Plaint', icon: Scale, category: 'Plaint and Written statement', fields: [{ id: 'plaintiff', label: 'Plaintiff', placeholder: 'e.g. ABC Corp.' }, { id: 'defendant', label: 'Defendant', placeholder: 'e.g. XYZ Ltd.' }, { id: 'court', label: 'Court', placeholder: 'e.g. District Court, Mumbai' }, { id: 'suitValue', label: 'Suit Value', placeholder: 'e.g. Rs. 50,00,000/-' }, { id: 'cause', label: 'Cause of Action', placeholder: 'e.g. Breach of contract...', type: 'textarea' }] },
-            { id: 'injunction', title: 'Injunction Application', icon: BookmarkMinus, category: 'Civil Pleadings', fields: [{ id: 'applicant', label: 'Applicant', placeholder: 'e.g. Rahul Verma' }, { id: 'respondent', label: 'Respondent', placeholder: 'e.g. Municipal Corp.' }, { id: 'court', label: 'Court', placeholder: 'e.g. Civil Judge, Bangalore' }, { id: 'property', label: 'Subject', placeholder: 'e.g. Plot No. 42, Sector 5' }, { id: 'urgency', label: 'Grounds of Urgency', placeholder: 'e.g. Illegal demolition...', type: 'textarea' }] },
+            { id: 'plaint', title: 'Civil Suit / Plaint', icon: Scale, category: 'Plaint and Written statement', fields: [{ id: 'plaintiff', label: 'Plaintiff', placeholder: 'e.g. ABC Corp.', material: true }, { id: 'defendant', label: 'Defendant', placeholder: 'e.g. XYZ Ltd.', material: true }, { id: 'court', label: 'Court', placeholder: 'e.g. District Court, Mumbai', material: true }, { id: 'suitValue', label: 'Suit Value', placeholder: 'e.g. Rs. 50,00,000/-' }, { id: 'cause', label: 'Cause of Action', placeholder: 'e.g. Breach of contract...', type: 'textarea', material: true }] },
+            { id: 'injunction', title: 'Injunction Application', icon: BookmarkMinus, category: 'Civil Pleadings', fields: [{ id: 'applicant', label: 'Applicant', placeholder: 'e.g. Rahul Verma', material: true }, { id: 'respondent', label: 'Respondent', placeholder: 'e.g. Municipal Corp.', material: true }, { id: 'court', label: 'Court', placeholder: 'e.g. Civil Judge, Bangalore', material: true }, { id: 'property', label: 'Subject', placeholder: 'e.g. Plot No. 42, Sector 5' }, { id: 'urgency', label: 'Grounds of Urgency', placeholder: 'e.g. Illegal demolition...', type: 'textarea', material: true }] },
         ]
     },
     {
         groupTitle: 'CONTRACTS',
         templates: [
-            { id: 'rent', title: 'Rent Agreement', icon: Briefcase, category: 'Lease Financing', fields: [{ id: 'landlord', label: 'Landlord', placeholder: 'e.g. Sunil Gupta' }, { id: 'tenant', label: 'Tenant', placeholder: 'e.g. Priya Sharma' }, { id: 'property', label: 'Property Address', placeholder: 'e.g. Flat 101, A-Wing...' }, { id: 'rent', label: 'Monthly Rent', placeholder: 'e.g. Rs. 25,000/-' }, { id: 'duration', label: 'Duration', placeholder: 'e.g. 11 Months' }] },
-            { id: 'employment', title: 'Employment Contract', icon: Users, category: 'Appointment', fields: [{ id: 'company', label: 'Company', placeholder: 'e.g. TechCorp Solutions' }, { id: 'employee', label: 'Employee', placeholder: 'e.g. Anil Kumar' }, { id: 'role', label: 'Job Title', placeholder: 'e.g. Senior Engineer' }, { id: 'salary', label: 'Annual CTC', placeholder: 'e.g. Rs. 15,00,000' }, { id: 'probation', label: 'Probation Period', placeholder: 'e.g. 3 Months' }] },
-            { id: 'nda', title: 'NDA', icon: Lock, category: 'Agreement', fields: [{ id: 'party1', label: 'Disclosing Party', placeholder: 'e.g. Innovator Inc.' }, { id: 'party2', label: 'Receiving Party', placeholder: 'e.g. Vendor Corp.' }, { id: 'purpose', label: 'Purpose', placeholder: 'e.g. Exploring M&A merger' }, { id: 'duration', label: 'Duration', placeholder: 'e.g. 3 Years' }] },
+            { id: 'rent', title: 'Rent Agreement', icon: Briefcase, category: 'Lease Financing', fields: [{ id: 'landlord', label: 'Landlord', placeholder: 'e.g. Sunil Gupta', material: true }, { id: 'tenant', label: 'Tenant', placeholder: 'e.g. Priya Sharma', material: true }, { id: 'property', label: 'Property Address', placeholder: 'e.g. Flat 101, A-Wing...', material: true }, { id: 'rent', label: 'Monthly Rent', placeholder: 'e.g. Rs. 25,000/-', material: true }, { id: 'duration', label: 'Duration', placeholder: 'e.g. 11 Months' }] },
+            { id: 'employment', title: 'Employment Contract', icon: Users, category: 'Appointment', fields: [{ id: 'company', label: 'Company', placeholder: 'e.g. TechCorp Solutions', material: true }, { id: 'employee', label: 'Employee', placeholder: 'e.g. Anil Kumar', material: true }, { id: 'role', label: 'Job Title', placeholder: 'e.g. Senior Engineer', material: true }, { id: 'salary', label: 'Annual CTC', placeholder: 'e.g. Rs. 15,00,000', material: true }, { id: 'probation', label: 'Probation Period', placeholder: 'e.g. 3 Months' }] },
+            { id: 'nda', title: 'NDA', icon: Lock, category: 'Agreement', fields: [{ id: 'party1', label: 'Disclosing Party', placeholder: 'e.g. Innovator Inc.', material: true }, { id: 'party2', label: 'Receiving Party', placeholder: 'e.g. Vendor Corp.', material: true }, { id: 'purpose', label: 'Purpose', placeholder: 'e.g. Exploring M&A merger', material: true }, { id: 'duration', label: 'Duration', placeholder: 'e.g. 3 Years' }] },
         ]
     },
     {
         groupTitle: 'COURT FORMS',
         templates: [
-            { id: 'vakalatnama', title: 'Vakalatnama', icon: FileSignature, category: 'Vakalatnama', fields: [{ id: 'court', label: 'Court Name', placeholder: 'e.g. Supreme Court of India' }, { id: 'client', label: 'Client Name', placeholder: 'e.g. XYZ Ltd.' }, { id: 'advocate', label: 'Advocate Name', placeholder: 'e.g. Sharma Sr. Counsel' }, { id: 'caseNo', label: 'Case No.', placeholder: 'e.g. SLP (C) 1245/2026' }] },
-            { id: 'affidavit', title: 'Affidavit', icon: FileText, category: 'Affidavit', fields: [{ id: 'deponent', label: 'Deponent Name', placeholder: 'e.g. Ramesh Singh' }, { id: 'age', label: 'Age / Father', placeholder: 'e.g. 45 yrs, S/o Suresh' }, { id: 'address', label: 'Address', placeholder: 'e.g. 12, Civil Lines...' }, { id: 'matter', label: 'Related Matter', placeholder: 'e.g. Support of Bail App.' }] },
+            { id: 'vakalatnama', title: 'Vakalatnama', icon: FileSignature, category: 'Vakalatnama', fields: [{ id: 'court', label: 'Court Name', placeholder: 'e.g. Supreme Court of India', material: true }, { id: 'client', label: 'Client Name', placeholder: 'e.g. XYZ Ltd.', material: true }, { id: 'advocate', label: 'Advocate Name', placeholder: 'e.g. Sharma Sr. Counsel', material: true }, { id: 'caseNo', label: 'Case No.', placeholder: 'e.g. SLP (C) 1245/2026' }] },
+            { id: 'affidavit', title: 'Affidavit', icon: FileText, category: 'Affidavit', fields: [{ id: 'deponent', label: 'Deponent Name', placeholder: 'e.g. Ramesh Singh', material: true }, { id: 'age', label: 'Age / Father', placeholder: 'e.g. 45 yrs, S/o Suresh' }, { id: 'address', label: 'Address', placeholder: 'e.g. 12, Civil Lines...' }, { id: 'matter', label: 'Related Matter', placeholder: 'e.g. Support of Bail App.', material: true }] },
         ]
     },
 ];
@@ -57,10 +70,12 @@ const DraftAssistant = () => {
     const [documentContent, setDocumentContent] = useState('');
     const [sources, setSources] = useState([]);
     const [reviewData, setReviewData] = useState(null);
+    const [provenanceData, setProvenanceData] = useState(null);
     const [error, setError] = useState('');
     const [copied, setCopied] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [panelOpen, setPanelOpen] = useState(true);
+    const [showMissingWarning, setShowMissingWarning] = useState(false);
     const editorRef = useRef(null);
 
     const switchTemplate = (id) => {
@@ -70,12 +85,22 @@ const DraftAssistant = () => {
         setDocumentContent('');
         setSources([]);
         setReviewData(null);
+        setProvenanceData(null);
         setError('');
+        setShowMissingWarning(false);
     };
 
     const handleInputChange = (fieldId, value) => {
         setFormData(prev => ({ ...prev, [fieldId]: value }));
     };
+
+    // Compute missing material fields
+    const missingMaterialFields = useMemo(() => {
+        const materialIds = MATERIAL_FIELDS[activeTemplateId] || [];
+        return currentTemplate.fields
+            .filter(f => materialIds.includes(f.id) && !formData[f.id]?.trim())
+            .map(f => f.label);
+    }, [activeTemplateId, formData, currentTemplate]);
 
     const buildDescription = () => {
         const parts = [`Generate a ${currentTemplate.title} with the following details:`];
@@ -87,10 +112,36 @@ const DraftAssistant = () => {
         return parts.join('\n');
     };
 
+    const buildStructuredInput = () => {
+        const provided = {};
+        const empty = [];
+        currentTemplate.fields.forEach(field => {
+            if (formData[field.id]?.trim()) {
+                provided[field.id] = formData[field.id].trim();
+            } else {
+                empty.push(field.id);
+            }
+        });
+        return {
+            document_type: currentTemplate.title,
+            template_id: activeTemplateId,
+            provided_fields: provided,
+            empty_fields: empty,
+        };
+    };
+
     const triggerGeneration = async () => {
+        // Show warning about missing material fields
+        if (missingMaterialFields.length > 0 && !showMissingWarning) {
+            setShowMissingWarning(true);
+            return;
+        }
+
         setIsGenerating(true);
         setError('');
         setReviewData(null);
+        setProvenanceData(null);
+        setShowMissingWarning(false);
 
         try {
             const response = await fetch('/api/documents/draft', {
@@ -100,6 +151,8 @@ const DraftAssistant = () => {
                     description: buildDescription(),
                     category: currentTemplate.category,
                     n_results: 5,
+                    template_id: activeTemplateId,
+                    structured_input: buildStructuredInput(),
                 }),
             });
 
@@ -113,6 +166,7 @@ const DraftAssistant = () => {
             setDocumentContent(data.draft);
             setSources(data.sources || []);
             setReviewData(data.review || null);
+            setProvenanceData(data.provenance_report || null);
             setHasGenerated(true);
         } catch (err) {
             setError(err.message);
@@ -188,7 +242,7 @@ const DraftAssistant = () => {
                         <div className="standard-form-wrapper">
                             <div className="draft-form-header">
                                 <h2>Draft: {currentTemplate.title}</h2>
-                                <p>Fill in the details below. LexSetu AI will generate a complete legal document using 1,841 real Indian legal templates and automatically run a 2-Pass RAG Review & Auto-Fix Refinement.</p>
+                                <p>Fill in the details below. LexSetu AI will generate a grounded legal document using real Indian legal templates. Missing information will be explicitly marked as [NOT PROVIDED] — not assumed or fabricated.</p>
                             </div>
                             <div className="draft-form-body">
                                 {error && (
@@ -196,10 +250,41 @@ const DraftAssistant = () => {
                                         {error}
                                     </div>
                                 )}
+
+                                {/* Missing material fields warning */}
+                                {showMissingWarning && missingMaterialFields.length > 0 && (
+                                    <div className="missing-fields-warning">
+                                        <div className="missing-warning-header">
+                                            <AlertTriangle size={18} />
+                                            <strong>Missing Information</strong>
+                                        </div>
+                                        <p>The following fields were not provided and will appear as <code>[NOT PROVIDED]</code> in the generated draft:</p>
+                                        <ul>
+                                            {missingMaterialFields.map((label, i) => (
+                                                <li key={i}>{label}</li>
+                                            ))}
+                                        </ul>
+                                        <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                                            You can still generate the draft — incomplete information will be clearly flagged, not fabricated.
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem' }}>
+                                            <button className="smart-generate-btn" onClick={triggerGeneration} style={{ flex: 1 }}>
+                                                <Sparkles size={18} /> Generate Anyway
+                                            </button>
+                                            <button className="editor-action-btn secondary" onClick={() => setShowMissingWarning(false)} style={{ flex: 0 }}>
+                                                Go Back
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="form-grid-premium">
                                     {currentTemplate.fields.map(field => (
                                         <div key={field.id} className={`form-group-premium ${field.type === 'textarea' ? 'full-width' : ''}`}>
-                                            <label>{field.label}</label>
+                                            <label>
+                                                {field.label}
+                                                {field.material && <span className="material-badge" title="Important for accuracy">Required</span>}
+                                            </label>
                                             {field.type === 'textarea' ? (
                                                 <textarea
                                                     rows="3"
@@ -218,9 +303,11 @@ const DraftAssistant = () => {
                                         </div>
                                     ))}
                                 </div>
-                                <button className="smart-generate-btn" onClick={triggerGeneration}>
-                                    <Sparkles size={20} /> Generate & Auto-Refine Draft
-                                </button>
+                                {!showMissingWarning && (
+                                    <button className="smart-generate-btn" onClick={triggerGeneration}>
+                                        <Sparkles size={20} /> Generate Grounded Draft
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -231,8 +318,8 @@ const DraftAssistant = () => {
                         <div className="spinner-ring">
                             <Loader2 size={48} className="spin text-primary" />
                         </div>
-                        <h3>Generating & Auto-Refining Document...</h3>
-                        <p className="loading-stage-text">⚡ 2-Pass Active: Generating Initial Draft → Pass 1 RAG Review & Auto-Fix → Pass 2 RAG Review & Auto-Fix...</p>
+                        <h3>Generating Grounded Draft...</h3>
+                        <p className="loading-stage-text">⚡ Building fact manifest → Validating statutes → Generating from templates → Hallucination check → Auto-fix...</p>
                     </div>
                 )}
 
@@ -243,8 +330,8 @@ const DraftAssistant = () => {
                                 <CheckCircle2 size={15} style={{ color: localOnly ? '#92400E' : '#10B981' }} />
                                 <span>
                                     {localOnly
-                                        ? 'Generated locally (Ollama) — 2-Pass refinement skipped in local-only mode'
-                                        : `2-Pass Refined & Auto-Fixed ${reviewData?.overall_score ? `(Score: ${reviewData.overall_score}/100)` : '(Verified)'}`}
+                                        ? 'Generated locally (Ollama) — refinement skipped in local-only mode'
+                                        : `Grounded & Refined ${reviewData?.overall_score ? `(Score: ${reviewData.overall_score}/100)` : '(Verified)'}`}
                                 </span>
                             </div>
 
@@ -252,7 +339,7 @@ const DraftAssistant = () => {
                                 <button className="editor-action-btn secondary" onClick={handleOpenInReview}>
                                     <FileCheck size={15} /> Inspect in Draft Review
                                 </button>
-                                <button className="editor-action-btn secondary" onClick={() => setHasGenerated(false)}>
+                                <button className="editor-action-btn secondary" onClick={() => { setHasGenerated(false); setShowMissingWarning(false); }}>
                                     <Edit3 size={15} /> Edit Details
                                 </button>
                                 <button className="editor-action-btn secondary" onClick={triggerGeneration}>
@@ -287,14 +374,14 @@ const DraftAssistant = () => {
                     <button
                         className="panel-toggle-btn panel-toggle-btn-right"
                         onClick={() => setPanelOpen(!panelOpen)}
-                        title={panelOpen ? 'Collapse sources' : 'Expand sources'}
+                        title={panelOpen ? 'Collapse panel' : 'Expand panel'}
                     >
                         {panelOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
                     </button>
                     {panelOpen && (
                         <>
                             <Sparkles size={18} className="text-primary" />
-                            <h3>Reference Sources</h3>
+                            <h3>Provenance & Sources</h3>
                         </>
                     )}
                 </div>
@@ -303,13 +390,64 @@ const DraftAssistant = () => {
                     {!hasGenerated && (
                         <div className="empty-suggestions">
                             <Wand2 size={32} className="text-secondary mx-auto mb-4 opacity-50" />
-                            <p>Generate a draft to see which real legal templates were used as reference.</p>
+                            <p>Generate a draft to see provenance tracking — what facts came from your input vs. what was marked as missing.</p>
                         </div>
                     )}
+
+                    {/* Provenance Report */}
+                    {hasGenerated && provenanceData && (
+                        <div className="provenance-section animate-fade-in">
+                            <h4 className="provenance-heading">
+                                <Info size={15} /> Fact Provenance
+                            </h4>
+
+                            {provenanceData.provided_facts?.length > 0 && (
+                                <div className="provenance-group provenance-provided">
+                                    <h5>✅ From Your Input ({provenanceData.total_provided})</h5>
+                                    {provenanceData.provided_facts.map((f, i) => (
+                                        <div key={i} className="provenance-item">
+                                            <span className="provenance-label">{f.field}</span>
+                                            <span className="provenance-value">{f.value}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {provenanceData.missing_material?.length > 0 && (
+                                <div className="provenance-group provenance-missing-material">
+                                    <h5>⚠️ Missing — Material ({provenanceData.total_missing_material})</h5>
+                                    <p className="provenance-note">These appear as [NOT PROVIDED] in the draft</p>
+                                    {provenanceData.missing_material.map((f, i) => (
+                                        <div key={i} className="provenance-item">
+                                            <span className="provenance-label">{f.field}</span>
+                                            <span className="provenance-status">[NOT PROVIDED]</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {provenanceData.missing_optional?.length > 0 && (
+                                <div className="provenance-group provenance-missing-optional">
+                                    <h5>📋 Missing — Optional ({provenanceData.total_missing_optional})</h5>
+                                    {provenanceData.missing_optional.map((f, i) => (
+                                        <div key={i} className="provenance-item">
+                                            <span className="provenance-label">{f.field}</span>
+                                            <span className="provenance-status">[NOT PROVIDED]</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Reference Sources */}
                     {hasGenerated && sources.length > 0 && (
-                        <div className="animate-fade-in">
+                        <div className="animate-fade-in" style={{ marginTop: '1rem' }}>
+                            <h4 className="provenance-heading">
+                                <CornerDownRight size={15} /> Reference Templates
+                            </h4>
                             <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.75rem' }}>
-                                AI referenced these real documents from your legal database:
+                                AI referenced these real documents from the legal database:
                             </p>
                             {sources.map((s, i) => (
                                 <div key={i} className="suggestion-card">
