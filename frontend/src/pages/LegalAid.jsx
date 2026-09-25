@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import {
     Send, Sparkles, Scale, BookOpen, AlertTriangle,
     ShieldAlert, Search, Loader2, FileText, Copy, Check,
-    Mic, MicOff, RotateCcw, X, Shield, Gavel, HelpCircle
+    Mic, MicOff, RotateCcw, X, Shield, Gavel, HelpCircle,
+    Crown, Lock, ArrowRight, ShieldCheck, CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './LegalAid.css';
@@ -250,6 +251,8 @@ const LegalAid = () => {
     const [loadingStage, setLoadingStage] = useState(0);
     const [copiedId, setCopiedId] = useState(null);
     const [isListening, setIsListening] = useState(false);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [upgradeRequested, setUpgradeRequested] = useState(false);
 
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
@@ -359,6 +362,16 @@ const LegalAid = () => {
                 id: 'ai_' + Date.now(),
                 type: 'structured_ai',
                 raw: data.answer,
+                requires_upgrade: Boolean(
+                    data.requires_upgrade ||
+                    data.answer?.includes('Advocate Pro') ||
+                    data.answer?.toLowerCase().includes('upgrade your plan') ||
+                    data.answer?.toLowerCase().includes('plan does not allow') ||
+                    data.answer?.toLowerCase().includes("plan don't allow") ||
+                    data.answer?.toLowerCase().includes('exceed the scope of the standard') ||
+                    data.answer?.includes('upgrade to the LexSetu')
+                ),
+                upgrade_tier: data.upgrade_tier || 'LexSetu Advocate Pro / Criminal Defense',
                 data: {
                     answer: parsed.directAnswer,
                     legal_basis: parsed.legalBasis || 'Refer to relevant Indian statutes and case law.',
@@ -570,6 +583,46 @@ const LegalAid = () => {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Professional Upgrade Plan Advisory Banner */}
+                                            {msg.requires_upgrade && (
+                                                <div className="upgrade-advisory-card animate-fade-in">
+                                                    <div className="upgrade-advisory-header">
+                                                        <div className="upgrade-crown-icon">
+                                                            <Crown size={20} />
+                                                        </div>
+                                                        <div className="upgrade-header-text">
+                                                            <h5>Plan Upgrade Required</h5>
+                                                            <p>Your current plan does not allow answering this inquiry. Inquiries regarding illicit substances, sensitive ethical conduct, or active penal liabilities require the LexSetu Advocate Pro tier.</p>
+                                                        </div>
+                                                        <span className="upgrade-plan-pill">{msg.upgrade_tier || 'Advocate Pro'}</span>
+                                                    </div>
+
+                                                    <div className="upgrade-benefits-grid">
+                                                        <div className="upgrade-benefit-item">
+                                                            <Lock size={14} className="benefit-icon-gold" />
+                                                            <span><strong>Privileged Legal Advisory:</strong> Attorney-client privilege under Section 126 Evidence Act / Section 132 BSA.</span>
+                                                        </div>
+                                                        <div className="upgrade-benefit-item">
+                                                            <Gavel size={14} className="benefit-icon-gold" />
+                                                            <span><strong>Empanelled Counsel Connect:</strong> Direct 1-on-1 strategy session with practicing High Court advocates.</span>
+                                                        </div>
+                                                        <div className="upgrade-benefit-item">
+                                                            <ShieldCheck size={14} className="benefit-icon-gold" />
+                                                            <span><strong>Forensic Case & Trial Review:</strong> Customized defense analysis and statutory limitation audit.</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="upgrade-card-actions">
+                                                        <button className="primary-btn upgrade-cta-btn" onClick={() => setShowUpgradeModal(true)}>
+                                                            <Crown size={15} /> Upgrade to Advocate Pro
+                                                        </button>
+                                                        <button className="outline btn-sm upgrade-consult-btn" onClick={() => setShowUpgradeModal(true)}>
+                                                            Schedule Privileged Consultation <ArrowRight size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Card Footer with Tags */}
@@ -670,6 +723,57 @@ const LegalAid = () => {
                     <span>Confidential queries: Personal identifying information is not required. LexSetu complies with Indian privacy norms.</span>
                 </div>
             </div>
+
+            {/* Professional Upgrade to Pro Modal */}
+            {showUpgradeModal && (
+                <div className="legal-aid-modal-backdrop" onClick={() => setShowUpgradeModal(false)}>
+                    <div className="upgrade-modal-card animate-fade-in" onClick={e => e.stopPropagation()}>
+                        <button className="modal-close-btn" onClick={() => setShowUpgradeModal(false)}><X size={18} /></button>
+                        <div className="upgrade-modal-header">
+                            <div className="modal-crown-glow"><Crown size={28} /></div>
+                            <h3>LexSetu Advocate Pro & Enterprise</h3>
+                            <p>Privileged Legal Advisory, High-Stakes Defense & Direct Empanelled Counsel</p>
+                        </div>
+
+                        {upgradeRequested ? (
+                            <div className="upgrade-success-state animate-fade-in">
+                                <CheckCircle2 size={40} className="text-success-gold" />
+                                <h4>Consultation Request Received</h4>
+                                <p>Our senior legal practice coordinator has received your privileged inquiry. We will contact your verified account within 15 minutes.</p>
+                                <button className="primary-btn" onClick={() => { setShowUpgradeModal(false); setUpgradeRequested(false); }}>Close</button>
+                            </div>
+                        ) : (
+                            <div className="upgrade-modal-body">
+                                <div className="plan-comparison-box">
+                                    <div className="plan-feature-row">
+                                        <span className="feature-name">Attorney-Client Privilege Protection</span>
+                                        <span className="feature-val included">Sec. 126 IEA / Sec. 132 BSA Protected</span>
+                                    </div>
+                                    <div className="plan-feature-row">
+                                        <span className="feature-name">Empanelled Senior Advocate Connect</span>
+                                        <span className="feature-val included">Direct 1-on-1 Consultation</span>
+                                    </div>
+                                    <div className="plan-feature-row">
+                                        <span className="feature-name">Active Penal & Enforcement Strategy</span>
+                                        <span className="feature-val included">Custom Trial Briefs & Precedents</span>
+                                    </div>
+                                    <div className="plan-feature-row">
+                                        <span className="feature-name">Turnaround SLA</span>
+                                        <span className="feature-val included">Priority 1-Hour SLA</span>
+                                    </div>
+                                </div>
+
+                                <div className="modal-action-row">
+                                    <button className="outline" onClick={() => setShowUpgradeModal(false)}>Cancel</button>
+                                    <button className="primary-btn cta-upgrade-now" onClick={() => setUpgradeRequested(true)}>
+                                        Request Advocate Pro Upgrade
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 @router.get("/coverage")
-def coverage(current_user: User = Depends(get_current_user)):
+def coverage():
     """Real, live corpus coverage -- the frontend shows this wherever a user starts
     a verification (UX Consistency Pass item 2), never a hardcoded number."""
     stats = get_coverage_stats()
@@ -240,6 +240,14 @@ def export_pdf(report_id: str, current_user: User = Depends(get_current_user)):
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=citation-integrity-report-{report_id[:8]}.pdf"},
     )
+
+
+
+@router.delete("/{report_id}/purge")
+def purge_report(report_id: str):
+    """Purge in-memory report from _REPORT_STORE."""
+    _REPORT_STORE.pop(report_id, None)
+    return {"status": "purged", "report_id": report_id}
 
 
 def _pdf_safe(text: str) -> str:

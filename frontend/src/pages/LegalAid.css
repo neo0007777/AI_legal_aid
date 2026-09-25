@@ -923,3 +923,280 @@
         padding: 0.35rem 0.45rem;
     }
 }
+
+/* --------------------------------------------------------------------------
+   Upgrade Advisory Card & Modal (Monetization & Safety Gate)
+   -------------------------------------------------------------------------- */
+.upgrade-advisory-card {
+    margin-top: 1rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, rgba(99, 18, 14, 0.12) 0%, rgba(223, 164, 111, 0.18) 100%);
+    border: 1.5px solid #dfa46f;
+    border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(99, 18, 14, 0.08);
+}
+
+.upgrade-advisory-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    margin-bottom: 0.85rem;
+}
+
+.upgrade-crown-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #dfa46f, #8c3a2a);
+    color: #f9eedc;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(99, 18, 14, 0.2);
+}
+
+.upgrade-header-text {
+    flex: 1;
+}
+
+.upgrade-header-text h5 {
+    font-family: var(--font-heading, serif);
+    font-size: 1.05rem;
+    color: #63120e;
+    margin: 0 0 0.25rem 0;
+    font-weight: 700;
+}
+
+.upgrade-header-text p {
+    font-size: 0.82rem;
+    color: #8c3a2a;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.upgrade-plan-pill {
+    margin-left: auto;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+    background: #63120e;
+    color: #f9eedc;
+    flex-shrink: 0;
+}
+
+.upgrade-benefits-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.65);
+    border: 1px solid rgba(223, 164, 111, 0.35);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.upgrade-benefit-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    font-size: 0.82rem;
+    color: #443834;
+    line-height: 1.4;
+}
+
+.benefit-icon-gold {
+    color: #8c3a2a;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.upgrade-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.upgrade-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1.15rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: #63120e;
+    color: #f9eedc;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(99, 18, 14, 0.25);
+    transition: all 0.2s ease;
+}
+
+.upgrade-cta-btn:hover {
+    background: #8c3a2a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 18, 14, 0.35);
+}
+
+.upgrade-consult-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid #8c3a2a;
+    color: #63120e;
+    background: transparent;
+    padding: 0.5rem 0.95rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.upgrade-consult-btn:hover {
+    background: rgba(99, 18, 14, 0.08);
+}
+
+/* Modal */
+.legal-aid-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.upgrade-modal-card {
+    position: relative;
+    background: #fdfbf7;
+    border: 1.5px solid #dfa46f;
+    border-radius: 14px;
+    max-width: 520px;
+    width: 100%;
+    padding: 2rem;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+}
+
+.modal-close-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: transparent;
+    border: none;
+    color: #8c3a2a;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.modal-close-btn:hover {
+    background: rgba(99, 18, 14, 0.08);
+}
+
+.upgrade-modal-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.modal-crown-glow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #dfa46f, #8c3a2a);
+    color: #f9eedc;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 4px 14px rgba(99, 18, 14, 0.25);
+}
+
+.upgrade-modal-header h3 {
+    font-family: var(--font-heading, serif);
+    font-size: 1.4rem;
+    color: #63120e;
+    margin: 0 0 0.35rem 0;
+}
+
+.upgrade-modal-header p {
+    font-size: 0.85rem;
+    color: #8c3a2a;
+    margin: 0;
+}
+
+.plan-comparison-box {
+    background: #f9eedc;
+    border: 1px solid #dfa46f;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.plan-feature-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed rgba(140, 58, 42, 0.2);
+    font-size: 0.82rem;
+}
+
+.plan-feature-row:last-child {
+    border-bottom: none;
+}
+
+.feature-name {
+    color: #63120e;
+    font-weight: 500;
+}
+
+.feature-val.included {
+    font-weight: 700;
+    color: #065f46;
+}
+
+.modal-action-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.cta-upgrade-now {
+    background: #63120e !important;
+    color: #f9eedc !important;
+}
+
+.upgrade-success-state {
+    text-align: center;
+    padding: 1.5rem 0.5rem;
+}
+
+.text-success-gold {
+    color: #059669;
+    margin: 0 auto 0.75rem;
+}
+
+.upgrade-success-state h4 {
+    color: #63120e;
+    font-size: 1.2rem;
+    margin: 0 0 0.5rem 0;
+}
+
+.upgrade-success-state p {
+    font-size: 0.85rem;
+    color: #4b5563;
+    line-height: 1.5;
+    margin-bottom: 1.25rem;
+}

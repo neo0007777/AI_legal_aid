@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
     UploadCloud, FileCheck2, Loader2, Download, FileDown, ChevronDown,
     LayoutList, ListOrdered, ShieldAlert, AlertCircle, Sparkles, Info,
-    Scale, Hash, ExternalLink, BookmarkCheck, Check, FileText,
+    Scale, Hash, ExternalLink, BookmarkCheck, Check, FileText, Trash2, CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
@@ -16,6 +16,7 @@ import CitationWalkthrough from '../components/CitationWalkthrough';
 import ContradictionDiff from '../components/ContradictionDiff';
 import AdjustmentBadge from '../components/AdjustmentBadge';
 import FlagCorrectionButton from '../components/FlagCorrectionButton';
+import PrivilegeShield from '../components/PrivilegeShield';
 import './VerifyFiling.css';
 
 
@@ -258,6 +259,27 @@ const VerifyFiling = () => {
         }
     };
 
+    const [purging, setPurging] = useState(false);
+    const [purgeNotice, setPurgeNotice] = useState(null);
+
+    const handlePurgeSession = async () => {
+        if (!reportId) return;
+        setPurging(true);
+        try {
+            await fetch(`/api/citations/${reportId}/purge`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+        } catch (e) {
+            console.warn('Purge session notice:', e);
+        } finally {
+            setPurging(false);
+        }
+        resetResults();
+        setPurgeNotice('Filing text & citation report completely purged from active server memory. Zero trace retained.');
+        setTimeout(() => setPurgeNotice(null), 6000);
+    };
+
     // Stable index order (not arrival order) so cards don't jump around as
     // parallel results land -- each slot fills in place, "checking..." until it does.
     const orderedCitations = Array.from({ length: totalCount }, (_, i) => {
@@ -283,6 +305,16 @@ const VerifyFiling = () => {
                 <Info size={15} />
                 {coverage ? coverage.banner : 'Loading indexed corpus coverage…'}
             </div>
+
+            {/* High-trust visible Attorney-Client Privilege Shield */}
+            <PrivilegeShield />
+
+            {purgeNotice && (
+                <div className="purge-success-banner animate-fade-in">
+                    <CheckCircle2 size={16} />
+                    <span>{purgeNotice}</span>
+                </div>
+            )}
 
             {localOnly && (
                 <div className="local-only-block-banner">
@@ -398,6 +430,14 @@ const VerifyFiling = () => {
                                 </button>
                                 <button className="outline btn-sm" onClick={() => downloadExport('pdf')} disabled={exporting === 'pdf'}>
                                     {exporting === 'pdf' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} Export PDF
+                                </button>
+                                <button
+                                    className="outline btn-sm btn-purge-session"
+                                    onClick={handlePurgeSession}
+                                    disabled={purging}
+                                    title="Immediately wipe document and verification record from active server RAM"
+                                >
+                                    {purging ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />} Purge RAM
                                 </button>
                             </div>
                         </div>

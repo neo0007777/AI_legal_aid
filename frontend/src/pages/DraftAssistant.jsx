@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
 import VoiceInputButton from '../components/VoiceInputButton';
+import PrivilegeShield from '../components/PrivilegeShield';
 import './DraftAssistant.css';
 
 export const sanitizeDraftText = (text) => {
@@ -490,8 +491,13 @@ const DraftAssistant = () => {
                     <div className="form-draft-container animate-fade-in">
                         <div className="standard-form-wrapper">
                             <div className="draft-form-header">
-                                <h2>Draft: {currentTemplate.title}</h2>
-                                <p>Fill in the details below. LexSetu AI will generate a grounded legal document using real Indian legal templates. Missing information will be explicitly marked as [NOT PROVIDED] — not assumed or fabricated.</p>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                                    <div style={{ flex: '1', minWidth: '240px' }}>
+                                        <h2>Draft: {currentTemplate.title}</h2>
+                                        <p>Fill in the details below. LexSetu AI will generate a grounded legal document using real Indian legal templates. Missing information will be explicitly marked as [NOT PROVIDED] — not assumed or fabricated.</p>
+                                    </div>
+                                    <PrivilegeShield compact={true} />
+                                </div>
                             </div>
                             <div className="draft-form-body">
                                 {error && (
@@ -609,7 +615,8 @@ const DraftAssistant = () => {
                                 </button>
                             </div>
 
-                            <div className="editor-actions ml-auto">
+                            <div className="editor-actions ml-auto" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <PrivilegeShield compact={true} />
                                 <button className="editor-action-btn secondary" onClick={handleOpenInReview}>
                                     <FileCheck size={15} /> Inspect in Draft Review
                                 </button>

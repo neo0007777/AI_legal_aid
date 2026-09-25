@@ -210,6 +210,8 @@ class LegalAidResponse(BaseModel):
     question: str
     answer: str
     sources: List[SearchSource]
+    requires_upgrade: Optional[bool] = False
+    upgrade_tier: Optional[str] = None
 
 
 # ─── Correction Memory & Translation ──────────────────

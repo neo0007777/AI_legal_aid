@@ -156,6 +156,7 @@ def get_act_detail(
             "id": p.id,
             "provision_number": p.provision_number,
             "heading": p.heading,
+            "title": p.heading,
             "words": p.words,
             "has_text": p.raw_text is not None,
             "source_url": p.source_url,
@@ -202,8 +203,14 @@ def get_exact_provision(
     Uses structured database lookup. If text is not yet stored, safely fetches from source API.
     Does NOT use vector search. Never alters legal text. Never fabricates missing fields.
     """
-    clean_act = act_id.strip().lower()
+    clean_id = act_id.strip().lower()
     clean_num = str(provision_number).strip()
+
+    # Resolve Act by source_act_id or id UUID
+    act = db.query(Act).filter(
+        or_(Act.source_act_id == clean_id, Act.id == clean_id)
+    ).first()
+    clean_act = act.source_act_id if act else clean_id
 
     # Lookup or sync provision
     try:
@@ -231,8 +238,8 @@ def get_exact_provision(
             detail=f"Section '{clean_num}' of '{clean_act}' not found from source."
         )
 
-    # Fetch corresponding Act record for metadata
-    act = db.query(Act).filter(Act.source_act_id == clean_act).first()
+    if not act:
+        act = db.query(Act).filter(Act.source_act_id == clean_act).first()
 
     # Query source mappings (bidirectional)
     mappings = db.query(StatuteMapping).filter(
@@ -266,20 +273,34 @@ def get_exact_provision(
             "relation": m.relation,
             "score": m.score,
             "target_url": target_url,
-            # Neutral source-data terminology
             "label": "Source-listed correspondence (API mapping)",
             "applicability_warning": "Source mapping only; legal applicability depends on case timeline and procedural posture.",
         })
 
+    formatted_correspondences = []
+    for c in correspondences:
+        formatted_correspondences.append({
+            **c,
+            "target_act_code": c["target_act"].upper(),
+            "target_section": c["target_provision"],
+            "mapping_type": c.get("relation") or c.get("direction") or "CORRESPONDING",
+            "description": f"{c.get('target_heading', '')} ({c.get('direction', '')})",
+        })
+
     return {
+        "id": provision.id,
+        "act_id": act.id if act else provision.act_source_id,
         "act_source_id": provision.act_source_id,
         "act_title": act.title if act else provision.act_source_id.upper(),
         "provision_type": provision.provision_type or "section",
         "provision_number": provision.provision_number,
         "heading": provision.heading or "Not available from source",
+        "title": provision.heading or f"Section {provision.provision_number}",
+        "content": provision.raw_text,
         "verbatim_text": provision.raw_text,
         "html": provision.html,
         "words": provision.words,
+        "correspondences": formatted_correspondences,
         "source_correspondences": correspondences,
         "provenance": {
             "source_api": provision.source_api or "indiacode.ecourtsindia.com",
