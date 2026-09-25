@@ -5,12 +5,226 @@ import {
     Sparkles, CornerDownRight, Check, Loader2, ShieldAlert, AlertOctagon,
     Scale, BookmarkMinus, Briefcase, Users, Lock, FileSignature,
     UploadCloud, X, AlertTriangle, ListChecks, ArrowRightCircle,
-    ChevronLeft, ChevronRight, FileCheck, CheckCircle2, Info, CircleAlert
+    ChevronLeft, ChevronRight, FileCheck, CheckCircle2, Info, CircleAlert, Eye
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
 import VoiceInputButton from '../components/VoiceInputButton';
 import './DraftAssistant.css';
+
+export const sanitizeDraftText = (text) => {
+    if (!text) return '';
+    return text
+        .replace(/^#{1,6}\s*/gm, '')
+        .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1')
+        .replace(/___([^_]+)___/g, '$1')
+        .replace(/__([^_]+)__/g, '$1')
+        .replace(/_([^_]+)_/g, '$1')
+        .replace(/^(\s*[-*_]\s*){3,}$/gm, '----------------------------------------')
+        .replace(/\*\*/g, '')
+        .replace(/(?<=\s)\*(?=\s)/g, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+};
+
+const renderInlineContent = (text) => {
+    if (!text) return null;
+    const regex = /(\[(?:NOT PROVIDED|REQUIRES VERIFICATION|CITATION REQUIRES VERIFICATION|CASE-SPECIFIC GROUND REQUIRES SUPPORTING FACTS)[^\]]*\]|【(?:USER_FACT|DOCUMENT_FACT|VERIFIED_LEGAL_RULE)[^】]*】|\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/g;
+    const parts = text.split(regex);
+
+    return parts.map((part, index) => {
+        if (!part) return null;
+
+        if (part.startsWith('[') && part.endsWith(']')) {
+            const inner = part.slice(1, -1);
+            const isMissing = inner.includes('NOT PROVIDED');
+            return (
+                <span
+                    key={index}
+                    className={isMissing ? 'court-tag-missing' : 'court-tag-verification'}
+                    title={isMissing ? 'Information not provided in input' : 'Requires verification with case files'}
+                >
+                    {isMissing ? <AlertTriangle size={11} className="court-tag-icon" /> : <CircleAlert size={11} className="court-tag-icon" />}
+                    <span>{inner}</span>
+                </span>
+            );
+        }
+
+        if (part.startsWith('【') && part.endsWith('】')) {
+            const inner = part.slice(1, -1);
+            return (
+                <span key={index} className="court-tag-fact" title="Grounded verification category">
+                    {inner}
+                </span>
+            );
+        }
+
+        if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+            const content = part.slice(2, -2).trim();
+            return <strong key={index} className="court-strong">{content}</strong>;
+        }
+
+        if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
+            const content = part.slice(1, -1).trim();
+            return <em key={index} className="court-italic">{content}</em>;
+        }
+
+        if (part.startsWith('_') && part.endsWith('_') && part.length >= 2) {
+            const content = part.slice(1, -1).trim();
+            return <em key={index} className="court-italic">{content}</em>;
+        }
+
+        const cleaned = part.replace(/\*\*/g, '').replace(/(?<=\s)\*(?=\s)/g, '');
+        return <span key={index}>{cleaned}</span>;
+    });
+};
+
+const renderCourtDocument = (text) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+    const elements = [];
+    let tableRows = [];
+    let inTable = false;
+
+    const flushTable = (key) => {
+        if (tableRows.length > 0) {
+            const isHeader = tableRows[0];
+            const dataRows = tableRows.slice(1).filter(r => !r.every(c => /^[-:\s]+$/.test(c)));
+            elements.push(
+                <div key={`table-${key}`} className="court-table-wrapper">
+                    <table className="court-table">
+                        <thead>
+                            <tr>
+                                {isHeader.map((h, i) => (
+                                    <th key={i}>{renderInlineContent(h)}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {dataRows.map((row, ri) => (
+                                <tr key={ri}>
+                                    {row.map((cell, ci) => (
+                                        <td key={ci}>{renderInlineContent(cell)}</td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+            tableRows = [];
+            inTable = false;
+        }
+    };
+
+    lines.forEach((rawLine, idx) => {
+        const trimmed = rawLine.trim();
+
+        // Check if markdown table line: e.g. | col1 | col2 |
+        if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+            const cells = trimmed.split('|').slice(1, -1).map(c => c.trim());
+            tableRows.push(cells);
+            inTable = true;
+            return;
+        } else if (inTable) {
+            flushTable(idx);
+        }
+
+        if (!trimmed) {
+            elements.push(<div key={idx} className="court-spacer" />);
+            return;
+        }
+
+        if (/^(\s*[-*_]\s*){3,}$/.test(trimmed)) {
+            elements.push(<hr key={idx} className="court-divider" />);
+            return;
+        }
+
+        const cleanLine = trimmed.replace(/^#{1,6}\s*/, '');
+
+        if (/^(\d+\.\s+)?(Heading\s*\/\s*Cause Title|Verified Case Information|Factual Background|Legal Grounds|Prayer|Verification)/i.test(cleanLine)) {
+            const badgeText = cleanLine.replace(/\*\*/g, '').trim();
+            elements.push(
+                <div key={idx} className="court-section-guide">
+                    <span className="court-guide-pill">{badgeText}</span>
+                </div>
+            );
+            return;
+        }
+
+        if (/^(IN THE COURT OF|BEFORE THE|IN THE HIGH COURT|IN THE SUPREME COURT|COURT OF THE|AT\s+[A-Z\s,]+|BAIL APPLICATION NO|APPLICATION FOR|PETITION FOR|SUIT NO|CRIMINAL MISC|MEMORANDUM OF|APPLICATION UNDER|PETITION UNDER)/i.test(cleanLine)) {
+            elements.push(
+                <div key={idx} className="court-header-title">
+                    {renderInlineContent(cleanLine)}
+                </div>
+            );
+            return;
+        }
+
+        if (/^\s*(?:\*\*)?\s*(?:VERSUS|V\/S|VS\.?|V\.)\s*(?:\*\*)?\s*$/i.test(trimmed)) {
+            elements.push(
+                <div key={idx} className="court-versus-block">
+                    VERSUS
+                </div>
+            );
+            return;
+        }
+
+        if (/^IN THE MATTER OF:?/i.test(cleanLine)) {
+            elements.push(
+                <div key={idx} className="court-matter-title">
+                    {renderInlineContent(cleanLine)}
+                </div>
+            );
+            return;
+        }
+
+        if (/^(MOST RESPECTFULLY SHOWETH|RESPECTFULLY SHOWETH|GROUNDS|GROUNDS FOR BAIL|FACTS OF THE CASE|PRAYER|PRAYER CLAUSE|VERIFICATION|AFFIDAVIT|TERMS AND CONDITIONS|SYNOPSIS|LIST OF DATES):?/i.test(cleanLine)) {
+            elements.push(
+                <div key={idx} className="court-section-heading">
+                    {renderInlineContent(cleanLine)}
+                </div>
+            );
+            return;
+        }
+
+        const numberedMatch = cleanLine.match(/^\s*(\d+[\.\)]|[a-zA-Z][\.\)]|\([0-9a-zA-Z]+\))\s+(.*)/);
+        if (numberedMatch) {
+            const prefix = numberedMatch[1];
+            const body = numberedMatch[2];
+            elements.push(
+                <div key={idx} className="court-numbered-para">
+                    <span className="court-para-num">{prefix}</span>
+                    <span className="court-para-body">{renderInlineContent(body)}</span>
+                </div>
+            );
+            return;
+        }
+
+        if (/\.\.\.\s*(?:Applicant|Respondent|Petitioner|Defendant|Accused|Deponent|Complainant)/i.test(cleanLine)) {
+            elements.push(
+                <div key={idx} className="court-party-line">
+                    {renderInlineContent(cleanLine)}
+                </div>
+            );
+            return;
+        }
+
+        elements.push(
+            <p key={idx} className="court-para">
+                {renderInlineContent(cleanLine)}
+            </p>
+        );
+    });
+
+    if (inTable) {
+        flushTable('final');
+    }
+
+    return elements;
+};
 
 // Material fields per template — these are flagged if missing
 const MATERIAL_FIELDS = {
@@ -77,6 +291,9 @@ const DraftAssistant = () => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [panelOpen, setPanelOpen] = useState(true);
     const [showMissingWarning, setShowMissingWarning] = useState(false);
+    const [viewMode, setViewMode] = useState('court'); // 'court' | 'edit'
+    const [statuteAudit, setStatuteAudit] = useState(null);
+    const [isVerifyingStatutes, setIsVerifyingStatutes] = useState(false);
     const editorRef = useRef(null);
 
     const switchTemplate = (id) => {
@@ -87,8 +304,11 @@ const DraftAssistant = () => {
         setSources([]);
         setReviewData(null);
         setProvenanceData(null);
+        setStatuteAudit(null);
+        setIsVerifyingStatutes(false);
         setError('');
         setShowMissingWarning(false);
+        setViewMode('court');
     };
 
     const handleInputChange = (fieldId, value) => {
@@ -168,7 +388,10 @@ const DraftAssistant = () => {
             setSources(data.sources || []);
             setReviewData(data.review || null);
             setProvenanceData(data.provenance_report || null);
+            setStatuteAudit(data.statute_verification || null);
             setHasGenerated(true);
+            setSidebarOpen(false); // Give document generous reading/editing width
+            setViewMode('court');
         } catch (err) {
             setError(err.message);
         } finally {
@@ -176,14 +399,39 @@ const DraftAssistant = () => {
         }
     };
 
+    const handleReverifyStatutes = async () => {
+        if (!documentContent) return;
+        setIsVerifyingStatutes(true);
+        try {
+            const res = await fetch('/api/documents/verify-statutes', {
+                method: 'POST',
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    draft_text: documentContent,
+                    category: currentTemplate.category
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setStatuteAudit(data);
+            }
+        } catch (e) {
+            console.error("Re-verify statutes failed:", e);
+        } finally {
+            setIsVerifyingStatutes(false);
+        }
+    };
+
     const handleCopy = () => {
-        navigator.clipboard.writeText(documentContent);
+        const cleanText = sanitizeDraftText(documentContent);
+        navigator.clipboard.writeText(cleanText);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
     const handleDownload = () => {
-        const blob = new Blob([documentContent], { type: 'text/plain' });
+        const cleanText = sanitizeDraftText(documentContent);
+        const blob = new Blob([cleanText], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -344,6 +592,23 @@ const DraftAssistant = () => {
                                 </span>
                             </div>
 
+                            <div className="view-mode-toggle">
+                                <button
+                                    className={`view-toggle-btn ${viewMode === 'court' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('court')}
+                                    title="Court-ready styled document"
+                                >
+                                    <Eye size={14} /> Court View
+                                </button>
+                                <button
+                                    className={`view-toggle-btn ${viewMode === 'edit' ? 'active' : ''}`}
+                                    onClick={() => setViewMode('edit')}
+                                    title="Directly edit text"
+                                >
+                                    <Edit3 size={14} /> Edit Text
+                                </button>
+                            </div>
+
                             <div className="editor-actions ml-auto">
                                 <button className="editor-action-btn secondary" onClick={handleOpenInReview}>
                                     <FileCheck size={15} /> Inspect in Draft Review
@@ -363,16 +628,21 @@ const DraftAssistant = () => {
                             </div>
                         </div>
                         <div className="a4-canvas animate-fade-in">
-                            <div
-                                className="a4-page"
-                                ref={editorRef}
-                                contentEditable
-                                suppressContentEditableWarning
-                                onInput={(e) => setDocumentContent(e.currentTarget.innerText)}
-                                style={{ whiteSpace: 'pre-wrap' }}
-                            >
-                                {documentContent}
-                            </div>
+                            {viewMode === 'court' ? (
+                                <div className="a4-page court-view-mode" ref={editorRef}>
+                                    {renderCourtDocument(documentContent)}
+                                </div>
+                            ) : (
+                                <div className="a4-page edit-view-mode">
+                                    <textarea
+                                        className="a4-editor-textarea"
+                                        value={documentContent}
+                                        onChange={(e) => setDocumentContent(e.target.value)}
+                                        placeholder="Draft document content..."
+                                        spellCheck={false}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -400,6 +670,90 @@ const DraftAssistant = () => {
                         <div className="empty-suggestions">
                             <Wand2 size={32} className="text-secondary mx-auto mb-4 opacity-50" />
                             <p>Generate a draft to see provenance tracking — what facts came from your input vs. what was marked as missing.</p>
+                        </div>
+                    )}
+
+                    {/* Statute & Section Verification Audit */}
+                    {hasGenerated && (
+                        <div className="statute-audit-section animate-fade-in">
+                            <div className="statute-audit-header">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                    <Scale size={16} className="text-primary" />
+                                    <h4 className="provenance-heading" style={{ margin: 0 }}>Statute & Section Audit</h4>
+                                </div>
+                                <button
+                                    className="recheck-statute-btn"
+                                    onClick={handleReverifyStatutes}
+                                    disabled={isVerifyingStatutes}
+                                    title="Re-verify legal provisions in current draft"
+                                >
+                                    {isVerifyingStatutes ? (
+                                        <Loader2 size={12} className="spin" />
+                                    ) : (
+                                        <RefreshCw size={12} />
+                                    )}
+                                    <span>{isVerifyingStatutes ? 'Checking...' : 'Re-check'}</span>
+                                </button>
+                            </div>
+
+                            {statuteAudit ? (
+                                <>
+                                    <div className={`statute-summary-badge ${statuteAudit.has_warnings ? 'has-warnings' : 'all-verified'}`}>
+                                        {statuteAudit.has_warnings ? (
+                                            <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                                        ) : (
+                                            <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
+                                        )}
+                                        <span>{statuteAudit.summary}</span>
+                                    </div>
+
+                                    <div className="statute-findings-list">
+                                        {statuteAudit.findings.map((item, idx) => (
+                                            <div key={idx} className={`statute-item-card status-${item.status.toLowerCase()}`}>
+                                                <div className="statute-item-top">
+                                                    <span className="statute-name-badge">
+                                                        {item.raw_mention || `Section ${item.section_number} ${item.act_id.toUpperCase()}`}
+                                                    </span>
+                                                    <span className={`statute-status-pill ${item.status.toLowerCase()}`}>
+                                                        {item.status === 'VERIFIED' ? (
+                                                            <><Check size={11} /> Verified</>
+                                                        ) : (
+                                                            <><CircleAlert size={11} /> Not Found</>
+                                                        )}
+                                                    </span>
+                                                </div>
+
+                                                {item.heading && (
+                                                    <div className="statute-official-title">
+                                                        <strong>Title:</strong> {item.heading}
+                                                    </div>
+                                                )}
+
+                                                {item.transition_note && (
+                                                    <div className="statute-transition-note">
+                                                        <Info size={12} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                                        <span>{item.transition_note}</span>
+                                                    </div>
+                                                )}
+
+                                                {item.equivalent && (
+                                                    <div className="statute-equivalent-tag">
+                                                        <span className="equiv-label">2024 Law:</span>
+                                                        <span className="equiv-val">
+                                                            Section {item.equivalent.section} {item.equivalent.act}
+                                                            {item.equivalent.heading ? ` (${item.equivalent.heading})` : ''}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="empty-statute-audit">
+                                    <p>Click "Re-check" to audit statutory sections in this draft.</p>
+                                </div>
+                            )}
                         </div>
                     )}
 

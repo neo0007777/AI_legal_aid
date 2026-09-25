@@ -2,12 +2,18 @@
 .sidebar-nav {
     width: 280px;
     height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
     background-color: var(--sidebar-bg, #63120e);
     color: var(--sidebar-text, #f9eedc);
     display: flex;
     flex-direction: column;
     border-right: 1px solid rgba(241, 209, 166, 0.2);
     flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
+    box-sizing: border-box;
 }
 
 .mobile-nav-toggle {
@@ -52,9 +58,11 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1.5rem;
+    padding: 1.25rem 1.5rem;
     border-bottom: 1px solid rgba(241, 209, 166, 0.2);
-    margin-bottom: 1.5rem;
+    flex-shrink: 0;
+    background-color: var(--sidebar-bg, #63120e);
+    z-index: 2;
 }
 
 .logo-icon {
@@ -101,9 +109,42 @@
     letter-spacing: 0.5px;
 }
 
+/* Scrollable middle body */
+.sidebar-scrollable {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.25rem 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(241, 209, 166, 0.3) transparent;
+}
+
+.sidebar-scrollable::-webkit-scrollbar {
+    width: 5px;
+}
+
+.sidebar-scrollable::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-scrollable::-webkit-scrollbar-thumb {
+    background: rgba(241, 209, 166, 0.25);
+    border-radius: 9999px;
+}
+
+.sidebar-scrollable::-webkit-scrollbar-thumb:hover {
+    background: rgba(241, 209, 166, 0.5);
+}
+
 .sidebar-section {
-    padding: 0 1.5rem;
-    margin-bottom: 2rem;
+    padding: 0 1.25rem;
+    margin-bottom: 0;
 }
 
 .section-title {
@@ -112,7 +153,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
 }
 
 .nav-links {
@@ -126,9 +167,9 @@
     align-items: center;
     gap: 0.75rem;
     color: #f9eedc;
-    padding: 0.65rem 1rem;
+    padding: 0.6rem 0.85rem;
     border-radius: 8px;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     font-weight: 500;
     transition: all 0.2s ease;
     text-decoration: none;
@@ -157,10 +198,6 @@
     font-weight: 700;
 }
 
-.mt-auto {
-    margin-top: auto;
-}
-
 .recent-list {
     display: flex;
     flex-direction: column;
@@ -183,11 +220,14 @@
 }
 
 .sidebar-footer {
-    padding: 1.5rem;
+    padding: 1rem 1.25rem;
     border-top: 1px solid rgba(241, 209, 166, 0.2);
     position: relative;
     display: flex;
     flex-direction: column;
+    flex-shrink: 0;
+    background-color: var(--sidebar-bg, #63120e);
+    z-index: 10;
 }
 
 /* =========================================

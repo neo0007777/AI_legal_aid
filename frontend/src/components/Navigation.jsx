@@ -51,52 +51,54 @@ const Navigation = () => {
                 </div>
             </div>
 
-            <div className="sidebar-section">
-                <p className="section-title">Workspace</p>
-                <div className="nav-links">
-                    <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                        <HomeIcon size={18} /> Dashboard
-                    </NavLink>
-                    <NavLink to="/verify-filing" className={({ isActive }) => isActive ? "nav-link active nav-link-flagship" : "nav-link nav-link-flagship"}>
-                        <ShieldCheck size={18} /> Verify a Filing
-                    </NavLink>
-                    <NavLink to="/case-finder" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                        <Scale size={18} /> Case Finder
-                    </NavLink>
-                    <NavLink to="/draft-assistant" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                        <BookOpen size={18} /> Draft Assistant
-                    </NavLink>
-                    <NavLink to="/draft-review" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                        <FileCheck size={18} /> Draft Review
-                    </NavLink>
-                    <NavLink to="/clause-conflict" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                        <FileSearch size={18} /> Contract Analysis
-                    </NavLink>
-                    <NavLink to="/statutes" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                        <Scale size={18} /> Bare Acts & Statutes
-                    </NavLink>
-                    <NavLink to="/legal-aid" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                        <MessageSquare size={18} /> AI Legal Aid
-                    </NavLink>
-                    {(user?.role === 'admin' || user?.role === 'advocate') && (
-                        <NavLink to="/admin/corrections" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                            <ShieldAlert size={18} /> Correction Memory
+            <div className="sidebar-scrollable">
+                <div className="sidebar-section">
+                    <p className="section-title">Workspace</p>
+                    <div className="nav-links">
+                        <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                            <HomeIcon size={18} /> Dashboard
                         </NavLink>
-                    )}
+                        <NavLink to="/verify-filing" className={({ isActive }) => isActive ? "nav-link active nav-link-flagship" : "nav-link nav-link-flagship"}>
+                            <ShieldCheck size={18} /> Verify a Filing
+                        </NavLink>
+                        <NavLink to="/case-finder" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                            <Scale size={18} /> Case Finder
+                        </NavLink>
+                        <NavLink to="/draft-assistant" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                            <BookOpen size={18} /> Draft Assistant
+                        </NavLink>
+                        <NavLink to="/draft-review" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                            <FileCheck size={18} /> Draft Review
+                        </NavLink>
+                        <NavLink to="/clause-conflict" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                            <FileSearch size={18} /> Contract Analysis
+                        </NavLink>
+                        <NavLink to="/statutes" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                            <Scale size={18} /> Bare Acts & Statutes
+                        </NavLink>
+                        <NavLink to="/legal-aid" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                            <MessageSquare size={18} /> AI Legal Aid
+                        </NavLink>
+                        {(user?.role === 'admin' || user?.role === 'advocate') && (
+                            <NavLink to="/admin/corrections" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                                <ShieldAlert size={18} /> Correction Memory
+                            </NavLink>
+                        )}
+                    </div>
                 </div>
-            </div>
 
-            <div className="sidebar-section mt-auto">
-                <p className="section-title">Recent Activity</p>
-                <div className="recent-list">
-                    <div className="recent-item"><Clock size={14} /> Case Search</div>
-                    <div className="recent-item"><Clock size={14} /> Draft Assistant</div>
-                    <div className="recent-item"><Clock size={14} /> Legal Aid Q&A</div>
+                <div className="sidebar-section">
+                    <p className="section-title">Recent Activity</p>
+                    <div className="recent-list">
+                        <div className="recent-item"><Clock size={14} /> Case Search</div>
+                        <div className="recent-item"><Clock size={14} /> Draft Assistant</div>
+                        <div className="recent-item"><Clock size={14} /> Legal Aid Q&A</div>
+                    </div>
                 </div>
-            </div>
 
-            <div className="sidebar-section">
-                <LocalModeToggle />
+                <div className="sidebar-section">
+                    <LocalModeToggle />
+                </div>
             </div>
 
             <div className="sidebar-footer">

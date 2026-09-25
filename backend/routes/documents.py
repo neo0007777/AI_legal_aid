@@ -5,10 +5,11 @@ from models.database import get_db, User, QueryLog
 from models.schemas import (
     DraftRequest, DraftResponse,
     ContradictionRequest, ContradictionResponse, ContradictionPoint,
-    SearchSource
+    SearchSource, StatuteVerificationRequest
 )
 from services.rag import search_drafts
 from services.llm import call_llm
+from services.statute_verifier import verify_draft_statutes
 from services.contradiction import find_contradictions
 from services.review_engine import run_two_pass_refinement
 from services.fact_manifest import build_manifest
@@ -208,7 +209,7 @@ D. What requires verification?
 E. Which arguments can safely be generated from the available information?
 Do not hide this uncertainty merely because the final output should look professional.
 
-12. OUTPUT DESIGN
+12. OUTPUT DESIGN & COURT TYPOGRAPHY
 
 Generate the legal document in this structure:
 - Heading / Cause Title
@@ -218,8 +219,13 @@ Generate the legal document in this structure:
 - Prayer
 - Verification / Required Completion Fields
 
-Where information is missing, use [NOT PROVIDED] or [REQUIRES VERIFICATION].
-Do NOT fabricate content to make paragraphs sound complete.
+STRICT FORMATTING RULES:
+- Do NOT use markdown heading hashes (###, ####) or markdown bold asterisks (**) or markdown dividers (---).
+- Headings, cause titles, and section titles must be written in clean plain uppercase (e.g., 'IN THE COURT OF THE SESSIONS JUDGE AT NEW DELHI', 'APPLICATION FOR REGULAR BAIL UNDER SECTION 483 BNSS', 'MOST RESPECTFULLY SHOWETH:', 'GROUNDS', 'PRAYER', 'VERIFICATION').
+- Do not use stars, asterisks, hashes, backticks, or raw markdown signs anywhere in the generated draft. This is a court-ready document, not a markdown file.
+- Number all paragraphs cleanly: '1. That...', '2. That...'.
+- Where information is missing, use [NOT PROVIDED] or [REQUIRES VERIFICATION].
+- Do NOT fabricate content to make paragraphs sound complete.
 
 13. FINAL SELF-CHECK
 
@@ -438,6 +444,9 @@ Reference Templates from Database:
         provenance["source_locked_corpus"] = locked_corpus.to_dict()
         provenance["source_lock_violations_detected"] = len(audit_violations)
 
+        # ── Step 8.5: Run Statute & Section Verification Audit ─
+        statute_audit = verify_draft_statutes(final_draft, document_category=req.category or "")
+
         try:
             db.add(QueryLog(
                 user_id=current_user.id,
@@ -464,12 +473,19 @@ Reference Templates from Database:
             provenance_report=provenance,
             procedural_posture=posture.to_dict(),
             ground_traceability=[g.to_dict() for g in grounds_plan],
+            statute_verification=statute_audit,
         )
     except HTTPException:
         raise
     except Exception as e:
         print(f"[Documents] Unhandled error: {e}")
         raise HTTPException(status_code=500, detail="Draft generation failed. Please try again.")
+
+
+@router.post("/verify-statutes")
+def verify_statutes_endpoint(req: StatuteVerificationRequest):
+    """Run an on-demand statutory section audit on any draft text."""
+    return verify_draft_statutes(req.draft_text, document_category=req.category or "")
 
 
 @router.post("/scan-contradictions", response_model=ContradictionResponse)

@@ -1,19 +1,48 @@
 import { useState, useRef, useEffect } from 'react';
 import {
     Send, Sparkles, Scale, BookOpen, AlertTriangle,
-    MessageSquare, ShieldAlert, Search, Loader2, FileText, Copy, Check
+    ShieldAlert, Search, Loader2, FileText, Copy, Check,
+    Mic, MicOff, RotateCcw, X, Shield, Gavel, HelpCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './LegalAid.css';
 
 const SUGGESTIONS = [
-    { text: "What are the rules for filing an Anticipatory Bail under Section 438 CrPC?", icon: ShieldAlert },
-    { text: "My landlord is refusing to return my security deposit. What is my legal recourse?", icon: Scale },
-    { text: "How do I secure an ex-parte injunction against illegal demolition?", icon: AlertTriangle },
-    { text: "Can an FIR be quashed under Section 482 CrPC if the parties compromise?", icon: BookOpen },
+    {
+        category: "Criminal Law",
+        text: "What are the rules and procedure for filing an Anticipatory Bail under Section 438 CrPC?",
+        icon: ShieldAlert,
+    },
+    {
+        category: "Tenancy & Civil",
+        text: "My landlord is refusing to return my security deposit without damages. What is my legal recourse?",
+        icon: Scale,
+    },
+    {
+        category: "Civil Injunctions",
+        text: "How do I secure an urgent ex-parte injunction against illegal property demolition under Order 39 CPC?",
+        icon: AlertTriangle,
+    },
+    {
+        category: "Criminal Procedure",
+        text: "Can an FIR be quashed under Section 482 CrPC if the parties have reached a mutual compromise?",
+        icon: BookOpen,
+    },
+    {
+        category: "Commercial Law",
+        text: "What is the statutory limitation period and notice requirement for cheque dishonour under Section 138 NI Act?",
+        icon: Gavel,
+    },
+    {
+        category: "Consumer Rights",
+        text: "What remedies exist under Consumer Protection Act 2019 for deficient service and misleading claims?",
+        icon: Shield,
+    }
 ];
 
 const parseAnswer = (rawAnswer) => {
+    if (!rawAnswer) return { directAnswer: '', legalBasis: '', precedents: '', insight: '', disclaimer: '' };
+
     const sections = {
         directAnswer: '',
         legalBasis: '',
@@ -22,21 +51,194 @@ const parseAnswer = (rawAnswer) => {
         disclaimer: '',
     };
 
-    const directMatch = rawAnswer.match(/DIRECT ANSWER:\s*([\s\S]*?)(?=LEGAL BASIS:|$)/i);
-    const legalMatch = rawAnswer.match(/LEGAL BASIS:\s*([\s\S]*?)(?=BINDING PRECEDENTS:|$)/i);
-    const precedentsMatch = rawAnswer.match(/BINDING PRECEDENTS:\s*([\s\S]*?)(?=ACTIONABLE INSIGHT:|$)/i);
-    const insightMatch = rawAnswer.match(/ACTIONABLE INSIGHT:\s*([\s\S]*?)(?=DISCLAIMER:|$)/i);
-    const disclaimerMatch = rawAnswer.match(/DISCLAIMER:\s*([\s\S]*?)$/i);
+    // Resilient regex that matches markdown headers, asterisks, hashes, colons
+    const directMatch = rawAnswer.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?DIRECT ANSWER:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?LEGAL BASIS:?|$)/i);
+    const legalMatch = rawAnswer.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?LEGAL BASIS:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?BINDING PRECEDENTS:?|$)/i);
+    const precedentsMatch = rawAnswer.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?BINDING PRECEDENTS:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?ACTIONABLE INSIGHT:?|$)/i);
+    const insightMatch = rawAnswer.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?ACTIONABLE INSIGHT:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?DISCLAIMER:?|$)/i);
+    const disclaimerMatch = rawAnswer.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?DISCLAIMER:?(?:\*\*)?\s*([\s\S]*?)$/i);
 
-    if (directMatch) sections.directAnswer = directMatch[1].trim();
-    if (legalMatch) sections.legalBasis = legalMatch[1].trim();
-    if (precedentsMatch) sections.precedents = precedentsMatch[1].trim();
-    if (insightMatch) sections.insight = insightMatch[1].trim();
-    if (disclaimerMatch) sections.disclaimer = disclaimerMatch[1].trim();
+    if (directMatch && directMatch[1].trim()) sections.directAnswer = directMatch[1].trim();
+    if (legalMatch && legalMatch[1].trim()) sections.legalBasis = legalMatch[1].trim();
+    if (precedentsMatch && precedentsMatch[1].trim()) sections.precedents = precedentsMatch[1].trim();
+    if (insightMatch && insightMatch[1].trim()) sections.insight = insightMatch[1].trim();
+    if (disclaimerMatch && disclaimerMatch[1].trim()) sections.disclaimer = disclaimerMatch[1].trim();
 
-    if (!sections.directAnswer) sections.directAnswer = rawAnswer;
+    if (!sections.directAnswer && !sections.legalBasis) {
+        sections.directAnswer = rawAnswer.trim();
+    }
 
     return sections;
+};
+
+const formatCategoryTag = (cat) => {
+    if (!cat) return 'General Law';
+    const upper = cat.toUpperCase();
+    if (upper === 'SALE') return 'Sale of Goods / Property Act';
+    if (upper === 'CRPC') return 'Code of Criminal Procedure';
+    if (upper === 'IPC') return 'Indian Penal Code';
+    if (upper === 'CPC') return 'Code of Civil Procedure';
+    if (upper === 'CONSTITUTION') return 'Constitutional Law';
+    return cat.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+const cleanAndNormalizeText = (text) => {
+    if (!text) return '';
+    return text
+        .replace(/[\u202F\u00A0\u2000-\u200A]/g, ' ') // normalize all strange unicode spaces
+        .replace(/\s*---+$/, '') // remove trailing markdown lines
+        .trim();
+};
+
+const formatRichInline = (rawText) => {
+    if (!rawText) return null;
+    const text = cleanAndNormalizeText(rawText);
+
+    // Regex to match:
+    // 1. ***bold italic***
+    // 2. **bold**
+    // 3. *italic* or _italic_
+    // 4. `code`
+    const regex = /(\*\*\*[^*]+?\*\*\*|\*\*[^*]+?\*\*|\*[^*]+?\*|_[^_]+?_|`[^`]+?`)/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+            const rawPiece = text.substring(lastIndex, match.index).replace(/\*+/g, '');
+            if (rawPiece) parts.push(rawPiece);
+        }
+        const token = match[0];
+        if (token.startsWith('***') && token.endsWith('***')) {
+            const inner = token.slice(3, -3);
+            parts.push(<strong key={match.index} className="aid-strong"><em className="aid-italic">{inner}</em></strong>);
+        } else if (token.startsWith('**') && token.endsWith('**')) {
+            const inner = token.slice(2, -2);
+            parts.push(<strong key={match.index} className="aid-strong">{inner}</strong>);
+        } else if (token.startsWith('*') && token.endsWith('*')) {
+            const inner = token.slice(1, -1);
+            parts.push(<em key={match.index} className="aid-italic">{inner}</em>);
+        } else if (token.startsWith('_') && token.endsWith('_')) {
+            const inner = token.slice(1, -1);
+            parts.push(<em key={match.index} className="aid-italic">{inner}</em>);
+        } else if (token.startsWith('`') && token.endsWith('`')) {
+            const inner = token.slice(1, -1);
+            parts.push(<code key={match.index} className="aid-code">{inner}</code>);
+        }
+        lastIndex = match.index + token.length;
+    }
+
+    if (lastIndex < text.length) {
+        const rawPiece = text.substring(lastIndex).replace(/\*+/g, '');
+        if (rawPiece) parts.push(rawPiece);
+    }
+
+    if (parts.length === 0) {
+        return text.replace(/\*+/g, '');
+    }
+
+    return parts;
+};
+
+const renderFormattedText = (text) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+    const elements = [];
+    let tableRows = [];
+    let inTable = false;
+
+    const flushTable = (key) => {
+        if (tableRows.length > 0) {
+            const isHeader = tableRows[0];
+            const dataRows = tableRows.slice(1).filter(r => !r.every(c => /^[-:\s]+$/.test(c)));
+            elements.push(
+                <div key={`table-${key}`} className="aid-table-wrapper">
+                    <table className="aid-table">
+                        <thead>
+                            <tr>
+                                {isHeader.map((h, i) => (
+                                    <th key={i}>{formatRichInline(h)}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {dataRows.map((row, ri) => (
+                                <tr key={ri}>
+                                    {row.map((cell, ci) => (
+                                        <td key={ci}>{formatRichInline(cell)}</td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+            tableRows = [];
+            inTable = false;
+        }
+    };
+
+    lines.forEach((line, idx) => {
+        const trimmed = line.trim();
+
+        // Check if markdown table line: e.g. | col1 | col2 |
+        if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+            const cells = trimmed.split('|').slice(1, -1).map(c => c.trim());
+            tableRows.push(cells);
+            inTable = true;
+            return;
+        } else if (inTable) {
+            flushTable(idx);
+        }
+
+        if (!trimmed) {
+            elements.push(<div key={idx} className="aid-line-spacer" />);
+            return;
+        }
+
+        // Horizontal separator line --- or ***
+        if (/^[-*]{3,}$/.test(trimmed)) {
+            elements.push(<hr key={idx} className="aid-divider" />);
+            return;
+        }
+
+        // Bullet point: - item, * item, • item
+        if (trimmed.startsWith('- ') || trimmed.startsWith('• ') || trimmed.startsWith('* ')) {
+            const cleanContent = line.replace(/^[-•*]\s*/, '').trim();
+            elements.push(
+                <div key={idx} className="aid-bullet-point">
+                    <span className="aid-bullet-dot">•</span>
+                    <span className="aid-bullet-content">{formatRichInline(cleanContent)}</span>
+                </div>
+            );
+            return;
+        }
+
+        // Numbered list: e.g. "1. " or "5. "
+        const numMatch = trimmed.match(/^(\d+[\.\)])\s*(.*)/);
+        if (numMatch) {
+            elements.push(
+                <div key={idx} className="aid-numbered-point">
+                    <span className="aid-numbered-badge">{numMatch[1]}</span>
+                    <span className="aid-numbered-content">{formatRichInline(numMatch[2])}</span>
+                </div>
+            );
+            return;
+        }
+
+        elements.push(
+            <p key={idx} className="aid-paragraph">
+                {formatRichInline(line)}
+            </p>
+        );
+    });
+
+    if (inTable) {
+        flushTable('end');
+    }
+
+    return elements;
 };
 
 const LegalAid = () => {
@@ -46,12 +248,80 @@ const LegalAid = () => {
     const [inputValue, setInputValue] = useState('');
     const [isThinking, setIsThinking] = useState(false);
     const [loadingStage, setLoadingStage] = useState(0);
+    const [copiedId, setCopiedId] = useState(null);
+    const [isListening, setIsListening] = useState(false);
 
     const messagesEndRef = useRef(null);
+    const inputRef = useRef(null);
+    const recognitionRef = useRef(null);
+
+    // Initialize Web Speech API for voice dictation
+    useEffect(() => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            try {
+                const recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-IN';
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    setInputValue(prev => prev ? `${prev.trim()} ${transcript}` : transcript);
+                    setIsListening(false);
+                };
+
+                recognition.onerror = () => {
+                    setIsListening(false);
+                };
+
+                recognition.onend = () => {
+                    setIsListening(false);
+                };
+
+                recognitionRef.current = recognition;
+            } catch (e) {
+                console.error("Speech recognition setup failed:", e);
+            }
+        }
+    }, []);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isThinking]);
+
+    const toggleListening = () => {
+        if (!recognitionRef.current) {
+            alert('Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.');
+            return;
+        }
+        if (isListening) {
+            recognitionRef.current.stop();
+            setIsListening(false);
+        } else {
+            try {
+                recognitionRef.current.start();
+                setIsListening(true);
+            } catch (err) {
+                console.error('Speech recognition error:', err);
+                setIsListening(false);
+            }
+        }
+    };
+
+    const handleCopy = (id, text) => {
+        navigator.clipboard.writeText(text);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    const handleClearChat = () => {
+        if (messages.length === 0) return;
+        if (window.confirm("Start a new consultation? This will clear current conversation.")) {
+            setMessages([]);
+            setInputValue('');
+        }
+    };
 
     const handleSend = async (queryText) => {
         const text = queryText || inputValue;
@@ -92,7 +362,7 @@ const LegalAid = () => {
                 data: {
                     answer: parsed.directAnswer,
                     legal_basis: parsed.legalBasis || 'Refer to relevant Indian statutes and case law.',
-                    references: parsed.precedents ? parsed.precedents.split('\n').filter(Boolean) : [],
+                    references: parsed.precedents ? parsed.precedents.split('\n').map(r => r.trim()).filter(Boolean) : [],
                     insight: parsed.insight || '',
                     disclaimer: parsed.disclaimer,
                     tags: data.sources?.map(s => s.category).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3) || [],
@@ -114,163 +384,292 @@ const LegalAid = () => {
     };
 
     return (
-        <div className="intelligence-workspace-layout">
-            <aside className="intelligence-sidebar">
-                <div className="sidebar-header-workspace"><h3>Legal Intelligence</h3></div>
-                <div className="sidebar-category-group">
-                    <div className="template-item active">
-                        <MessageSquare size={18} className="template-icon" />
-                        <div><h4>AI Legal Assistant</h4></div>
+        <div className="legal-aid-workspace">
+            {/* Top Bar with Title, Status & Actions */}
+            <header className="legal-aid-header">
+                <div className="header-brand-block">
+                    <div className="header-icon-wrap">
+                        <Scale size={24} />
                     </div>
-                </div>
-            </aside>
-
-            <main className="intelligence-feed-area">
-                <div className="feed-app-header">
-                    <div className="header-titles">
+                    <div>
                         <h2>Legal Aid Intelligence</h2>
-                        <p>AI-powered legal guidance grounded in IPC, CrPC, CPC, and the Constitution of India.</p>
+                        <p>Statutory guidance grounded in IPC, CrPC, CPC, BNS & Judicial Precedents</p>
                     </div>
                 </div>
 
-                <div className="disclaimer-soft-box">
-                    <ShieldAlert size={20} className="disclaimer-icon" />
-                    <p><strong>Notice:</strong> This AI provides legal information for reference only. It does not constitute attorney-client advice.</p>
-                </div>
+                <div className="header-actions">
+                    <div className="status-pill">
+                        <span className="pulse-dot" />
+                        <span>India Kanoon & Bare Acts Grounded</span>
+                    </div>
 
-                <div className="intelligence-messages-river">
-                    {messages.length === 0 ? (
-                        <div className="empty-sandbox-state animate-fade-in">
-                            <Sparkles size={48} className="text-primary mb-4 opacity-50 mx-auto" />
-                            <h2>How can LexSetu help you today?</h2>
-                            <div className="suggestion-chips-grid">
-                                {SUGGESTIONS.map((sug, idx) => (
-                                    <button key={idx} className="suggestion-chip" onClick={() => handleSend(sug.text)}>
-                                        <sug.icon size={18} className="chip-icon" />
-                                        <span>{sug.text}</span>
-                                    </button>
-                                ))}
-                            </div>
+                    {messages.length > 0 && (
+                        <button
+                            type="button"
+                            className="header-action-btn"
+                            onClick={handleClearChat}
+                            title="Start new consultation"
+                        >
+                            <RotateCcw size={15} />
+                            <span>New Consultation</span>
+                        </button>
+                    )}
+                </div>
+            </header>
+
+            {/* Compact Informational Notice */}
+            <div className="legal-notice-banner">
+                <ShieldAlert size={16} className="notice-icon" />
+                <span>
+                    <strong>Statutory Reference:</strong> This AI assistant provides research and procedural guidance. It does not constitute formal advocate-client representation.
+                </span>
+            </div>
+
+            {/* Scrollable Conversation Stream */}
+            <div className="legal-aid-stream">
+                {messages.length === 0 ? (
+                    <div className="legal-aid-empty-state">
+                        <div className="empty-state-badge">
+                            <Sparkles size={20} />
+                            <span>AI Legal Research Suite</span>
                         </div>
-                    ) : (
-                        messages.map((msg) => (
-                            <div key={msg.id} className={`message-wrapper ${msg.type === 'user' ? 'user-wrapper' : 'ai-wrapper'}`}>
+                        <h3>How can LexSetu assist your legal research today?</h3>
+                        <p className="empty-state-subtitle">
+                            Ask procedural questions, verify criminal provisions, clarify tenancy issues, or explore remedies under Indian law.
+                        </p>
+
+                        <div className="suggestions-grid">
+                            {SUGGESTIONS.map((sug, idx) => (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    className="suggestion-card"
+                                    onClick={() => handleSend(sug.text)}
+                                >
+                                    <div className="suggestion-card-header">
+                                        <sug.icon size={18} className="suggestion-icon" />
+                                        <span className="suggestion-category">{sug.category}</span>
+                                    </div>
+                                    <p className="suggestion-text">{sug.text}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="messages-container">
+                        {messages.map((msg) => (
+                            <div key={msg.id} className={`chat-message-row ${msg.type === 'user' ? 'user-row' : 'ai-row'}`}>
                                 {msg.type === 'user' && (
-                                    <div className="user-query-bubble"><p>{msg.text}</p></div>
+                                    <div className="user-bubble">
+                                        <p>{msg.text}</p>
+                                    </div>
                                 )}
 
                                 {msg.type === 'error' && (
-                                    <div className="user-query-bubble" style={{ background: '#fee2e2', color: '#991b1b' }}>
-                                        <p>Error: {msg.text}. Please ensure the backend is running.</p>
+                                    <div className="error-bubble">
+                                        <AlertTriangle size={18} className="error-icon" />
+                                        <div>
+                                            <strong>Unable to retrieve advice:</strong> {msg.text}
+                                            <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>Please verify backend service status.</div>
+                                        </div>
                                     </div>
                                 )}
 
                                 {msg.type === 'structured_ai' && (
-                                    <div className="ai-intelligence-card animate-fade-in">
-                                        <div className="card-top-accent"></div>
-                                        <div className="ai-card-content">
-
-                                            <div className="intelligence-block">
-                                                <h4 className="flex items-center gap-2 font-bold mb-2 text-primary">
-                                                    <FileText size={16} /> Direct Answer
-                                                </h4>
-                                                <p>{msg.data.answer}</p>
+                                    <div className="ai-response-card">
+                                        <div className="card-header-bar">
+                                            <div className="card-header-title">
+                                                <Scale size={18} className="card-header-icon" />
+                                                <span>LexSetu Legal Analysis</span>
                                             </div>
-
-                                            {msg.data.legal_basis && (
-                                                <div className="intelligence-block border-l-4 border-gray-400 pl-4 py-1">
-                                                    <h4 className="flex items-center gap-2 font-bold mb-2 text-gray-800">
-                                                        <Scale size={16} /> Legal Basis
-                                                    </h4>
-                                                    <p className="text-gray-600 text-sm leading-relaxed">{msg.data.legal_basis}</p>
-                                                </div>
-                                            )}
-
-                                            {msg.data.references.length > 0 && (
-                                                <div className="intelligence-block blue-tint">
-                                                    <h4 className="flex items-center gap-2 font-bold mb-2 text-blue-900">
-                                                        <BookOpen size={16} /> Precedents Cited
-                                                    </h4>
-                                                    <ul className="list-disc pl-5 text-sm text-blue-800 space-y-1">
-                                                        {msg.data.references.map((ref, i) => (
-                                                            <li key={i}>{ref}</li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-
-                                            {msg.data.insight && (
-                                                <div className="intelligence-block bg-gray-900 text-white rounded-lg p-4">
-                                                    <h4 className="flex items-center gap-2 font-bold mb-2 text-blue-300 uppercase tracking-wider text-xs">
-                                                        <AlertTriangle size={14} /> Actionable Insight
-                                                    </h4>
-                                                    <p className="text-sm">{msg.data.insight}</p>
-                                                </div>
-                                            )}
-
+                                            <button
+                                                type="button"
+                                                className="copy-card-btn"
+                                                onClick={() => handleCopy(msg.id, msg.raw)}
+                                                title="Copy complete analysis"
+                                            >
+                                                {copiedId === msg.id ? (
+                                                    <>
+                                                        <Check size={14} className="text-green-600" />
+                                                        <span>Copied!</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy size={14} />
+                                                        <span>Copy</span>
+                                                    </>
+                                                )}
+                                            </button>
                                         </div>
 
-                                        <div className="ai-card-footer">
-                                            <div className="card-tags-group">
+                                        <div className="card-sections-body">
+                                            {/* Direct Answer */}
+                                            {msg.data.answer && (
+                                                <div className="response-section direct-answer-section">
+                                                    <div className="section-heading">
+                                                        <FileText size={16} />
+                                                        <h4>Direct Answer</h4>
+                                                    </div>
+                                                    <div className="section-content text-rich">
+                                                        {renderFormattedText(msg.data.answer)}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Legal Basis */}
+                                            {msg.data.legal_basis && (
+                                                <div className="response-section legal-basis-section">
+                                                    <div className="section-heading">
+                                                        <Scale size={16} />
+                                                        <h4>Statutory Grounds & Legal Basis</h4>
+                                                    </div>
+                                                    <div className="section-content text-rich">
+                                                        {renderFormattedText(msg.data.legal_basis)}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Precedents Cited */}
+                                            {msg.data.references && msg.data.references.length > 0 && (
+                                                <div className="response-section precedents-section">
+                                                    <div className="section-heading">
+                                                        <BookOpen size={16} />
+                                                        <h4>Judicial Precedents & Authorities Cited</h4>
+                                                    </div>
+                                                    <div className="precedents-list">
+                                                        {msg.data.references.map((ref, i) => {
+                                                            const cleanRef = ref
+                                                                .replace(/^(\d+[\.\)]\s*|[-•*]\s*)+/, '')
+                                                                .replace(/\s*---+$/, '')
+                                                                .trim();
+                                                            if (!cleanRef || cleanRef.toLowerCase().includes('no direct precedent required')) {
+                                                                return null;
+                                                            }
+                                                            return (
+                                                                <div key={i} className="precedent-item">
+                                                                    <span className="precedent-index-badge">{i + 1}</span>
+                                                                    <div className="precedent-content">
+                                                                        {formatRichInline(cleanRef)}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Actionable Insight */}
+                                            {msg.data.insight && (
+                                                <div className="response-section insight-section">
+                                                    <div className="section-heading">
+                                                        <AlertTriangle size={16} />
+                                                        <h4>Actionable Counsel & Strategic Steps</h4>
+                                                    </div>
+                                                    <div className="section-content text-rich">
+                                                        {renderFormattedText(msg.data.insight)}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Card Footer with Tags */}
+                                        <div className="card-footer-bar">
+                                            <div className="card-tags-list">
                                                 {msg.data.tags.map((tag, i) => (
-                                                    <span key={i} className="legal-tag">{tag}</span>
+                                                    <span key={i} className="statute-tag">
+                                                        {formatCategoryTag(tag)}
+                                                    </span>
                                                 ))}
                                             </div>
-                                            <div className="card-quick-actions">
-                                                <button
-                                                    className="quick-action-btn"
-                                                    onClick={() => navigator.clipboard.writeText(msg.raw)}
-                                                >
-                                                    <Copy size={14} /> Copy
-                                                </button>
-                                            </div>
+                                            {msg.data.disclaimer && (
+                                                <p className="footer-disclaimer-note">
+                                                    {msg.data.disclaimer}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 )}
                             </div>
-                        ))
-                    )}
+                        ))}
+                    </div>
+                )}
 
-                    {isThinking && (
-                        <div className="message-wrapper ai-wrapper">
-                            <div className="ai-spinner-card animate-fade-in">
-                                <Loader2 size={24} className="spin text-primary mr-3" />
-                                <span className="spinner-text">
-                                    {loadingStage === 0 && "Parsing legal query..."}
-                                    {loadingStage === 1 && "Cross-referencing statutory databases (CrPC / IPC)..."}
-                                    {loadingStage === 2 && "Compiling precedents and actionable insights..."}
-                                </span>
+                {/* AI Thinking Animation */}
+                {isThinking && (
+                    <div className="thinking-indicator-wrapper">
+                        <div className="thinking-card">
+                            <Loader2 size={20} className="spin-loader" />
+                            <div className="thinking-text-flow">
+                                <strong>
+                                    {loadingStage === 0 && "Parsing legal query & identifying jurisdiction..."}
+                                    {loadingStage === 1 && "Cross-referencing statutory database (IPC, CrPC, CPC)..."}
+                                    {loadingStage === 2 && "Synthesizing binding precedents and actionable insight..."}
+                                </strong>
+                                <span className="thinking-subtext">LexSetu Neural Engine active</span>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                <div ref={messagesEndRef} />
+            </div>
+
+            {/* Bottom Query Input Assembly */}
+            <div className="legal-aid-input-area">
+                <div className="input-box-wrapper">
+                    <Search size={20} className="input-leading-icon" />
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        className="legal-query-input"
+                        placeholder="Ask about bail, property partition, cheques, contracts, consumer redressal..."
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSend();
+                            }
+                        }}
+                        disabled={isThinking}
+                    />
+
+                    {inputValue.trim() && (
+                        <button
+                            type="button"
+                            className="input-clear-btn"
+                            onClick={() => setInputValue('')}
+                            title="Clear input"
+                        >
+                            <X size={16} />
+                        </button>
                     )}
 
-                    <div ref={messagesEndRef} />
+                    <button
+                        type="button"
+                        className={`input-voice-btn ${isListening ? 'listening' : ''}`}
+                        onClick={toggleListening}
+                        title={isListening ? "Listening... click to stop" : "Voice dictation (English / Hindi)"}
+                    >
+                        {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                    </button>
+
+                    <button
+                        type="button"
+                        className={`input-submit-btn ${inputValue.trim() ? 'can-send' : ''}`}
+                        onClick={() => handleSend()}
+                        disabled={!inputValue.trim() || isThinking}
+                        title="Submit query (Enter)"
+                    >
+                        <Send size={18} />
+                    </button>
                 </div>
 
-                <div className="huge-input-assembly">
-                    <div className="search-bar-wrapper">
-                        <Search size={22} className="input-search-icon" />
-                        <input
-                            type="text"
-                            className="massive-legal-input"
-                            placeholder="Ask about bail, contracts, property rights, consumer protection, labour law..."
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) handleSend(); }}
-                        />
-                        <button
-                            className={`massive-send-btn ${inputValue.trim() ? 'active' : ''}`}
-                            onClick={() => handleSend()}
-                            disabled={!inputValue.trim() || isThinking}
-                        >
-                            <Send size={18} />
-                        </button>
-                    </div>
-                    <div className="input-footnote">
-                        <ShieldAlert size={12} /> Obfuscate confidential names or PII before querying.
-                    </div>
+                <div className="input-footer-note">
+                    <Shield size={12} />
+                    <span>Confidential queries: Personal identifying information is not required. LexSetu complies with Indian privacy norms.</span>
                 </div>
-            </main>
+            </div>
         </div>
     );
 };

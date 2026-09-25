@@ -146,6 +146,12 @@ class DraftResponse(BaseModel):
     provenance_report: Optional[dict] = None   # Provenance of each assertion
     procedural_posture: Optional[dict] = None  # Verified procedural posture & governing provision
     ground_traceability: Optional[List[dict]] = None # Internal ground-by-ground verification record
+    statute_verification: Optional[dict] = None # Statutory provision audit against India Code
+
+
+class StatuteVerificationRequest(BaseModel):
+    draft_text: str
+    category: Optional[str] = None
 
 
 class ContradictionRequest(BaseModel):
