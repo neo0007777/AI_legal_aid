@@ -12,7 +12,6 @@ import { useLocalMode } from '../context/LocalModeContext';
 import VoiceInputButton from '../components/VoiceInputButton';
 import PrivilegeShield from '../components/PrivilegeShield';
 import { downloadFileFromBlob, exportPdfFromApi } from '../utils/downloadHelper';
-import TranslateAction from '../components/TranslateAction';
 import PipelineStageList from '../components/PipelineStageList';
 import { useStageStream } from '../hooks/useStageStream';
 import './DraftAssistant.css';
@@ -706,12 +705,6 @@ const DraftAssistant = () => {
                                 </div>
                             )}
                         </div>
-
-                        <TranslateAction
-                            sourceType="draft_assistant"
-                            text={documentContent}
-                            citations={sources}
-                        />
                     </div>
                 )}
             </main>

@@ -5,14 +5,12 @@ import {
     AlertCircle, CheckCircle, RefreshCw, ChevronRight, Scale,
     FileText, ArrowRight, Layers, Database, Globe2
 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
 import './Statutes.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const Statutes = () => {
     const { t } = useTranslation();
-    const { languageCode } = useLanguage();
     // States for Acts
     const [acts, setActs] = useState([]);
     const [selectedAct, setSelectedAct] = useState(null);
@@ -293,12 +291,6 @@ const Statutes = () => {
                                     <span>{t('statutes.verbatimSourceText')}</span>
                                     <span className="unaltered-pill">{t('statutes.unalteredText')}</span>
                                 </div>
-                                {languageCode !== 'en' && (
-                                    <div className="legal-applicability-disclaimer" style={{ marginBottom: '0.6rem' }}>
-                                        <Globe2 size={14} />
-                                        <span>{t('statutes.englishOnlyNotice')}</span>
-                                    </div>
-                                )}
                                 <div className="statutory-text-content">
                                     {provisionDetail.verbatim_text ? (
                                         <p>{provisionDetail.verbatim_text}</p>

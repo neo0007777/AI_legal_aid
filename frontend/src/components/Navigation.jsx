@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { Scale, BookOpen, MessageSquare, Home as HomeIcon, FileSearch, Clock, User, LogOut, FileCheck, ShieldCheck, Menu, X, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import LocalModeToggle from './LocalModeToggle';
-import LanguageSwitcher from './LanguageSwitcher';
 import './Navigation.css';
 
 const Navigation = () => {
@@ -99,8 +98,7 @@ const Navigation = () => {
                     </div>
                 </div>
 
-                <div className="sidebar-section" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <LanguageSwitcher />
+                <div className="sidebar-section">
                     <LocalModeToggle />
                 </div>
             </div>

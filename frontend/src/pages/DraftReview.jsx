@@ -5,19 +5,6 @@ import {
     FileCheck, UploadCloud, AlertTriangle, AlertCircle, CheckCircle2, Sparkles,
     ShieldAlert, RefreshCw, FileText, ArrowRight, Wand2, Check, Copy, Download
 } from 'lucide-react';
-import TranslateAction from '../components/TranslateAction';
-
-const buildReviewSummaryText = (report) => {
-    if (!report) return '';
-    const parts = [`Document type: ${report.document_type}. Risk level: ${report.risk_level}. Score: ${report.overall_score}/100.`, report.summary];
-    if (report.missing_sections?.length) parts.push(`Missing mandatory sections: ${report.missing_sections.join(', ')}.`);
-    if (report.missing_fields?.length) parts.push(`Unfilled placeholders: ${report.missing_fields.map(f => f.placeholder).join(', ')}.`);
-    const allIssues = [...(report.critical || []), ...(report.warnings || []), ...(report.suggestions || [])];
-    allIssues.forEach(issue => {
-        parts.push(`${issue.title}: ${issue.description}${issue.suggested_fix ? ` Fix: ${issue.suggested_fix}` : ''}`);
-    });
-    return parts.join('\n\n');
-};
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -365,12 +352,6 @@ const DraftReview = () => {
                                     )}
                                 </button>
                             </div>
-
-                            <TranslateAction
-                                sourceType="draft_review"
-                                text={buildReviewSummaryText(reviewReport)}
-                                citations={[]}
-                            />
                         </div>
                     )}
                 </div>

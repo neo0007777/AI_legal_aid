@@ -7,7 +7,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
 import { usePersona } from '../context/PersonaContext';
-import { useLanguage, SUPPORTED_LANGUAGES } from '../context/LanguageContext';
 import PersonaSwitcher from '../components/PersonaSwitcher';
 import CitationStatusBadge, {
     ConfidenceBars, TechnicalFailureNote, RetrievalSourceBadge,
@@ -72,8 +71,6 @@ const VerifyFiling = () => {
     const { token } = useAuth();
     const { localOnly } = useLocalMode();
     const { personaId, persona } = usePersona();
-    const { languageCode } = useLanguage();
-
     const [coverage, setCoverage] = useState(null);
     const [file, setFile] = useState(null);
     const [filingLabel, setFilingLabel] = useState('');
@@ -90,9 +87,6 @@ const VerifyFiling = () => {
     const [expandedIdx, setExpandedIdx] = useState(null);
     const [exporting, setExporting] = useState(null); // 'csv' | 'pdf' | null
     const [inputExpanded, setInputExpanded] = useState(true);
-    const [renderLanguage, setRenderLanguage] = useState('en');
-    const [renderedCitations, setRenderedCitations] = useState(null);
-    const [rendering, setRendering] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -115,47 +109,7 @@ const VerifyFiling = () => {
         setTotalCount(0);
         setExpandedIdx(null);
         setInputExpanded(true);
-        setRenderLanguage('en');
-        setRenderedCitations(null);
-        setRendering(false);
     };
-
-    const changeLanguage = async (targetLang) => {
-        if (!reportId || targetLang === renderLanguage) return;
-        if (targetLang === 'en') {
-            setRenderLanguage('en');
-            setRenderedCitations(null);
-            return;
-        }
-        setRendering(true);
-        try {
-            const res = await fetch(`/api/citations/${reportId}/render`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ language: targetLang }),
-            });
-            if (!res.ok) throw new Error(`Render failed: ${res.status}`);
-            const data = await res.json();
-            setRenderedCitations(data.citations);
-            setRenderLanguage(targetLang);
-        } catch (err) {
-            console.error('Translation error:', err);
-        } finally {
-            setRendering(false);
-        }
-    };
-
-    // Auto-follow the app-wide language switcher: as soon as a report is
-    // ready, or the global language changes, render the citation report in
-    // that language without requiring a separate click inside this page.
-    // Hinglish stays a manual-only option below (it isn't part of the
-    // app-wide switcher), and the manual buttons still work as an override.
-    useEffect(() => {
-        if (!reportId) return;
-        if (languageCode === renderLanguage) return;
-        changeLanguage(languageCode);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [reportId, languageCode]);
 
     const handleFlagged = (idx, newStatus, meta) => {
         setCitationResults((prev) => {
@@ -256,8 +210,7 @@ const VerifyFiling = () => {
         if (!reportId) return;
         setExporting(format);
         try {
-            const langParam = format === 'pdf' && renderLanguage !== 'en' ? `?lang=${encodeURIComponent(renderLanguage)}` : '';
-            const response = await fetch(`/api/citations/export/${reportId}.${format}${langParam}`, {
+            const response = await fetch(`/api/citations/export/${reportId}.${format}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!response.ok) throw new Error(`Export failed (${response.status})`);
@@ -300,8 +253,7 @@ const VerifyFiling = () => {
         return result ? { ...found, ...result } : found ? { ...found, pending: true } : null;
     });
     const finalCitations = doneReport?.citations || null;
-    const baseCitations = finalCitations || orderedCitations;
-    const displayCitations = renderedCitations || baseCitations;
+    const displayCitations = finalCitations || orderedCitations;
 
     return (
         <div className="verify-wrapper animate-fade-in">
@@ -465,25 +417,6 @@ const VerifyFiling = () => {
                                     <ListOrdered size={15} /> Step-by-step walkthrough
                                 </button>
                             </div>
-
-                            <div className="language-toggle" role="tablist">
-                                {[{ code: 'en', nativeLabel: 'English' }, ...SUPPORTED_LANGUAGES.filter(l => l.code !== 'en'), { code: 'hinglish', nativeLabel: 'Hinglish' }].map(({ code, nativeLabel }) => (
-                                    <button
-                                        key={code}
-                                        className={renderLanguage === code ? 'active' : ''}
-                                        onClick={() => changeLanguage(code)}
-                                        disabled={rendering}
-                                    >
-                                        {rendering && renderLanguage === code ? <Loader2 size={13} className="spin" /> : null} {nativeLabel}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {renderLanguage !== 'en' && renderedCitations && (
-                        <div className="translation-notice">
-                            <Info size={14} /> Translated from a result verified in English — the verdicts and citation data themselves are unchanged, only this text.
                         </div>
                     )}
 

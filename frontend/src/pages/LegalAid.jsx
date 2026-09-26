@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { downloadFileFromBlob, exportPdfFromApi } from '../utils/downloadHelper';
-import TranslateAction from '../components/TranslateAction';
 import PipelineStageList from '../components/PipelineStageList';
 import { useStageStream } from '../hooks/useStageStream';
 import './LegalAid.css';
@@ -1033,12 +1032,6 @@ const LegalAid = () => {
                                                 )}
                                             </div>
                                         </div>
-
-                                        <TranslateAction
-                                            sourceType="legal_aid"
-                                            text={msg.raw}
-                                            citations={msg.data.sources}
-                                        />
 
                                         {/* Upgrade to Pro for better reasoning and features - Presented after result for Free tier */}
                                         {!msg.requires_upgrade && !isProActive && !msg.is_pro && (
