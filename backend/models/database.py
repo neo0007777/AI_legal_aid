@@ -29,6 +29,7 @@ class User(Base):
     role = Column(String, default="user")  # user, advocate, intern, admin
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    preferred_language = Column(String, default="en")  # app-wide language switcher, see LanguageContext.jsx
 
 
 class Workflow(Base):
@@ -82,6 +83,37 @@ class QueryLog(Base):
     query_type = Column(String, nullable=False)  # case_search, draft, legal_aid, compliance
     encrypted_query = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserSession(Base):
+    """Loophole fix #2: auth was pure stateless JWT with no way to revoke a
+    token before its natural expiry -- /logout did nothing server-side. Every
+    issued access token now gets a row here (id = the token's jti claim), so
+    logout, admin-forced logout, and "log out of all devices" all become a
+    single UPDATE rather than being architecturally impossible."""
+    __tablename__ = "user_sessions"
+
+    id = Column(String, primary_key=True)  # the JWT's jti claim
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    issued_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    user_agent = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+
+
+class LoginAttempt(Base):
+    """Loophole fix #3: /login had no brute-force protection at all -- unlimited
+    password guesses against any account. Every attempt (success or failure)
+    is logged here; the login route checks recent failures for an email
+    before even touching the password hash."""
+    __tablename__ = "login_attempts"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String, nullable=False, index=True)
+    success = Column(Boolean, nullable=False)
+    attempted_at = Column(DateTime, default=datetime.utcnow, index=True)
+    ip_address = Column(String, nullable=True)
 
 
 class Correction(Base):
@@ -244,6 +276,26 @@ class IngestionLog(Base):
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    _ensure_column("users", "preferred_language", "VARCHAR DEFAULT 'en'")
+
+
+def _ensure_column(table: str, column: str, coltype_sql: str):
+    """Lightweight, no-alembic migration guard: Base.metadata.create_all only
+    creates missing TABLES, it never ALTERs an existing one -- so a column
+    added to a model after the sqlite file already exists (e.g. this
+    language-switcher release) would otherwise 500 on first query. Safe to
+    call on every startup; a no-op once the column exists."""
+    if engine.dialect.name != "sqlite":
+        # Non-sqlite (e.g. a real Postgres deploy) needs a real migration tool;
+        # this guard only covers the sqlite dev/demo default.
+        return
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        existing_cols = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))}
+        if column not in existing_cols:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype_sql}"))
+            conn.commit()
+            print(f"[LexSetu] Migrated: added {table}.{column}")
 
 
 def get_db():

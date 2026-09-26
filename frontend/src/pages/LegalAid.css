@@ -693,6 +693,12 @@
     box-shadow: 0 4px 15px rgba(140, 58, 42, 0.08);
 }
 
+.thinking-card-stages {
+    align-items: flex-start;
+    min-width: 320px;
+    padding: 0.4rem 0.6rem;
+}
+
 .spin-loader {
     color: #8c3a2a;
     animation: spin 1s linear infinite;

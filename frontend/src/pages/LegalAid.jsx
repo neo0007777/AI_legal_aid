@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
     Send, Sparkles, Scale, BookOpen, AlertTriangle,
-    ShieldAlert, Search, Loader2, FileText, Copy, Check,
+    ShieldAlert, Search, FileText, Copy, Check,
     Mic, MicOff, RotateCcw, X, Shield, Gavel, HelpCircle,
     Crown, Lock, ArrowRight, ShieldCheck, CheckCircle2, FileDown,
     SlidersHorizontal, Bookmark, BookmarkCheck, ListChecks,
@@ -9,7 +9,21 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { downloadFileFromBlob, exportPdfFromApi } from '../utils/downloadHelper';
+import TranslateAction from '../components/TranslateAction';
+import PipelineStageList from '../components/PipelineStageList';
+import { useStageStream } from '../hooks/useStageStream';
 import './LegalAid.css';
+
+// Real, distinct steps backend/routes/legal_aid.py's /ask stream actually emits
+// (see ask_legal_question_stream) -- collapsed from a proposed 5-stage list to 4
+// because there's no separable "cross-referencing" step distinct from retrieval.
+const LEGAL_AID_STAGE_ORDER = ['parsing_query', 'retrieving_sources', 'generating_answer', 'attaching_sources'];
+const LEGAL_AID_STAGE_LABELS = {
+    parsing_query: 'Parsing legal query & identifying jurisdiction',
+    retrieving_sources: 'Searching statutes, precedents & drafting corpus',
+    generating_answer: 'Synthesizing grounded answer',
+    attaching_sources: 'Attaching source citations',
+};
 
 const SUGGESTIONS = [
     {
@@ -380,7 +394,7 @@ const LegalAid = () => {
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
     const [isThinking, setIsThinking] = useState(false);
-    const [loadingStage, setLoadingStage] = useState(0);
+    const { stages: legalAidStages, connectionLost, run: runStageStream } = useStageStream();
     const [copiedId, setCopiedId] = useState(null);
     const [downloadingPdfId, setDownloadingPdfId] = useState(null);
     const [isListening, setIsListening] = useState(false);
@@ -575,72 +589,62 @@ const LegalAid = () => {
         setMessages(prev => [...prev, userMsg]);
         setInputValue('');
         setIsThinking(true);
-        setLoadingStage(0);
-
-        const stageInterval = setInterval(() => {
-            setLoadingStage(prev => (prev < 2 ? prev + 1 : prev));
-        }, 1200);
 
         try {
-            const response = await fetch('/api/legal-aid/ask', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders(),
-                },
-                body: JSON.stringify({
-                    question: text,
-                    n_results: 3,
-                    structure_mode: structureMode,
-                    custom_instructions: customInstructions || null,
-                    save_to_memory: false,
+            await runStageStream(
+                fetch('/api/legal-aid/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders(),
+                    },
+                    body: JSON.stringify({
+                        question: text,
+                        n_results: 3,
+                        structure_mode: structureMode,
+                        custom_instructions: customInstructions || null,
+                        save_to_memory: false,
+                    }),
                 }),
-            });
+                {
+                    onDone: (data) => {
+                        const effectiveMode = data.applied_structure_mode || structureMode;
+                        const parsed = parseLegalAidAnswer(data.answer, effectiveMode);
 
-            clearInterval(stageInterval);
+                        const aiMsg = {
+                            id: 'ai_' + Date.now(),
+                            type: 'structured_ai',
+                            question: text,
+                            raw: data.answer,
+                            applied_structure_mode: effectiveMode,
+                            applied_structure_title: data.applied_structure_title || structureTitle,
+                            memory_active: data.memory_active,
+                            requires_upgrade: Boolean(
+                                data.requires_upgrade ||
+                                data.answer?.includes('Advocate Pro') ||
+                                data.answer?.toLowerCase().includes('upgrade your plan') ||
+                                data.answer?.toLowerCase().includes('plan does not allow') ||
+                                data.answer?.toLowerCase().includes("plan don't allow") ||
+                                data.answer?.toLowerCase().includes('exceed the scope of the standard') ||
+                                data.answer?.includes('upgrade to the LexSetu')
+                            ),
+                            upgrade_tier: data.upgrade_tier || 'LexSetu Advocate Pro / Criminal Defense',
+                            parsed: parsed,
+                            data: {
+                                tags: data.sources?.map(s => s.category).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3) || [],
+                                sources: data.sources || [],
+                            }
+                        };
 
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.detail || `Server error (${response.status})`);
-            }
-
-            const data = await response.json();
-            const parsed = parseLegalAidAnswer(data.answer, data.applied_structure_mode || structureMode);
-
-            const aiMsg = {
-                id: 'ai_' + Date.now(),
-                type: 'structured_ai',
-                question: text,
-                raw: data.answer,
-                applied_structure_mode: data.applied_structure_mode || structureMode,
-                applied_structure_title: data.applied_structure_title || structureTitle,
-                memory_active: data.memory_active,
-                requires_upgrade: Boolean(
-                    data.requires_upgrade ||
-                    data.answer?.includes('Advocate Pro') ||
-                    data.answer?.toLowerCase().includes('upgrade your plan') ||
-                    data.answer?.toLowerCase().includes('plan does not allow') ||
-                    data.answer?.toLowerCase().includes("plan don't allow") ||
-                    data.answer?.toLowerCase().includes('exceed the scope of the standard') ||
-                    data.answer?.includes('upgrade to the LexSetu')
-                ),
-                upgrade_tier: data.upgrade_tier || 'LexSetu Advocate Pro / Criminal Defense',
-                parsed: parsed,
-                data: {
-                    tags: data.sources?.map(s => s.category).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3) || [],
-                    sources: data.sources || [],
+                        setMessages(prev => [...prev, aiMsg]);
+                    },
+                    onError: (message) => {
+                        setMessages(prev => [...prev, { id: 'err_' + Date.now(), type: 'error', text: message }]);
+                    },
                 }
-            };
-
-            setMessages(prev => [...prev, aiMsg]);
+            );
         } catch (err) {
-            clearInterval(stageInterval);
-            const errorMsg = {
-                id: 'err_' + Date.now(),
-                type: 'error',
-                text: err.message,
-            };
-            setMessages(prev => [...prev, errorMsg]);
+            setMessages(prev => [...prev, { id: 'err_' + Date.now(), type: 'error', text: err.message || 'Stream failed' }]);
         } finally {
             setIsThinking(false);
         }
@@ -950,6 +954,12 @@ const LegalAid = () => {
                                             </div>
                                         </div>
 
+                                        <TranslateAction
+                                            sourceType="legal_aid"
+                                            text={msg.raw}
+                                            citations={msg.data.sources}
+                                        />
+
                                         {/* Upgrade to Pro for better reasoning and features - Presented after EVERY result */}
                                         {!msg.requires_upgrade && (
                                             <div className="pro-reasoning-callout animate-fade-in">
@@ -979,20 +989,24 @@ const LegalAid = () => {
                     </div>
                 )}
 
-                {/* AI Thinking Animation */}
+                {/* Live, backend-truthful pipeline stage trace -- same visual language as
+                    Verify Filing's CitationStageList, driven by real SSE stage events,
+                    never a client-side timer. */}
                 {isThinking && (
                     <div className="thinking-indicator-wrapper">
-                        <div className="thinking-card">
-                            <Loader2 size={20} className="spin-loader" />
-                            <div className="thinking-text-flow">
-                                <strong>
-                                    {loadingStage === 0 && "Parsing legal query & identifying jurisdiction..."}
-                                    {loadingStage === 1 && "Cross-referencing statutory database (IPC, CrPC, CPC)..."}
-                                    {loadingStage === 2 && "Synthesizing binding precedents and actionable insight..."}
-                                </strong>
-                                <span className="thinking-subtext">LexSetu Neural Engine active • Applying {structureTitle}</span>
-                            </div>
+                        <div className="thinking-card thinking-card-stages">
+                            <PipelineStageList
+                                stages={legalAidStages}
+                                stageOrder={LEGAL_AID_STAGE_ORDER}
+                                stageLabels={LEGAL_AID_STAGE_LABELS}
+                                title={`LexSetu Neural Engine active • Applying ${structureTitle}`}
+                            />
                         </div>
+                        {connectionLost && (
+                            <p className="stage-connection-lost">
+                                <AlertTriangle size={14} /> Couldn't confirm progress — result may still be correct.
+                            </p>
+                        )}
                     </div>
                 )}
 

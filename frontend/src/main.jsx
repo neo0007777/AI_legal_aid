@@ -4,7 +4,9 @@ import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { LocalModeProvider } from './context/LocalModeContext'
 import { PersonaProvider } from './context/PersonaContext'
+import { LanguageProvider } from './context/LanguageContext'
 import ErrorBoundary from './components/ErrorBoundary'
+import './i18n'
 import './index.css'
 import App from './App.jsx'
 
@@ -13,11 +15,13 @@ createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <LocalModeProvider>
-            <PersonaProvider>
-              <App />
-            </PersonaProvider>
-          </LocalModeProvider>
+          <LanguageProvider>
+            <LocalModeProvider>
+              <PersonaProvider>
+                <App />
+              </PersonaProvider>
+            </LocalModeProvider>
+          </LanguageProvider>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>

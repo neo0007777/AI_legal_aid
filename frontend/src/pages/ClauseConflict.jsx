@@ -4,7 +4,17 @@ import {
     ShieldAlert, Loader2, Sparkles, AlertCircle, FileSearch, ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import TranslateAction from '../components/TranslateAction';
 import './ClauseConflict.css';
+
+const buildContradictionSummaryText = (results) => {
+    if (!results) return '';
+    const parts = [`Overall compatibility: ${results.overall_compatibility}. ${results.total_contradictions} contradiction(s) found.`];
+    (results.contradictions || []).forEach((c) => {
+        parts.push(`Clause: ${c.clause}\nParty A position: "${c.party_a_position}"\nParty B position: "${c.party_b_position}"\nSuggested resolution: ${c.suggested_resolution}`);
+    });
+    return parts.join('\n\n');
+};
 
 const ClauseConflict = () => {
     const { getAuthHeaders } = useAuth();
@@ -337,6 +347,12 @@ const ClauseConflict = () => {
                                 </div>
                             ))}
                         </div>
+
+                        <TranslateAction
+                            sourceType="clause_conflict"
+                            text={buildContradictionSummaryText(analysisResults)}
+                            citations={[]}
+                        />
                     </div>
                 )}
             </main>

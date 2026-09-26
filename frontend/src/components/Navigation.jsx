@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Scale, BookOpen, MessageSquare, Home as HomeIcon, FileSearch, Clock, User, LogOut, FileCheck, ShieldCheck, Menu, X, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import LocalModeToggle from './LocalModeToggle';
+import LanguageSwitcher from './LanguageSwitcher';
 import './Navigation.css';
 
 const Navigation = () => {
+    const { t } = useTranslation();
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
@@ -53,42 +56,42 @@ const Navigation = () => {
 
             <div className="sidebar-scrollable">
                 <div className="sidebar-section">
-                    <p className="section-title">Workspace</p>
+                    <p className="section-title">{t('nav.workspace')}</p>
                     <div className="nav-links">
                         <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                            <HomeIcon size={18} /> Dashboard
+                            <HomeIcon size={18} /> {t('nav.dashboard')}
                         </NavLink>
                         <NavLink to="/verify-filing" className={({ isActive }) => isActive ? "nav-link active nav-link-flagship" : "nav-link nav-link-flagship"}>
-                            <ShieldCheck size={18} /> Verify a Filing
+                            <ShieldCheck size={18} /> {t('nav.verifyFiling')}
                         </NavLink>
                         <NavLink to="/case-finder" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                            <Scale size={18} /> Case Finder
+                            <Scale size={18} /> {t('nav.caseFinder')}
                         </NavLink>
                         <NavLink to="/draft-assistant" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                            <BookOpen size={18} /> Draft Assistant
+                            <BookOpen size={18} /> {t('nav.draftAssistant')}
                         </NavLink>
                         <NavLink to="/draft-review" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                            <FileCheck size={18} /> Draft Review
+                            <FileCheck size={18} /> {t('nav.draftReview')}
                         </NavLink>
                         <NavLink to="/clause-conflict" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                            <FileSearch size={18} /> Contract Analysis
+                            <FileSearch size={18} /> {t('nav.contractAnalysis')}
                         </NavLink>
                         <NavLink to="/statutes" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                            <Scale size={18} /> Bare Acts & Statutes
+                            <Scale size={18} /> {t('nav.bareActsStatutes')}
                         </NavLink>
                         <NavLink to="/legal-aid" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                            <MessageSquare size={18} /> AI Legal Aid
+                            <MessageSquare size={18} /> {t('nav.aiLegalAid')}
                         </NavLink>
                         {(user?.role === 'admin' || user?.role === 'advocate') && (
                             <NavLink to="/admin/corrections" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                                <ShieldAlert size={18} /> Correction Memory
+                                <ShieldAlert size={18} /> {t('nav.correctionMemory')}
                             </NavLink>
                         )}
                     </div>
                 </div>
 
                 <div className="sidebar-section">
-                    <p className="section-title">Recent Activity</p>
+                    <p className="section-title">{t('nav.recentActivity')}</p>
                     <div className="recent-list">
                         <div className="recent-item"><Clock size={14} /> Case Search</div>
                         <div className="recent-item"><Clock size={14} /> Draft Assistant</div>
@@ -96,7 +99,8 @@ const Navigation = () => {
                     </div>
                 </div>
 
-                <div className="sidebar-section">
+                <div className="sidebar-section" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <LanguageSwitcher />
                     <LocalModeToggle />
                 </div>
             </div>
@@ -122,7 +126,7 @@ const Navigation = () => {
                                 </div>
                                 <div className="dropdown-divider"></div>
                                 <button className="dropdown-action text-red-600" onClick={handleLogout}>
-                                    <LogOut size={16} /> Logout
+                                    <LogOut size={16} /> {t('nav.logout')}
                                 </button>
                             </div>
                         )}
@@ -130,7 +134,7 @@ const Navigation = () => {
                 ) : (
                     <div className="unauthenticated-container">
                         <button className="massive-login-btn" onClick={() => navigate('/login')}>
-                            <User size={18} /> Login / Sign Up
+                            <User size={18} /> {t('nav.login')}
                         </button>
                     </div>
                 )}
