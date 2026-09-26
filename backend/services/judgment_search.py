@@ -149,6 +149,27 @@ def _init_parents_db() -> sqlite3.Connection:
 
 def get_parent_judgment(case_id: str) -> dict:
     try:
+        from models.database import SessionLocal, Judgment
+        db = SessionLocal()
+        try:
+            j = db.query(Judgment).filter(Judgment.case_id == case_id).first()
+            if j:
+                return {
+                    "case_id": j.case_id,
+                    "case_name": j.case_name,
+                    "court": j.court,
+                    "date": j.date,
+                    "citation": j.citation,
+                    "disposition": j.disposition,
+                    "full_text": j.full_text,
+                    "chunk_count": j.chunk_count,
+                }
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[JudgmentSearch] PostgreSQL lookup notice: {e}")
+
+    try:
         conn = sqlite3.connect(_parents_db_path())
         try:
             row = conn.execute(
@@ -458,6 +479,25 @@ def ingest_judgments(stream_batch_size: int = 128, force: bool = False):
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (case_id, case_name, court, case_date_str, citation, disposition, full_text, len(group)),
         )
+        try:
+            from models.database import SessionLocal, Judgment
+            _pg = SessionLocal()
+            try:
+                _pg.merge(Judgment(
+                    case_id=str(case_id),
+                    case_name=case_name,
+                    court=court,
+                    date=case_date_str,
+                    citation=citation,
+                    disposition=disposition,
+                    full_text=full_text,
+                    chunk_count=len(group)
+                ))
+                _pg.commit()
+            finally:
+                _pg.close()
+        except Exception as _e:
+            pass
         case_count += 1
 
         for _, row in group.iterrows():
@@ -609,8 +649,27 @@ def search_judgments(query: str, top_k: int = 5, court_filter: str = None, case_
 
 
 def get_coverage_stats() -> dict:
-    """Real counts/date-range backing the S2 coverage banner — computed from parents.db,
-    never hardcoded, so it can't drift from what's actually indexed."""
+    """Real counts/date-range backing the S2 coverage banner — computed from PostgreSQL or parents.db."""
+    try:
+        from models.database import SessionLocal, Judgment
+        from sqlalchemy import func
+        db = SessionLocal()
+        try:
+            res = db.query(
+                func.count(Judgment.case_id),
+                func.min(Judgment.date),
+                func.max(Judgment.date)
+            ).filter(Judgment.date != "").first()
+            if res and res[0] and res[0] > 0:
+                count, min_date, max_date = res
+                min_year = min_date[:4] if min_date else None
+                max_year = max_date[:4] if max_date else None
+                return {"case_count": count or 0, "min_year": min_year, "max_year": max_year}
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[JudgmentSearch] PostgreSQL coverage check notice: {e}")
+
     try:
         conn = sqlite3.connect(_parents_db_path())
         try:

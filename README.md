@@ -177,7 +177,8 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env      # Add your Groq API key
+cp .env.example .env      # Configure PostgreSQL, Qdrant, and Groq keys
+alembic upgrade head      # Run database migrations
 uvicorn main:app --reload
 ```
 
@@ -185,7 +186,9 @@ uvicorn main:app --reload
 ```bash
 cd frontend
 npm install
-npm start
+npm run dev               # Development server at http://localhost:3000
+# For production build:
+# npm run build
 ```
 
 ### Offline Mode (Ollama)
@@ -198,9 +201,15 @@ ollama pull llama3.2
 
 ## Environment Variables
 
-```
-GROQ_API_KEY=your_groq_api_key_here
-```
+See `backend/.env.example` for full configuration details.
+
+```env
+DATABASE_URL=postgresql://user:password@host:port/dbname
+QDRANT_URL=https://your-cluster.cloud.qdrant.io
+QDRANT_API_KEY=your_qdrant_api_key
+GROQ_API_KEY=your_groq_api_key
+JWT_SECRET_KEY=your_jwt_secret_key
+ENCRYPTION_KEY=your_fernet_encryption_key
 
 ---
 

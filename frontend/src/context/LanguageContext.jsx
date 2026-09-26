@@ -14,17 +14,17 @@ export const useLanguage = () => useContext(LanguageContext);
 // Adding a language later is a data change to this list (+ a locale JSON file
 // for static UI strings), not a rewrite -- nothing else hardcodes "Hindi".
 export const SUPPORTED_LANGUAGES = [
-    { code: 'en', label: 'English', nativeLabel: 'English' },
+    { code: 'en', label: 'English', nativeLabel: 'English', i18nCode: 'en' },
     { code: 'hindi', label: 'Hindi', nativeLabel: 'हिन्दी', i18nCode: 'hi' },
-    { code: 'marathi', label: 'Marathi', nativeLabel: 'मराठी' },
-    { code: 'bengali', label: 'Bengali', nativeLabel: 'বাংলা' },
-    { code: 'tamil', label: 'Tamil', nativeLabel: 'தமிழ்' },
-    { code: 'telugu', label: 'Telugu', nativeLabel: 'తెలుగు' },
-    { code: 'kannada', label: 'Kannada', nativeLabel: 'ಕನ್ನಡ' },
-    { code: 'gujarati', label: 'Gujarati', nativeLabel: 'ગુજરાતી' },
-    { code: 'malayalam', label: 'Malayalam', nativeLabel: 'മലയാളം' },
-    { code: 'punjabi', label: 'Punjabi', nativeLabel: 'ਪੰਜਾਬੀ' },
-    { code: 'odia', label: 'Odia', nativeLabel: 'ଓଡ଼ିଆ' },
+    { code: 'marathi', label: 'Marathi', nativeLabel: 'मराठी', i18nCode: 'mr' },
+    { code: 'bengali', label: 'Bengali', nativeLabel: 'বাংলা', i18nCode: 'bn' },
+    { code: 'tamil', label: 'Tamil', nativeLabel: 'தமிழ்', i18nCode: 'ta' },
+    { code: 'telugu', label: 'Telugu', nativeLabel: 'తెలుగు', i18nCode: 'te' },
+    { code: 'kannada', label: 'Kannada', nativeLabel: 'ಕನ್ನಡ', i18nCode: 'kn' },
+    { code: 'gujarati', label: 'Gujarati', nativeLabel: 'ગુજરાતી', i18nCode: 'gu' },
+    { code: 'malayalam', label: 'Malayalam', nativeLabel: 'മലയാളം', i18nCode: 'ml' },
+    { code: 'punjabi', label: 'Punjabi', nativeLabel: 'ਪੰਜਾਬੀ', i18nCode: 'pa' },
+    { code: 'odia', label: 'Odia', nativeLabel: 'ଓଡ଼ିଆ', i18nCode: 'or' },
 ];
 
 const STORAGE_KEY = 'lexsetu_language';

@@ -19,6 +19,11 @@ _qdrant_lock = threading.Lock()
 _embedding_model = None
 _embedding_lock = threading.Lock()
 
+def _is_production() -> bool:
+    env = os.getenv("ENVIRONMENT", "").lower()
+    return env in ("production", "prod", "staging") or bool(os.getenv("RENDER")) or os.getenv("REQUIRE_CLOUD_QDRANT", "").lower() in ("true", "1")
+
+
 def get_qdrant():
     # Double-checked locking: S2's parallel citation checking calls this from multiple
     # threads at once (asyncio.to_thread). Without the lock, concurrent first-callers
@@ -33,16 +38,25 @@ def get_qdrant():
             if _qdrant_client is None:
                 qdrant_url = os.getenv("QDRANT_URL")
                 qdrant_api_key = os.getenv("QDRANT_API_KEY")
+                in_prod = _is_production()
 
                 if qdrant_url and qdrant_api_key and not qdrant_url.startswith("your_"):
                     try:
                         client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key, timeout=10)
                         client.get_collections()
                         _qdrant_client = client
-                    except Exception:
-                        print("[RAG] Cloud Qdrant connection failed. Falling back to local embedded Qdrant.")
+                    except Exception as e:
+                        if in_prod:
+                            raise RuntimeError(
+                                f"[RAG] Production requires reachable Qdrant Cloud cluster. Failed to connect to {qdrant_url}: {e}"
+                            )
+                        print(f"[RAG] Cloud Qdrant connection failed ({e}). Falling back to local embedded Qdrant.")
                         _qdrant_client = QdrantClient(path=QDRANT_PATH)
                 else:
+                    if in_prod:
+                        raise RuntimeError(
+                            "[RAG] QDRANT_URL and QDRANT_API_KEY must be configured in production environment."
+                        )
                     _qdrant_client = QdrantClient(path=QDRANT_PATH)
     return _qdrant_client
 

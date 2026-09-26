@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "workspace": "କାର୍ଯ୍ୟକ୍ଷେତ୍ର",
+    "dashboard": "ଡ୍ୟାସବୋର୍ଡ",
+    "verifyFiling": "ଫାଇଲିଂ ଯାଞ୍ଚ କରନ୍ତୁ",
+    "caseFinder": "କେସ୍ ଖୋଜାଳି",
+    "draftAssistant": "ଡ୍ରାଫ୍ଟ ସହାୟକ",
+    "draftReview": "ଡ୍ରାଫ୍ଟ ସମୀକ୍ଷା",
+    "contractAnalysis": "ଚୁକ୍ତି ବିଶ୍ଳେଷଣ",
+    "bareActsStatutes": "ଆଇନ ଓ ନିୟମ",
+    "aiLegalAid": "AI ଆଇନଗତ ସହାୟତା",
+    "correctionMemory": "ସଂଶୋଧନ ସ୍ମୃତି",
+    "recentActivity": "ସାମ୍ପ୍ରତିକ କାର୍ଯ୍ୟକଳାପ",
+    "login": "ଲଗଇନ / ସାଇନ ଅପ",
+    "logout": "ଲଗଆଉଟ"
+  },
+  "language": {
+    "switcherLabel": "ଭାଷା",
+    "switcherTitle": "ଆଇନଗତ ଉତ୍ତର ଏବଂ ଆପ୍ ଟେକ୍ସଟ୍ ପାଇଁ ଆପଣଙ୍କର ଭାଷା ବାଛନ୍ତୁ"
+  },
+  "translate": {
+    "button": "{{language}} ରେ ଅନୁବାଦ କରନ୍ତୁ",
+    "translating": "ଅନୁବାଦ ହେଉଛି...",
+    "viewOriginal": "ମୂଳ ଦେଖନ୍ତୁ (ଇଂରାଜୀ)",
+    "viewTranslated": "ଅନୁବାଦ ଦେଖନ୍ତୁ",
+    "disclaimer": "ଇଂରାଜୀରୁ ଅନୁବାଦିତ — ଯାଞ୍ଚ ଇଂରାଜୀରେ କରାଯାଇଥିଲା",
+    "error": "ଅନୁବାଦ ସେବା ଉପଲବ୍ଧ ନ ଥିଲା। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "hideTranslation": "ଅନୁବାଦ ଲୁଚାନ୍ତୁ"
+  },
+  "statutes": {
+    "title": "ଇଣ୍ଡିଆ କୋଡ୍ ସାଂବିଧିକ ଅନ୍ୱେଷକ",
+    "sourceOfTruth": "ନିଶ୍ଚିତ ମୂଳ ଉତ୍ସ",
+    "selectStatute": "ଆଇନ ବାଛନ୍ତୁ",
+    "loadingActs": "ଆଇନ ଲୋଡ୍ ହେଉଛି...",
+    "inForce": "ଲାଗୁ",
+    "tableOfProvisions": "ବ୍ୟବସ୍ଥାଗୁଡ଼ିକର ତାଲିକା",
+    "notAvailable": "ଉତ୍ସରୁ ଉପଲବ୍ଧ ନାହିଁ।",
+    "notAvailableShort": "ଉତ୍ସରୁ ଉପଲବ୍ଧ ନାହିଁ",
+    "verbatimSourceText": "ଯଥାର୍ଥ ମୂଳ ପାଠ୍ୟ",
+    "unalteredText": "ଅପରିବର୍ତ୍ତିତ ଆଇନଗତ ପାଠ୍ୟ",
+    "englishOnlyNotice": "ସାଂବିଧିକ ପାଠ୍ୟ କେବଳ ଇଂରାଜୀରେ ଦେଖାଯାଇଛି — ଏହା ଉତ୍ସ ବିରୁଦ୍ଧରେ ଯାଞ୍ଚିତ ସଠିକ୍ ଶବ୍ଦଗୁଡ଼ିକୁ ସୁରକ୍ଷିତ ରଖେ ଏବଂ ଆପଣଙ୍କର ଭାଷା ଚୟନ ଦ୍ୱାରା ଏହା ପ୍ରଭାବିତ ହୁଏ ନାହିଁ।",
+    "provenanceAudit": "ଉତ୍ପତ୍ତି ଏବଂ ସଚ୍ଚୋଟତା ଅଡିଟ୍"
+  }
+}

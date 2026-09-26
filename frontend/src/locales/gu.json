@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "workspace": "કાર્યક્ષેત્ર",
+    "dashboard": "ડેશબોર્ડ",
+    "verifyFiling": "ફાઇલિંગ ચકાસો",
+    "caseFinder": "કેસ શોધક",
+    "draftAssistant": "ડ્રાફ્ટ સહાયક",
+    "draftReview": "ડ્રાફ્ટ સમીક્ષા",
+    "contractAnalysis": "કરાર વિશ્લેષણ",
+    "bareActsStatutes": "કાયદા અને નિયમો",
+    "aiLegalAid": "AI કાનૂની સહાય",
+    "correctionMemory": "સુધારણા સ્મૃતિ",
+    "recentActivity": "તાજેતરની પ્રવૃત્તિ",
+    "login": "લોગિન / સાઇન અપ",
+    "logout": "લોગઆઉટ"
+  },
+  "language": {
+    "switcherLabel": "ભાષા",
+    "switcherTitle": "કાનૂની જવાબો અને એપ્લિકેશન ટેક્સ્ટ માટે તમારી ભાષા પસંદ કરો"
+  },
+  "translate": {
+    "button": "{{language}} માં અનુવાદ કરો",
+    "translating": "અનુવાદ થઈ રહ્યો છે...",
+    "viewOriginal": "મૂળ જુઓ (અંગ્રેજી)",
+    "viewTranslated": "અનુવાદ જુઓ",
+    "disclaimer": "અંગ્રેજીમાંથી અનુવાદિત — ચકાસણી અંગ્રેજીમાં કરવામાં આવી હતી",
+    "error": "અનુવાદ સેવા ઉપલબ્ધ ન હતી. કૃપા કરી ફરીથી પ્રયાસ કરો.",
+    "hideTranslation": "અનુવાદ છુપાવો"
+  },
+  "statutes": {
+    "title": "ઇન્ડિયા કોડ સાંવિધિક અન્વેષક",
+    "sourceOfTruth": "નિશ્ચિત મૂળ સ્રોત",
+    "selectStatute": "કાયદો પસંદ કરો",
+    "loadingActs": "કાયદા લોડ થઈ રહ્યા છે...",
+    "inForce": "અમલમાં",
+    "tableOfProvisions": "જોગવાઈઓનું કોષ્ટક",
+    "notAvailable": "સ્રોતમાંથી ઉપલબ્ધ નથી.",
+    "notAvailableShort": "સ્રોતમાંથી ઉપલબ્ધ નથી",
+    "verbatimSourceText": "શબ્દશઃ મૂળ લખાણ",
+    "unalteredText": "અપરિવર્તિત કાનૂની લખાણ",
+    "englishOnlyNotice": "સાંવિધિક લખાણ ફક્ત અંગ્રેજીમાં બતાવવામાં આવ્યું છે — આ સ્રોત સામે ચકાસાયેલા ચોક્કસ શબ્દોને સાચવે છે અને તમારી ભાષા પસંદગીથી પ્રભાવિત થતું નથી.",
+    "provenanceAudit": "ઉદ્‌ભવ અને અખંડિતતા ઓડિટ"
+  }
+}

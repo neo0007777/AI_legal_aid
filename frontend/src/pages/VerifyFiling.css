@@ -226,6 +226,8 @@
 .view-mode-toggle,
 .language-toggle {
     display: inline-flex;
+    flex-wrap: wrap;
+    max-width: 100%;
     background: #f1d1a6;
     border-radius: 10px;
     padding: 0.25rem;

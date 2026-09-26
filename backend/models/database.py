@@ -9,11 +9,22 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./nyayasetu.db")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}
-)
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False}
+    )
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+        pool_recycle=300
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -258,6 +269,39 @@ class IngestionLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class VerificationReport(Base):
+    """
+    Durable storage for citation verification reports and filing text.
+    Replaces ephemeral in-memory dict so reports survive restarts, multi-instance
+    backends, and horizontal scaling.
+    """
+    __tablename__ = "verification_reports"
+
+    id = Column(String, primary_key=True)  # UUID string
+    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    report_json = Column(Text, nullable=False)
+    filing_text = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    expires_at = Column(DateTime, nullable=True, index=True)
+
+
+class Judgment(Base):
+    """
+    Durable storage for parent judgment text (replaces/supplements local parents.db).
+    Ensures parent judgment texts survive ephemeral container restarts in production.
+    """
+    __tablename__ = "judgments"
+
+    case_id = Column(String, primary_key=True)
+    case_name = Column(String, nullable=True)
+    court = Column(String, nullable=True)
+    date = Column(String, nullable=True)
+    citation = Column(String, nullable=True)
+    disposition = Column(String, nullable=True)
+    full_text = Column(Text, nullable=True)
+    chunk_count = Column(Integer, default=0)
+
+
 def create_tables():
     Base.metadata.create_all(bind=engine)
     _ensure_column("users", "preferred_language", "VARCHAR DEFAULT 'en'")
@@ -266,20 +310,22 @@ def create_tables():
 def _ensure_column(table: str, column: str, coltype_sql: str):
     """Lightweight, no-alembic migration guard: Base.metadata.create_all only
     creates missing TABLES, it never ALTERs an existing one -- so a column
-    added to a model after the sqlite file already exists (e.g. this
+    added to a model after the database already exists (e.g. this
     language-switcher release) would otherwise 500 on first query. Safe to
-    call on every startup; a no-op once the column exists."""
-    if engine.dialect.name != "sqlite":
-        # Non-sqlite (e.g. a real Postgres deploy) needs a real migration tool;
-        # this guard only covers the sqlite dev/demo default.
+    call on every startup; a no-op once the column exists. Uses SQLAlchemy's
+    inspector rather than a dialect-specific PRAGMA so it works the same way
+    against both the sqlite dev default and a real Postgres deployment."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    if table not in inspector.get_table_names():
+        return  # create_all will have made it fresh with every current column
+    existing_cols = {c["name"] for c in inspector.get_columns(table)}
+    if column in existing_cols:
         return
-    from sqlalchemy import text
     with engine.connect() as conn:
-        existing_cols = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))}
-        if column not in existing_cols:
-            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype_sql}"))
-            conn.commit()
-            print(f"[LexSetu] Migrated: added {table}.{column}")
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype_sql}"))
+        conn.commit()
+        print(f"[LexSetu] Migrated: added {table}.{column}")
 
 
 def get_db():

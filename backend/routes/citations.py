@@ -1,21 +1,26 @@
 import csv
 import io
 import json
+import os
 import time
 import uuid
+from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from models.database import User, get_db
 from models.schemas import FlagCorrectionRequest, RenderLanguageRequest
-from services.citation_verifier import verify_filing_stream, render_report_in_language
+from services.citation_verifier import verify_filing_stream, render_report_in_language, _RENDER_LANGUAGE_INSTRUCTIONS
 from services.judgment_search import get_coverage_stats, get_coverage_banner
+from services.pdf_labels import get_labels, get_status_label, PDF_FONTS
 from utils.auth import get_current_user
 from utils.document_loader import load_pdf_bytes
 
 router = APIRouter()
+
+_FONTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "fonts")
 
 
 @router.get("/coverage")
@@ -68,18 +73,59 @@ async def verify_filing(
     async def event_gen():
         async for event in verify_filing_stream(text):
             if event["type"] == "done":
-                _REPORT_STORE[report_id] = {"report": event["report"], "filing_text": text, "ts": time.time()}
+                _persist_report(report_id, event["report"], text, getattr(current_user, "id", None))
                 event = {**event, "report_id": report_id}
             yield f"data: {json.dumps(event)}\n\n"
 
     return StreamingResponse(event_gen(), media_type="text/event-stream")
 
 
+from datetime import datetime, timedelta
+
+def _persist_report(report_id: str, report: dict, filing_text: str, user_id: str = None):
+    _REPORT_STORE[report_id] = {"report": report, "filing_text": filing_text, "ts": time.time()}
+    try:
+        from models.database import SessionLocal, VerificationReport
+        db = SessionLocal()
+        try:
+            expires_at = datetime.utcnow() + timedelta(days=7)
+            rec = VerificationReport(
+                id=report_id,
+                user_id=user_id,
+                report_json=json.dumps(report),
+                filing_text=filing_text,
+                created_at=datetime.utcnow(),
+                expires_at=expires_at,
+            )
+            db.merge(rec)
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[Citations] Report persistence note: {e}")
+
+
 def _get_entry(report_id: str) -> dict:
     entry = _REPORT_STORE.get(report_id)
-    if not entry or (time.time() - entry["ts"]) > _REPORT_TTL_SECONDS:
-        raise HTTPException(status_code=404, detail="Report not found or expired. Re-run verify-filing.")
-    return entry
+    if entry and (time.time() - entry["ts"]) <= _REPORT_TTL_SECONDS:
+        return entry
+
+    try:
+        from models.database import SessionLocal, VerificationReport
+        db = SessionLocal()
+        try:
+            row = db.query(VerificationReport).filter(VerificationReport.id == report_id).first()
+            if row:
+                rep_data = json.loads(row.report_json)
+                entry = {"report": rep_data, "filing_text": row.filing_text or "", "ts": time.time()}
+                _REPORT_STORE[report_id] = entry
+                return entry
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[Citations] Database report lookup error: {e}")
+
+    raise HTTPException(status_code=404, detail="Report not found or expired. Re-run verify-filing.")
 
 
 def _get_report(report_id: str) -> dict:
@@ -134,8 +180,8 @@ def flag_correction(
 
 @router.post("/{report_id}/render")
 def render_language(report_id: str, body: RenderLanguageRequest, current_user: User = Depends(get_current_user)):
-    if body.language not in ("hindi", "hinglish"):
-        raise HTTPException(status_code=400, detail="language must be 'hindi' or 'hinglish'.")
+    if body.language not in _RENDER_LANGUAGE_INSTRUCTIONS:
+        raise HTTPException(status_code=400, detail=f"language must be one of {list(_RENDER_LANGUAGE_INSTRUCTIONS)}.")
     report = _get_report(report_id)
     try:
         return render_report_in_language(report, body.language)
@@ -173,62 +219,100 @@ def export_csv(report_id: str, current_user: User = Depends(get_current_user)):
 
 
 @router.get("/export/{report_id}.pdf")
-def export_pdf(report_id: str, current_user: User = Depends(get_current_user)):
+def export_pdf(
+    report_id: str,
+    lang: Optional[str] = Query(None, description="Render the PDF's static labels + status words in this language (e.g. 'hindi'). Case names, citations, section numbers and the filing text itself always stay in their original form."),
+    current_user: User = Depends(get_current_user),
+):
     entry = _get_entry(report_id)
     report = entry["report"]
     filing_text = entry.get("filing_text", "")
     from fpdf import FPDF
 
+    # `lang` only ever affects DISPLAY -- it's the same already-verified
+    # English report, just relabeled. 'hinglish' is Roman-script already so
+    # it uses the English (Helvetica-safe) label set, not a Unicode font.
+    use_lang = lang if (lang and lang in _RENDER_LANGUAGE_INSTRUCTIONS and lang != "hinglish") else None
+    labels = get_labels(use_lang or "en")
+    font_name = PDF_FONTS.get(use_lang)
+
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.write(10, _pdf_safe("Citation Integrity Report") + "\n")
-    pdf.set_font("Helvetica", "", 9)
-    pdf.write(6, _pdf_safe(report.get("coverage_banner", "")) + "\n")
+
+    if font_name:
+        font_path = os.path.join(_FONTS_DIR, f"{font_name}.ttf")
+        pdf.add_font(font_name, "", font_path)
+        pdf.set_text_shaping(True)
+
+        def set_font(style="", size=10):
+            # The embedded Noto variable fonts ship one weight -- style is
+            # accepted for call-site parity but always resolves to the same face.
+            pdf.set_font(font_name, "", size)
+
+        def safe(text):
+            return text  # Unicode font -- no Latin-1 fallback needed
+    else:
+        def set_font(style="", size=10):
+            pdf.set_font("Helvetica", style, size)
+
+        def safe(text):
+            return _pdf_safe(text)
+
+    set_font("B", 14)
+    pdf.write(10, safe(labels["title"]) + "\n")
+    set_font("", 9)
+    pdf.write(6, safe(report.get("coverage_banner", "")) + "\n")
     summary = report.get("summary", {})
     summary_line = (
-        f"Verified: {summary.get('verified', 0)}  |  "
-        f"Partial Match: {summary.get('partial_match', 0)}  |  "
-        f"Mismatch: {summary.get('mismatch', 0)}  |  "
-        f"Fabrication: {summary.get('possible_fabrication', 0)}  |  "
-        f"Unverified: {summary.get('unverified', 0)}"
+        f"{labels['summary_verified']}: {summary.get('verified', 0)}  |  "
+        f"{labels['summary_partial']}: {summary.get('partial_match', 0)}  |  "
+        f"{labels['summary_mismatch']}: {summary.get('mismatch', 0)}  |  "
+        f"{labels['summary_fabrication']}: {summary.get('possible_fabrication', 0)}  |  "
+        f"{labels['summary_unverified']}: {summary.get('unverified', 0)}"
     )
-    pdf.write(6, _pdf_safe(summary_line) + "\n\n")
+    pdf.write(6, safe(summary_line) + "\n\n")
 
     if filing_text:
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.write(7, _pdf_safe("Full Filing Text") + "\n")
-        pdf.set_font("Helvetica", "", 8)
+        set_font("B", 11)
+        pdf.write(7, safe(labels["full_filing_text"]) + "\n")
+        set_font("", 8)
         pdf.set_text_color(60, 40, 20)
+        # The user's own uploaded filing is reproduced verbatim, never
+        # translated -- it's the original document being audited, not
+        # LexSetu's own output.
         pdf.write(5, _pdf_safe(filing_text[:10000]) + "\n\n")
         pdf.set_text_color(0, 0, 0)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.write(7, _pdf_safe("Citations Found in This Filing") + "\n\n")
+        set_font("B", 11)
+        pdf.write(7, safe(labels["citations_found"]) + "\n\n")
 
     for c in report["citations"]:
         case = c.get("matched_case") or (c.get("citation_identity") or {}).get("matched_case") or {}
         case_name = case.get("case_name") or c.get("case_name", "")
         cit_str = c.get("citation_string") or ""
-        pdf.set_font("Helvetica", "B", 10)
+        set_font("B", 10)
+        # Case name / citation string / court / date are identifiers, not
+        # descriptive prose -- kept in their original English/Latin form.
         pdf.write(6, _pdf_safe(f"{case_name} {cit_str}".strip()) + "\n")
-        pdf.set_font("Helvetica", "", 9)
-        id_status = (c.get("citation_identity") or {}).get("status", "N/A")
-        prop_status = (c.get("proposition_verification") or {}).get("status", "N/A")
-        pdf.write(5, _pdf_safe(
-            f"Court: {case.get('court', 'N/A')}   Date: {case.get('date', 'N/A')}   "
-            f"Status: {c.get('status', '')}   [Identity: {id_status}, Proposition: {prop_status}]"
+        set_font("", 9)
+        id_status = (c.get("citation_identity") or {}).get("status", labels["na"])
+        prop_status = (c.get("proposition_verification") or {}).get("status", labels["na"])
+        status_label = get_status_label(use_lang or "en", c.get("status", ""))
+        pdf.write(5, safe(
+            f"{labels['court']}: {str(case.get('court') or labels['na'])}   "
+            f"{labels['date']}: {str(case.get('date') or labels['na'])}   "
+            f"{labels['status']}: {status_label}   [{labels['identity']}: {id_status}, {labels['proposition']}: {prop_status}]"
         ) + "\n")
 
         if c.get("adjusted_from_correction"):
             meta = c.get("correction_meta") or {}
-            pdf.set_font("Helvetica", "I", 8)
+            set_font("I", 8)
             pdf.set_text_color(109, 40, 217)
-            footnote = f"* Adjusted from prior human correction"
+            footnote = labels["adjusted_note"]
             if meta.get("system_output"):
-                footnote += f" (originally: {meta['system_output']})"
+                footnote += f" ({labels['originally']}: {meta['system_output']})"
             if meta.get("note"):
                 footnote += f' - "{meta["note"]}"'
-            pdf.write(4, _pdf_safe(footnote) + "\n")
+            pdf.write(4, safe(footnote) + "\n")
             pdf.set_text_color(0, 0, 0)
 
         pdf.write(4, "\n")
