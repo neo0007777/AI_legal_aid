@@ -1,5 +1,4 @@
-import { Circle, Loader2, CheckCircle2, MinusCircle } from 'lucide-react';
-import './CitationStageList.css';
+import PipelineStageList from './PipelineStageList';
 
 // Harness-sprint Part B: the actual named pipeline stages, in the order they
 // really run. This mirrors backend/services/citation_verifier.py's emit()
@@ -16,29 +15,8 @@ const STAGE_LABELS = {
     applying_verdict: 'Applying verdict',
 };
 
-const CitationStageList = ({ stages, caseName }) => {
-    return (
-        <div className="stage-list">
-            {caseName && <div className="stage-list-title">{caseName}</div>}
-            {STAGE_ORDER.map((key) => {
-                const s = stages?.[key];
-                const status = s?.status || 'pending';
-                let Icon = Circle;
-                let cls = 'pending';
-                if (status === 'started') { Icon = Loader2; cls = 'in-progress'; }
-                else if (status === 'done') { Icon = CheckCircle2; cls = 'done'; }
-                else if (status === 'skipped') { Icon = MinusCircle; cls = 'skipped'; }
-
-                return (
-                    <div key={key} className={`stage-row ${cls}`}>
-                        <Icon size={15} className={status === 'started' ? 'spin' : ''} />
-                        <span className="stage-label">{STAGE_LABELS[key]}</span>
-                        {status === 'skipped' && s.reason && <span className="stage-reason">— {s.reason}</span>}
-                    </div>
-                );
-            })}
-        </div>
-    );
-};
+const CitationStageList = ({ stages, caseName }) => (
+    <PipelineStageList stages={stages} stageOrder={STAGE_ORDER} stageLabels={STAGE_LABELS} title={caseName} />
+);
 
 export default CitationStageList;

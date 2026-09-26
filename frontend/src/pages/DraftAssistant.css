@@ -254,42 +254,12 @@
     min-height: 60vh;
 }
 
-.spinner-ring {
-    background: #f1d1a6;
-    padding: 1.5rem;
-    border-radius: 50%;
-    box-shadow: 0 15px 40px rgba(140, 58, 42, 0.1);
-    margin-bottom: 2rem;
-    color: #8c3a2a;
-}
-
 .generation-loading-state h3 {
     font-size: 1.75rem;
     color: #63120e;
     font-weight: 800;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1.25rem;
     font-family: var(--font-heading);
-}
-
-.loading-stage-text {
-    color: #8c3a2a;
-    font-size: 1.15rem;
-    transition: opacity 0.3s;
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0% {
-        opacity: 0.6;
-    }
-
-    50% {
-        opacity: 1;
-    }
-
-    100% {
-        opacity: 0.6;
-    }
 }
 
 /* 3. GENERATED EDITOR STATE (A4) */

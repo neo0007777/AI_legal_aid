@@ -1,12 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
 import {
     Send, Sparkles, Scale, BookOpen, AlertTriangle,
-    ShieldAlert, Search, Loader2, FileText, Copy, Check,
+    ShieldAlert, Search, FileText, Copy, Check,
     Mic, MicOff, RotateCcw, X, Shield, Gavel, HelpCircle,
     Crown, Lock, ArrowRight, ShieldCheck, CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import TranslateAction from '../components/TranslateAction';
+import PipelineStageList from '../components/PipelineStageList';
+import { useStageStream } from '../hooks/useStageStream';
 import './LegalAid.css';
+
+// Real, distinct steps backend/routes/legal_aid.py's /ask stream actually emits
+// (see ask_legal_question_stream) -- collapsed from a proposed 5-stage list to 4
+// because there's no separable "cross-referencing" step distinct from retrieval.
+const LEGAL_AID_STAGE_ORDER = ['parsing_query', 'retrieving_sources', 'generating_answer', 'attaching_sources'];
+const LEGAL_AID_STAGE_LABELS = {
+    parsing_query: 'Parsing legal query & identifying jurisdiction',
+    retrieving_sources: 'Searching statutes, precedents & drafting corpus',
+    generating_answer: 'Synthesizing grounded answer',
+    attaching_sources: 'Attaching source citations',
+};
 
 const SUGGESTIONS = [
     {
@@ -248,7 +262,7 @@ const LegalAid = () => {
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
     const [isThinking, setIsThinking] = useState(false);
-    const [loadingStage, setLoadingStage] = useState(0);
+    const { stages: legalAidStages, connectionLost, run: runStageStream } = useStageStream();
     const [copiedId, setCopiedId] = useState(null);
     const [isListening, setIsListening] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -334,66 +348,50 @@ const LegalAid = () => {
         setMessages(prev => [...prev, userMsg]);
         setInputValue('');
         setIsThinking(true);
-        setLoadingStage(0);
 
-        const stageTimer1 = setTimeout(() => setLoadingStage(1), 1200);
-        const stageTimer2 = setTimeout(() => setLoadingStage(2), 2500);
-
-        try {
-            const response = await fetch('/api/legal-aid/ask', {
+        await runStageStream(
+            fetch('/api/legal-aid/ask', {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({ question: text, n_results: 3 }),
-            });
+            }),
+            {
+                onDone: (data) => {
+                    const parsed = parseAnswer(data.answer);
 
-            clearTimeout(stageTimer1);
-            clearTimeout(stageTimer2);
+                    const aiMsg = {
+                        id: 'ai_' + Date.now(),
+                        type: 'structured_ai',
+                        raw: data.answer,
+                        requires_upgrade: Boolean(
+                            data.requires_upgrade ||
+                            data.answer?.includes('Advocate Pro') ||
+                            data.answer?.toLowerCase().includes('upgrade your plan') ||
+                            data.answer?.toLowerCase().includes('plan does not allow') ||
+                            data.answer?.toLowerCase().includes("plan don't allow") ||
+                            data.answer?.toLowerCase().includes('exceed the scope of the standard') ||
+                            data.answer?.includes('upgrade to the LexSetu')
+                        ),
+                        upgrade_tier: data.upgrade_tier || 'LexSetu Advocate Pro / Criminal Defense',
+                        data: {
+                            answer: parsed.directAnswer,
+                            legal_basis: parsed.legalBasis || 'Refer to relevant Indian statutes and case law.',
+                            references: parsed.precedents ? parsed.precedents.split('\n').map(r => r.trim()).filter(Boolean) : [],
+                            insight: parsed.insight || '',
+                            disclaimer: parsed.disclaimer,
+                            tags: data.sources?.map(s => s.category).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3) || [],
+                            sources: data.sources || [],
+                        }
+                    };
 
-            if (!response.ok) {
-                let msg = 'Request failed';
-                try { const e = await response.json(); msg = e.detail || msg; } catch { msg = `Server error (${response.status})`; }
-                throw new Error(msg);
+                    setMessages(prev => [...prev, aiMsg]);
+                },
+                onError: (message) => {
+                    setMessages(prev => [...prev, { id: 'err_' + Date.now(), type: 'error', text: message }]);
+                },
             }
-
-            const data = await response.json();
-            const parsed = parseAnswer(data.answer);
-
-            const aiMsg = {
-                id: 'ai_' + Date.now(),
-                type: 'structured_ai',
-                raw: data.answer,
-                requires_upgrade: Boolean(
-                    data.requires_upgrade ||
-                    data.answer?.includes('Advocate Pro') ||
-                    data.answer?.toLowerCase().includes('upgrade your plan') ||
-                    data.answer?.toLowerCase().includes('plan does not allow') ||
-                    data.answer?.toLowerCase().includes("plan don't allow") ||
-                    data.answer?.toLowerCase().includes('exceed the scope of the standard') ||
-                    data.answer?.includes('upgrade to the LexSetu')
-                ),
-                upgrade_tier: data.upgrade_tier || 'LexSetu Advocate Pro / Criminal Defense',
-                data: {
-                    answer: parsed.directAnswer,
-                    legal_basis: parsed.legalBasis || 'Refer to relevant Indian statutes and case law.',
-                    references: parsed.precedents ? parsed.precedents.split('\n').map(r => r.trim()).filter(Boolean) : [],
-                    insight: parsed.insight || '',
-                    disclaimer: parsed.disclaimer,
-                    tags: data.sources?.map(s => s.category).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3) || [],
-                    sources: data.sources || [],
-                }
-            };
-
-            setMessages(prev => [...prev, aiMsg]);
-        } catch (err) {
-            const errorMsg = {
-                id: 'err_' + Date.now(),
-                type: 'error',
-                text: err.message,
-            };
-            setMessages(prev => [...prev, errorMsg]);
-        } finally {
-            setIsThinking(false);
-        }
+        );
+        setIsThinking(false);
     };
 
     return (
@@ -640,6 +638,12 @@ const LegalAid = () => {
                                                 </p>
                                             )}
                                         </div>
+
+                                        <TranslateAction
+                                            sourceType="legal_aid"
+                                            text={msg.raw}
+                                            citations={msg.data.sources}
+                                        />
                                     </div>
                                 )}
                             </div>
@@ -647,20 +651,24 @@ const LegalAid = () => {
                     </div>
                 )}
 
-                {/* AI Thinking Animation */}
+                {/* Live, backend-truthful pipeline stage trace -- same visual language as
+                    Verify Filing's CitationStageList, driven by real SSE stage events,
+                    never a client-side timer. */}
                 {isThinking && (
                     <div className="thinking-indicator-wrapper">
-                        <div className="thinking-card">
-                            <Loader2 size={20} className="spin-loader" />
-                            <div className="thinking-text-flow">
-                                <strong>
-                                    {loadingStage === 0 && "Parsing legal query & identifying jurisdiction..."}
-                                    {loadingStage === 1 && "Cross-referencing statutory database (IPC, CrPC, CPC)..."}
-                                    {loadingStage === 2 && "Synthesizing binding precedents and actionable insight..."}
-                                </strong>
-                                <span className="thinking-subtext">LexSetu Neural Engine active</span>
-                            </div>
+                        <div className="thinking-card thinking-card-stages">
+                            <PipelineStageList
+                                stages={legalAidStages}
+                                stageOrder={LEGAL_AID_STAGE_ORDER}
+                                stageLabels={LEGAL_AID_STAGE_LABELS}
+                                title="LexSetu Neural Engine active"
+                            />
                         </div>
+                        {connectionLost && (
+                            <p className="stage-connection-lost">
+                                <AlertTriangle size={14} /> Couldn't confirm progress — result may still be correct.
+                            </p>
+                        )}
                     </div>
                 )}
 

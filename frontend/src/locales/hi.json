@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "workspace": "कार्यक्षेत्र",
+    "dashboard": "डैशबोर्ड",
+    "verifyFiling": "फाइलिंग सत्यापित करें",
+    "caseFinder": "केस खोजक",
+    "draftAssistant": "प्रारूप सहायक",
+    "draftReview": "प्रारूप समीक्षा",
+    "contractAnalysis": "अनुबंध विश्लेषण",
+    "bareActsStatutes": "अधिनियम एवं कानून",
+    "aiLegalAid": "एआई विधिक सहायता",
+    "correctionMemory": "सुधार स्मृति",
+    "recentActivity": "हाल की गतिविधि",
+    "login": "लॉगिन / साइन अप",
+    "logout": "लॉगआउट"
+  },
+  "language": {
+    "switcherLabel": "भाषा",
+    "switcherTitle": "कानूनी उत्तरों और ऐप टेक्स्ट के लिए अपनी भाषा चुनें"
+  },
+  "translate": {
+    "button": "{{language}} में अनुवाद करें",
+    "translating": "अनुवाद हो रहा है...",
+    "viewOriginal": "मूल देखें (अंग्रेज़ी)",
+    "viewTranslated": "अनुवाद देखें",
+    "disclaimer": "अंग्रेज़ी से अनुवादित — सत्यापन अंग्रेज़ी में किया गया था",
+    "error": "अनुवाद सेवा उपलब्ध नहीं थी। कृपया पुनः प्रयास करें।",
+    "hideTranslation": "अनुवाद छिपाएं"
+  },
+  "statutes": {
+    "title": "इंडिया कोड सांविधिक अन्वेषक",
+    "sourceOfTruth": "निश्चयात्मक मूल स्रोत",
+    "selectStatute": "अधिनियम चुनें",
+    "loadingActs": "अधिनियम लोड हो रहे हैं...",
+    "inForce": "प्रभावी",
+    "tableOfProvisions": "प्रावधानों की तालिका",
+    "notAvailable": "स्रोत से उपलब्ध नहीं है।",
+    "notAvailableShort": "स्रोत से उपलब्ध नहीं है",
+    "verbatimSourceText": "यथावत स्रोत पाठ",
+    "unalteredText": "अपरिवर्तित कानूनी पाठ",
+    "englishOnlyNotice": "सांविधिक पाठ केवल अंग्रेज़ी में दिखाया गया है — यह स्रोत के विरुद्ध सत्यापित सटीक शब्दों को सुरक्षित रखता है और आपकी भाषा चयन से प्रभावित नहीं होता।",
+    "provenanceAudit": "उद्गम एवं अखंडता लेखा-परीक्षा"
+  }
+}

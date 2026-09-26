@@ -16,7 +16,7 @@ load_dotenv()
 from apscheduler.schedulers.background import BackgroundScheduler
 from models.database import create_tables, SessionLocal
 from services.compliance_fetcher import refresh_compliance_alerts
-from routes import auth, workflow, compliance, documents, cases, legal_aid, review, citations, statutes, admin
+from routes import auth, workflow, compliance, documents, cases, legal_aid, review, citations, statutes, admin, translate
 
 app = FastAPI(
     title="LexSetu API",
@@ -90,6 +90,7 @@ app.include_router(review.router,     prefix="/review",     tags=["Legal Draft R
 app.include_router(citations.router,  prefix="/citations",  tags=["Citation Verification"])
 app.include_router(statutes.router,   prefix="/statutes",   tags=["Statutes & India Code"])
 app.include_router(admin.router,      prefix="/admin",      tags=["Admin"])
+app.include_router(translate.router,  prefix="/translate",  tags=["Translation"])
 
 
 @app.get("/", tags=["Health"])

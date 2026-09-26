@@ -29,6 +29,7 @@ class User(Base):
     role = Column(String, default="user")  # user, advocate, intern, admin
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    preferred_language = Column(String, default="en")  # app-wide language switcher, see LanguageContext.jsx
 
 
 class Workflow(Base):
@@ -259,6 +260,26 @@ class IngestionLog(Base):
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    _ensure_column("users", "preferred_language", "VARCHAR DEFAULT 'en'")
+
+
+def _ensure_column(table: str, column: str, coltype_sql: str):
+    """Lightweight, no-alembic migration guard: Base.metadata.create_all only
+    creates missing TABLES, it never ALTERs an existing one -- so a column
+    added to a model after the sqlite file already exists (e.g. this
+    language-switcher release) would otherwise 500 on first query. Safe to
+    call on every startup; a no-op once the column exists."""
+    if engine.dialect.name != "sqlite":
+        # Non-sqlite (e.g. a real Postgres deploy) needs a real migration tool;
+        # this guard only covers the sqlite dev/demo default.
+        return
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        existing_cols = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))}
+        if column not in existing_cols:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype_sql}"))
+            conn.commit()
+            print(f"[LexSetu] Migrated: added {table}.{column}")
 
 
 def get_db():

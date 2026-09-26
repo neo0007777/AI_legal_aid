@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, status, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from models.database import get_db, User
-from models.schemas import UserRegister, UserLogin, TokenResponse, UserResponse
+from models.schemas import UserRegister, UserLogin, TokenResponse, UserResponse, LanguagePreferenceRequest
 from utils.auth import (
     hash_password, verify_password_safe, create_access_token, get_current_user,
     record_session, revoke_session, revoke_all_sessions,
@@ -84,6 +84,26 @@ def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.patch("/me/language", response_model=UserResponse)
+def set_preferred_language(
+    payload: LanguagePreferenceRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Persists the app-wide language switcher choice (LanguageContext.jsx) to
+    the user's profile so it follows them across devices/sessions, in
+    addition to the localStorage copy that survives a plain refresh."""
+    from services.translate_output import SUPPORTED_LANGUAGES
+    valid_codes = {"en", *SUPPORTED_LANGUAGES.keys()}
+    if payload.preferred_language not in valid_codes:
+        raise HTTPException(status_code=400, detail=f"preferred_language must be one of {sorted(valid_codes)}.")
+
+    current_user.preferred_language = payload.preferred_language
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

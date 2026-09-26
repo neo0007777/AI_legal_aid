@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     BookOpen, Search, ShieldCheck, ExternalLink, Hash, Clock,
     AlertCircle, CheckCircle, RefreshCw, ChevronRight, Scale,
-    FileText, ArrowRight, Layers, Database
+    FileText, ArrowRight, Layers, Database, Globe2
 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 import './Statutes.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const Statutes = () => {
+    const { t } = useTranslation();
+    const { languageCode } = useLanguage();
     // States for Acts
     const [acts, setActs] = useState([]);
     const [selectedAct, setSelectedAct] = useState(null);
@@ -138,9 +142,9 @@ const Statutes = () => {
                 <div className="statutes-title-area">
                     <div className="title-with-badge">
                         <Scale className="header-icon" size={28} />
-                        <h1>India Code Statutory Explorer</h1>
+                        <h1>{t('statutes.title')}</h1>
                         <span className="source-truth-badge">
-                            <ShieldCheck size={14} /> Deterministic Source-of-Truth
+                            <ShieldCheck size={14} /> {t('statutes.sourceOfTruth')}
                         </span>
                     </div>
                     <p className="statutes-subtitle">
@@ -176,11 +180,11 @@ const Statutes = () => {
             <section className="acts-strip-section">
                 <div className="strip-title">
                     <Layers size={16} />
-                    <span>SELECT STATUTE</span>
+                    <span>{t('statutes.selectStatute')}</span>
                 </div>
                 <div className="acts-strip">
                     {loadingActs ? (
-                        <div className="strip-loading">Loading bare acts...</div>
+                        <div className="strip-loading">{t('statutes.loadingActs')}</div>
                     ) : (
                         acts.map((act) => {
                             const isSelected = selectedAct?.source_act_id === act.source_act_id;
@@ -192,7 +196,7 @@ const Statutes = () => {
                                 >
                                     <div className="pill-top">
                                         <span className="pill-id">{act.source_act_id.toUpperCase()}</span>
-                                        {act.in_force && <span className="pill-status">IN FORCE</span>}
+                                        {act.in_force && <span className="pill-status">{t('statutes.inForce')}</span>}
                                     </div>
                                     <div className="pill-title">{act.title}</div>
                                     <div className="pill-footer">
@@ -224,7 +228,7 @@ const Statutes = () => {
                     </div>
 
                     <div className="provisions-list-header">
-                        <span>TABLE OF PROVISIONS</span>
+                        <span>{t('statutes.tableOfProvisions')}</span>
                         <span className="count-badge">{filteredProvisions.length} of {actDetail?.provisions_count || 0}</span>
                     </div>
 
@@ -286,14 +290,20 @@ const Statutes = () => {
                             <div className="verbatim-text-card">
                                 <div className="card-top-tag">
                                     <FileText size={14} />
-                                    <span>VERBATIM SOURCE TEXT</span>
-                                    <span className="unaltered-pill">Unaltered Legal Text</span>
+                                    <span>{t('statutes.verbatimSourceText')}</span>
+                                    <span className="unaltered-pill">{t('statutes.unalteredText')}</span>
                                 </div>
+                                {languageCode !== 'en' && (
+                                    <div className="legal-applicability-disclaimer" style={{ marginBottom: '0.6rem' }}>
+                                        <Globe2 size={14} />
+                                        <span>{t('statutes.englishOnlyNotice')}</span>
+                                    </div>
+                                )}
                                 <div className="statutory-text-content">
                                     {provisionDetail.verbatim_text ? (
                                         <p>{provisionDetail.verbatim_text}</p>
                                     ) : (
-                                        <p className="text-muted">Not available from source.</p>
+                                        <p className="text-muted">{t('statutes.notAvailable')}</p>
                                     )}
                                 </div>
                             </div>
@@ -351,7 +361,7 @@ const Statutes = () => {
                             <footer className="provenance-audit-box">
                                 <div className="audit-header">
                                     <Database size={15} />
-                                    <span>PROVENANCE & INTEGRITY AUDIT</span>
+                                    <span>{t('statutes.provenanceAudit')}</span>
                                 </div>
                                 <div className="audit-grid">
                                     <div className="audit-cell">

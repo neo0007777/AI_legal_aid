@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "workspace": "Workspace",
+    "dashboard": "Dashboard",
+    "verifyFiling": "Verify a Filing",
+    "caseFinder": "Case Finder",
+    "draftAssistant": "Draft Assistant",
+    "draftReview": "Draft Review",
+    "contractAnalysis": "Contract Analysis",
+    "bareActsStatutes": "Bare Acts & Statutes",
+    "aiLegalAid": "AI Legal Aid",
+    "correctionMemory": "Correction Memory",
+    "recentActivity": "Recent Activity",
+    "login": "Login / Sign Up",
+    "logout": "Logout"
+  },
+  "language": {
+    "switcherLabel": "Language",
+    "switcherTitle": "Choose your language for legal answers and app text"
+  },
+  "translate": {
+    "button": "Translate to {{language}}",
+    "translating": "Translating...",
+    "viewOriginal": "View original (English)",
+    "viewTranslated": "View translation",
+    "disclaimer": "Translated from English — verification was performed in English",
+    "error": "Translation service was unavailable. Please try again.",
+    "hideTranslation": "Hide translation"
+  },
+  "statutes": {
+    "title": "India Code Statutory Explorer",
+    "sourceOfTruth": "Deterministic Source-of-Truth",
+    "selectStatute": "SELECT STATUTE",
+    "loadingActs": "Loading bare acts...",
+    "inForce": "IN FORCE",
+    "tableOfProvisions": "TABLE OF PROVISIONS",
+    "notAvailable": "Not available from source.",
+    "notAvailableShort": "Not available from source",
+    "verbatimSourceText": "VERBATIM SOURCE TEXT",
+    "unalteredText": "Unaltered Legal Text",
+    "englishOnlyNotice": "Statutory text is shown in English only — this preserves the exact wording verified against the source and is not affected by your language selection.",
+    "provenanceAudit": "PROVENANCE & INTEGRITY AUDIT"
+  }
+}

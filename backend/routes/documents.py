@@ -1,18 +1,18 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.responses import StreamingResponse
+import json
 import logging
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from models.database import get_db, User, QueryLog
 from models.schemas import (
-    DraftRequest, DraftResponse,
+    DraftRequest,
     ContradictionRequest, ContradictionResponse, ContradictionPoint,
-    SearchSource
 )
 from services.rag import search_drafts
 from services.llm import call_llm
 from services.contradiction import find_contradictions
-from services.review_engine import run_two_pass_refinement
 from services.fact_manifest import build_manifest
 from services.statute_map import validate_sections_in_text
 from services.statute_verifier import verify_draft_statutes
@@ -298,19 +298,20 @@ def _build_provenance_report(manifest) -> dict:
     }
 
 
-@router.post("/draft", response_model=DraftResponse)
-def generate_draft(
-    req: DraftRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    local_only = request.headers.get("x-local-only", "").lower() == "true"
-    if not req.description.strip():
-        raise HTTPException(status_code=400, detail="Description cannot be empty")
-
+# Real, distinct steps this flow actually performs, in the order they run.
+# The originally proposed "first_pass_review" / "second_pass_review" stages
+# don't correspond to anything real here -- run_two_pass_refinement is never
+# called in this endpoint (that's a separate feature behind /review, used by
+# DraftReview.jsx). These 5 stages are relabeled to match what actually runs:
+# fact-manifest + posture planning, statute source-locking, template
+# retrieval, generation, and the post-generation consistency/statute audit.
+async def generate_draft_stream(req: DraftRequest, local_only: bool, db: Session, current_user: User):
+    """Mirrors citation_verifier.verify_filing_stream's shape: one {"type": "stage",
+    stage, status} event per real transition, a single terminal {"type": "done", ...}
+    event carrying today's /draft response body, or {"type": "error", message} on failure."""
     try:
-        # ── Step 1: Build Fact Manifest ──────────────────────
+        # ── Step 1 & 2: Fact Manifest + Procedural Posture / Grounding Plan ──
+        yield {"type": "stage", "stage": "building_manifest", "status": "started"}
         manifest = build_manifest(
             description=req.description,
             category=req.category,
@@ -319,7 +320,6 @@ def generate_draft(
         )
         fact_manifest_block = manifest.to_prompt_block()
 
-        # ── Step 2: Identify Procedural Posture & Build Legal Grounding Plan ──
         posture = identify_procedural_posture(
             description=req.description,
             structured_input=req.structured_input,
@@ -327,8 +327,10 @@ def generate_draft(
         )
         grounds_plan = build_ground_traceability_plan(posture, manifest)
         legal_reasoning_block = render_legal_reasoning_prompt_block(posture, grounds_plan)
+        yield {"type": "stage", "stage": "building_manifest", "status": "done"}
 
         # ── Step 3: Retrieve & Lock India Code Metadata ──────
+        yield {"type": "stage", "stage": "resolving_statutes", "status": "started"}
         locked_corpus = resolve_and_lock_statutory_metadata(
             db=db,
             description=req.description,
@@ -352,19 +354,25 @@ def generate_draft(
         if conflicts:
             conflict_msg = " | ".join(conflicts)
             logger.error(f"Document generation blocked due to SOURCE_CONFLICT: {conflict_msg}")
-            raise HTTPException(
-                status_code=409,
-                detail=(
+            yield {"type": "stage", "stage": "resolving_statutes", "status": "done"}
+            for stage in ("retrieving_templates", "generating_draft", "verifying_draft"):
+                yield {"type": "stage", "stage": stage, "status": "skipped", "reason": "Blocked: statutory provision marked SOURCE_CONFLICT"}
+            yield {
+                "type": "error",
+                "message": (
                     f"Document generation blocked: Statutory provision is marked SOURCE_CONFLICT between the API "
                     f"and canonical official India Code source (indiacode.nic.in). {conflict_msg}. "
                     "Do not generate a legal document from it until resolved."
                 ),
-            )
+            }
+            return
 
         source_lock_block = build_source_locked_prompt_block(locked_corpus)
         statute_block = _build_statute_validation_block(req.description)
+        yield {"type": "stage", "stage": "resolving_statutes", "status": "done"}
 
         # ── Step 4: Retrieve templates from Qdrant ───────────
+        yield {"type": "stage", "stage": "retrieving_templates", "status": "started"}
         results = []
         if req.category:
             results = search_drafts(req.description, n_results=req.n_results, category_filter=req.category)
@@ -372,15 +380,17 @@ def generate_draft(
             results = search_drafts(req.description, n_results=req.n_results)
 
         if not results:
-            raise HTTPException(
-                status_code=404,
-                detail="No templates found. Make sure you have run ingest.py first."
-            )
+            yield {"type": "stage", "stage": "retrieving_templates", "status": "done"}
+            for stage in ("generating_draft", "verifying_draft"):
+                yield {"type": "stage", "stage": stage, "status": "skipped", "reason": "No templates found"}
+            yield {"type": "error", "message": "No templates found. Make sure you have run ingest.py first."}
+            return
 
         context = "\n\n---\n\n".join([
             f"Template: {r['metadata']['filename']}\nCategory: {r['metadata']['category']}\n\n{r['text']}"
             for r in results
         ])
+        yield {"type": "stage", "stage": "retrieving_templates", "status": "done"}
 
         # ── Step 5: Compose the full prompt ──────────────────
         full_system_prompt = (
@@ -407,6 +417,7 @@ Reference Templates from Database:
 {context}"""
 
         # ── Step 6: Generate draft with higher token budget ──
+        yield {"type": "stage", "stage": "generating_draft", "status": "started"}
         initial_draft = call_llm(
             full_system_prompt, user_message,
             force_local=local_only,
@@ -420,7 +431,10 @@ Reference Templates from Database:
                 if local_only else
                 "AI service temporarily unavailable. Please verify your Groq API key and network connection."
             )
-            raise HTTPException(status_code=503, detail=detail)
+            yield {"type": "stage", "stage": "generating_draft", "status": "done"}
+            yield {"type": "stage", "stage": "verifying_draft", "status": "skipped", "reason": "Draft generation failed"}
+            yield {"type": "error", "message": detail}
+            return
 
         # ── Step 7: Post-Generation Consistency Check & Source-Lock Enforcement ──
         def regenerate_callback(sys_p: str, usr_m: str) -> str:
@@ -434,14 +448,14 @@ Reference Templates from Database:
             original_user_message=user_message,
             max_retries=1,
         )
-        review_report = None
+        yield {"type": "stage", "stage": "generating_draft", "status": "done"}
 
-        # ── Step 8: Build provenance report ──────────────────
+        # ── Step 8 & 8.5: Provenance report + Statute & Section Verification Audit ──
+        yield {"type": "stage", "stage": "verifying_draft", "status": "started"}
         provenance = _build_provenance_report(manifest)
         provenance["source_locked_corpus"] = locked_corpus.to_dict()
         provenance["source_lock_violations_detected"] = len(audit_violations)
 
-        # ── Step 8.5: Run Statute & Section Verification Audit ─
         statute_audit = verify_draft_statutes(final_draft, document_category=req.category or "")
 
         try:
@@ -453,30 +467,48 @@ Reference Templates from Database:
             db.commit()
         except Exception:
             pass
+        yield {"type": "stage", "stage": "verifying_draft", "status": "done"}
 
-        return DraftResponse(
-            description=req.description,
-            draft=final_draft,
-            sources=[
-                SearchSource(
-                    filename=r["metadata"]["filename"],
-                    category=r["metadata"]["category"],
-                    score=round(r["score"], 3),
-                )
+        yield {
+            "type": "done",
+            "description": req.description,
+            "draft": final_draft,
+            "sources": [
+                {
+                    "filename": r["metadata"]["filename"],
+                    "category": r["metadata"]["category"],
+                    "score": round(r["score"], 3),
+                }
                 for r in results
             ],
-            review=review_report,
-            fact_manifest=manifest.to_dict(),
-            provenance_report=provenance,
-            procedural_posture=posture.to_dict(),
-            ground_traceability=[g.to_dict() for g in grounds_plan],
-            statute_verification=statute_audit,
-        )
-    except HTTPException:
-        raise
+            "review": None,
+            "fact_manifest": manifest.to_dict(),
+            "provenance_report": provenance,
+            "procedural_posture": posture.to_dict(),
+            "ground_traceability": [g.to_dict() for g in grounds_plan],
+            "statute_verification": statute_audit,
+        }
     except Exception as e:
         print(f"[Documents] Unhandled error: {e}")
-        raise HTTPException(status_code=500, detail="Draft generation failed. Please try again.")
+        yield {"type": "error", "message": "Draft generation failed. Please try again."}
+
+
+@router.post("/draft")
+async def generate_draft(
+    req: DraftRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    local_only = request.headers.get("x-local-only", "").lower() == "true"
+    if not req.description.strip():
+        raise HTTPException(status_code=400, detail="Description cannot be empty")
+
+    async def event_gen():
+        async for event in generate_draft_stream(req, local_only, db, current_user):
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
 
 
 @router.post("/scan-contradictions", response_model=ContradictionResponse)

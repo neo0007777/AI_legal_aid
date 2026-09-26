@@ -11,7 +11,25 @@ import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
 import VoiceInputButton from '../components/VoiceInputButton';
 import PrivilegeShield from '../components/PrivilegeShield';
+import TranslateAction from '../components/TranslateAction';
+import PipelineStageList from '../components/PipelineStageList';
+import { useStageStream } from '../hooks/useStageStream';
 import './DraftAssistant.css';
+
+// Real, distinct steps backend/routes/documents.py's /draft stream actually emits
+// (see generate_draft_stream). Relabeled from a proposed list that included a
+// two-pass review -- run_two_pass_refinement is never called in this endpoint
+// (that's the separate /review flow behind DraftReview.jsx) -- to the steps
+// that actually run: manifest/posture planning, statute source-locking,
+// template retrieval, generation, and the post-generation consistency/statute audit.
+const DRAFT_STAGE_ORDER = ['building_manifest', 'resolving_statutes', 'retrieving_templates', 'generating_draft', 'verifying_draft'];
+const DRAFT_STAGE_LABELS = {
+    building_manifest: 'Building fact manifest & procedural posture',
+    resolving_statutes: 'Resolving & locking statutory sources',
+    retrieving_templates: 'Retrieving matching templates',
+    generating_draft: 'Generating draft',
+    verifying_draft: 'Verifying statute citations & source-lock consistency',
+};
 
 export const sanitizeDraftText = (text) => {
     if (!text) return '';
@@ -282,6 +300,7 @@ const DraftAssistant = () => {
 
     const [formData, setFormData] = useState({});
     const [isGenerating, setIsGenerating] = useState(false);
+    const { stages: draftStages, connectionLost, run: runStageStream } = useStageStream();
     const [hasGenerated, setHasGenerated] = useState(false);
     const [documentContent, setDocumentContent] = useState('');
     const [sources, setSources] = useState([]);
@@ -365,8 +384,8 @@ const DraftAssistant = () => {
         setProvenanceData(null);
         setShowMissingWarning(false);
 
-        try {
-            const response = await fetch('/api/documents/draft', {
+        await runStageStream(
+            fetch('/api/documents/draft', {
                 method: 'POST',
                 headers: { ...getAuthHeaders(), 'X-Local-Only': String(localOnly) },
                 body: JSON.stringify({
@@ -376,28 +395,22 @@ const DraftAssistant = () => {
                     template_id: activeTemplateId,
                     structured_input: buildStructuredInput(),
                 }),
-            });
-
-            if (!response.ok) {
-                let msg = 'Draft generation failed';
-                try { const e = await response.json(); msg = e.detail || msg; } catch { msg = `Server error (${response.status})`; }
-                throw new Error(msg);
+            }),
+            {
+                onDone: (data) => {
+                    setDocumentContent(data.draft);
+                    setSources(data.sources || []);
+                    setReviewData(data.review || null);
+                    setProvenanceData(data.provenance_report || null);
+                    setStatuteAudit(data.statute_verification || null);
+                    setHasGenerated(true);
+                    setSidebarOpen(false); // Give document generous reading/editing width
+                    setViewMode('court');
+                },
+                onError: (message) => setError(message),
             }
-
-            const data = await response.json();
-            setDocumentContent(data.draft);
-            setSources(data.sources || []);
-            setReviewData(data.review || null);
-            setProvenanceData(data.provenance_report || null);
-            setStatuteAudit(data.statute_verification || null);
-            setHasGenerated(true);
-            setSidebarOpen(false); // Give document generous reading/editing width
-            setViewMode('court');
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setIsGenerating(false);
-        }
+        );
+        setIsGenerating(false);
     };
 
     const handleReverifyStatutes = async () => {
@@ -578,11 +591,20 @@ const DraftAssistant = () => {
 
                 {isGenerating && (
                     <div className="generation-loading-state animate-fade-in">
-                        <div className="spinner-ring">
-                            <Loader2 size={48} className="spin text-primary" />
-                        </div>
                         <h3>Generating Grounded Draft...</h3>
-                        <p className="loading-stage-text">⚡ Building fact manifest → Validating statutes → Generating from templates → Hallucination check → Auto-fix...</p>
+                        {/* Live, backend-truthful pipeline stage trace -- same visual language
+                            as Verify Filing's CitationStageList, driven by real SSE stage
+                            events, never a client-side timer. */}
+                        <PipelineStageList
+                            stages={draftStages}
+                            stageOrder={DRAFT_STAGE_ORDER}
+                            stageLabels={DRAFT_STAGE_LABELS}
+                        />
+                        {connectionLost && (
+                            <p className="stage-connection-lost">
+                                <AlertTriangle size={14} /> Couldn't confirm progress — result may still be correct.
+                            </p>
+                        )}
                     </div>
                 )}
 
@@ -651,6 +673,12 @@ const DraftAssistant = () => {
                                 </div>
                             )}
                         </div>
+
+                        <TranslateAction
+                            sourceType="draft_assistant"
+                            text={documentContent}
+                            citations={sources}
+                        />
                     </div>
                 )}
             </main>

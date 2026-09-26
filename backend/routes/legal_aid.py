@@ -1,8 +1,10 @@
+import json
 import re
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from models.database import get_db, User, QueryLog
-from models.schemas import LegalAidRequest, LegalAidResponse, SearchSource
+from models.schemas import LegalAidRequest
 from services.rag import search_drafts
 from services.llm import call_llm
 from utils.auth import get_current_user
@@ -127,61 +129,7 @@ def is_unlawful_query(question: str) -> bool:
     return any(re.search(pat, q) for pat in ILLEGAL_FACILITATION_PATTERNS)
 
 
-@router.post("/ask", response_model=LegalAidResponse)
-def ask_legal_aid(
-    req: LegalAidRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    if not req.question.strip():
-        raise HTTPException(status_code=400, detail="Question cannot be empty")
-
-    # Scope Rule 1: Strictly legal queries only — reject programming code / software requests
-    if is_non_legal_query(req.question):
-        return LegalAidResponse(
-            question=req.question,
-            answer=NON_LEGAL_ANSWER,
-            sources=[],
-            requires_upgrade=False,
-        )
-
-    # Scope Rule 2: Illicit substances, weed, narcotics, extreme personal penal matters — upgrade plan required
-    if is_substance_or_extreme_query(req.question):
-        return LegalAidResponse(
-            question=req.question,
-            answer=SUBSTANCE_OR_EXTREME_UPGRADE_ANSWER,
-            sources=[],
-            requires_upgrade=True,
-            upgrade_tier="LexSetu Advocate Pro / Criminal Defense",
-        )
-
-    # Scope Rule 3: Active crime facilitation, bribery, forgery, evasion — upgrade plan required
-    if is_unlawful_query(req.question):
-        return LegalAidResponse(
-            question=req.question,
-            answer=UNLAWFUL_UPGRADE_ANSWER,
-            sources=[],
-            requires_upgrade=True,
-            upgrade_tier="LexSetu Advocate Pro / Enterprise",
-        )
-
-    try:
-        results = search_drafts(req.question, n_results=req.n_results)
-        kanoon_results = scrape_indian_kanoon(req.question)
-
-        context_parts = []
-        for r in results:
-            context_parts.append(
-                f"Reference: {r['metadata']['filename']} | Category: {r['metadata']['category']}\n{r['text']}"
-            )
-        for k in kanoon_results:
-            context_parts.append(
-                f"Case Title: {k['title']}\nSnippet: {k['snippet']}\nLink: {k['link']}"
-            )
-
-        context = "\n\n---\n\n".join(context_parts) if context_parts else ""
-
-        system_prompt = """You are LexSetu, an authoritative Indian legal aid intelligence assistant.
+ASK_SYSTEM_PROMPT = """You are LexSetu, an authoritative Indian legal aid intelligence assistant.
 You provide clear, accurate, and actionable legal guidance based on Indian statutory law and jurisprudence.
 
 CORE SCOPE & OPERATING POLICIES:
@@ -222,11 +170,67 @@ Formatting Rules:
 - Avoid gratuitous markdown signs, repeated asterisks, or raw formatting artifacts.
 - Be precise, authoritative, empathetic, and clear."""
 
-        user_message = f"""Legal Question: {req.question}
+
+# Real, distinct steps this flow actually performs, in the order they run --
+# collapsed from a proposed 5-stage list down to 4 because there is no
+# separable "cross-referencing" step distinct from retrieval in this code;
+# an honest 4-stage trace beats a padded fake 5-stage one.
+async def ask_legal_question_stream(question: str, n_results: int, db: Session, current_user: User):
+    """Mirrors citation_verifier.verify_filing_stream's shape: one {"type": "stage",
+    stage, status} event per real transition, a single terminal {"type": "done", ...}
+    event carrying today's /ask response body, or {"type": "error", message} on failure."""
+    try:
+        yield {"type": "stage", "stage": "parsing_query", "status": "started"}
+        non_legal = is_non_legal_query(question)
+        substance = False if non_legal else is_substance_or_extreme_query(question)
+        unlawful = False if (non_legal or substance) else is_unlawful_query(question)
+        yield {"type": "stage", "stage": "parsing_query", "status": "done"}
+
+        if non_legal or substance or unlawful:
+            skip_reason = "Scope rule matched — answered directly, no retrieval or generation needed"
+            for stage in ("retrieving_sources", "generating_answer", "attaching_sources"):
+                yield {"type": "stage", "stage": stage, "status": "skipped", "reason": skip_reason}
+            if non_legal:
+                payload = {"answer": NON_LEGAL_ANSWER, "requires_upgrade": False, "upgrade_tier": None}
+            elif substance:
+                payload = {
+                    "answer": SUBSTANCE_OR_EXTREME_UPGRADE_ANSWER,
+                    "requires_upgrade": True,
+                    "upgrade_tier": "LexSetu Advocate Pro / Criminal Defense",
+                }
+            else:
+                payload = {
+                    "answer": UNLAWFUL_UPGRADE_ANSWER,
+                    "requires_upgrade": True,
+                    "upgrade_tier": "LexSetu Advocate Pro / Enterprise",
+                }
+            yield {"type": "done", "question": question, "sources": [], **payload}
+            return
+
+        yield {"type": "stage", "stage": "retrieving_sources", "status": "started"}
+        results = search_drafts(question, n_results=n_results)
+        kanoon_results = scrape_indian_kanoon(question)
+
+        context_parts = []
+        for r in results:
+            context_parts.append(
+                f"Reference: {r['metadata']['filename']} | Category: {r['metadata']['category']}\n{r['text']}"
+            )
+        for k in kanoon_results:
+            context_parts.append(
+                f"Case Title: {k['title']}\nSnippet: {k['snippet']}\nLink: {k['link']}"
+            )
+        context = "\n\n---\n\n".join(context_parts) if context_parts else ""
+        yield {"type": "stage", "stage": "retrieving_sources", "status": "done"}
+
+        user_message = f"""Legal Question: {question}
 
 {"Relevant Legal References:" + chr(10) + context if context else "Answer based on your knowledge of Indian law."}"""
 
-        answer = call_llm(system_prompt, user_message)
+        yield {"type": "stage", "stage": "generating_answer", "status": "started"}
+        answer = call_llm(ASK_SYSTEM_PROMPT, user_message)
+        yield {"type": "stage", "stage": "generating_answer", "status": "done"}
+
         requires_upgrade = (
             "Advocate Pro" in answer or
             ("upgrade" in answer.lower() and "plan" in answer.lower()) or
@@ -234,33 +238,52 @@ Formatting Rules:
             "does not allow answering" in answer.lower()
         )
 
+        yield {"type": "stage", "stage": "attaching_sources", "status": "started"}
         try:
             db.add(QueryLog(
                 user_id=current_user.id,
                 query_type="legal_aid",
-                encrypted_query=encrypt(req.question),
+                encrypted_query=encrypt(question),
             ))
             db.commit()
         except Exception:
             pass
 
-        return LegalAidResponse(
-            question=req.question,
-            answer=answer,
-            sources=[
-                SearchSource(
-                    filename=r["metadata"]["filename"],
-                    category=r["metadata"]["category"],
-                    score=round(r["score"], 3),
-                )
-                for r in results
-            ],
-            requires_upgrade=requires_upgrade,
-            upgrade_tier="LexSetu Advocate Pro / Criminal Defense" if requires_upgrade else None,
-        )
-    except HTTPException:
-        raise
+        sources = [
+            {
+                "filename": r["metadata"]["filename"],
+                "category": r["metadata"]["category"],
+                "score": round(r["score"], 3),
+            }
+            for r in results
+        ]
+        yield {"type": "stage", "stage": "attaching_sources", "status": "done"}
+
+        yield {
+            "type": "done",
+            "question": question,
+            "answer": answer,
+            "sources": sources,
+            "requires_upgrade": requires_upgrade,
+            "upgrade_tier": "LexSetu Advocate Pro / Criminal Defense" if requires_upgrade else None,
+        }
     except Exception as e:
         print(f"[LegalAid] Unhandled error: {e}")
-        raise HTTPException(status_code=500, detail="Legal aid request failed. Please try again.")
+        yield {"type": "error", "message": "Legal aid request failed. Please try again."}
+
+
+@router.post("/ask")
+async def ask_legal_aid(
+    req: LegalAidRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not req.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
+
+    async def event_gen():
+        async for event in ask_legal_question_stream(req.question, req.n_results, db, current_user):
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
 

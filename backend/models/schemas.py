@@ -49,6 +49,7 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool
     created_at: datetime
+    preferred_language: Optional[str] = "en"
 
     class Config:
         from_attributes = True
@@ -239,3 +240,23 @@ class FlagCorrectionRequest(BaseModel):
 
 class RenderLanguageRequest(BaseModel):
     language: str  # "hindi" | "hinglish"
+
+
+# ─── App-wide translation (Part 2: generalized regional-language mode) ─
+
+class TranslateRequest(BaseModel):
+    source_type: str   # "legal_aid" | "draft_assistant" | "draft_review" | "clause_conflict"
+    target_lang: str   # one of translate_output.SUPPORTED_LANGUAGES
+    text: str           # already-generated, already-verified English text
+    citations: Optional[List[dict]] = []
+
+
+class TranslateResponse(BaseModel):
+    translated_text: str
+    source_citations: List[dict]
+    target_lang: str
+    disclaimer: str
+
+
+class LanguagePreferenceRequest(BaseModel):
+    preferred_language: str
