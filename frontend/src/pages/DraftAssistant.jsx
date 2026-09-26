@@ -164,7 +164,7 @@ const renderCourtDocument = (text) => {
 
         const cleanLine = trimmed.replace(/^#{1,6}\s*/, '');
 
-        if (/^(\d+\.\s+)?(Heading\s*\/\s*Cause Title|Verified Case Information|Factual Background|Legal Grounds|Prayer|Verification)/i.test(cleanLine)) {
+        if (/^(SECTION\s+[I|V|X\d]+:?\s*)?(\d+\.\s+)?(Synopsis|List of Dates|Heading\s*\/\s*Cause Title|Memo of Parties|Verified Case Information|Factual Background|Factual Matrix|Application|Legal Grounds|Prayer|Index of Annexures|Affidavit|Verification)/i.test(cleanLine)) {
             const badgeText = cleanLine.replace(/\*\*/g, '').trim();
             elements.push(
                 <div key={idx} className="court-section-guide">
@@ -201,7 +201,7 @@ const renderCourtDocument = (text) => {
             return;
         }
 
-        if (/^(MOST RESPECTFULLY SHOWETH|RESPECTFULLY SHOWETH|GROUNDS|GROUNDS FOR BAIL|FACTS OF THE CASE|PRAYER|PRAYER CLAUSE|VERIFICATION|AFFIDAVIT|TERMS AND CONDITIONS|SYNOPSIS|LIST OF DATES):?/i.test(cleanLine)) {
+        if (/^(MOST RESPECTFULLY SHOWETH|RESPECTFULLY SHOWETH|GROUNDS|GROUNDS FOR BAIL|FACTS OF THE CASE|PRAYER|PRAYER CLAUSE|VERIFICATION|AFFIDAVIT|AFFIDAVIT IN SUPPORT|TERMS AND CONDITIONS|SYNOPSIS|LIST OF DATES|INDEX OF ANNEXURES):?/i.test(cleanLine)) {
             elements.push(
                 <div key={idx} className="court-section-heading">
                     {renderInlineContent(cleanLine)}

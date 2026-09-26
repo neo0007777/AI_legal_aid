@@ -214,18 +214,68 @@ D. What requires verification?
 E. Which arguments can safely be generated from the available information?
 Do not hide this uncertainty merely because the final output should look professional.
 
-12. OUTPUT DESIGN
+12. OUTPUT DESIGN & COURT-STYLE PRESENTATION (HIGH STANDARDS FOR ANNEXURES & STRUCTURE)
 
-Generate the legal document in this structure:
-- Heading / Cause Title
-- Verified Case Information
-- Factual Background
-- Legal Grounds
-- Prayer
-- Verification / Required Completion Fields
+For Court Filings, Petitions, and Bail Applications, structure the document into these professional sections:
+
+SECTION I: SYNOPSIS & LIST OF DATES AND EVENTS
+- Brief Synopsis summarizing the matter, FIR details, date of arrest/custody (if provided), procedural history, and specific statutory relief sought.
+- Chronological "LIST OF DATES AND EVENTS" in clean format (Date | Procedural Event), tracing registration of FIR, arrest/remand, lower court rejection (if any), and filing of the present application.
+
+SECTION II: COMPLETE CAUSE TITLE & MEMO OF PARTIES
+- Court heading: IN THE COURT OF [SESSIONS JUDGE / HIGH COURT OF ... AT ...]
+- Case designation: BAIL APPLICATION / CRIMINAL MISC. APPLICATION NO. ___ OF 202X
+- Detailed Memo of Parties:
+  [APPLICANT NAME], S/o [FATHER/PARENT NAME], Aged about [AGE] years,
+  R/o [ADDRESS], Currently lodged at [JAIL/CUSTODY or At Large / Apprehending Arrest]
+  ... APPLICANT / PETITIONER
+  VERSUS
+  STATE ([NCT OF DELHI / STATE OF ...]) Through SHO, P.S. [POLICE STATION]
+  ... RESPONDENT
+- Application Title: APPLICATION UNDER SECTION [483 BNSS, 2023 / 439 Cr.P.C., 1973 for Regular Bail OR SECTION 482 BNSS, 2023 / 438 Cr.P.C., 1973 for Anticipatory Bail OR SECTION 480 BNSS / 437 Cr.P.C.] FOR GRANT OF BAIL TO THE APPLICANT IN FIR NO. [FIR NO.] DATED [DATE] REGISTERED AT POLICE STATION [POLICE STATION] UNDER SECTIONS [SECTIONS].
+
+SECTION III: APPLICATION / FACTUAL MATRIX WITH IN-TEXT ANNEXURE CITATIONS
+- Opening: "MOST RESPECTFULLY SHOWETH:"
+- Numbered paragraphs setting out jurisdiction, facts strictly traceable to manifest (using [NOT PROVIDED] for unknown particulars).
+- Mandatory in-text Annexure cross-references:
+  * "A true / typed copy of the First Information Report (FIR No. [FIR] dated [DATE]) is annexed herewith and marked as ANNEXURE A-1."
+  * "A true copy of the Impugned Rejection Order dated [DATE] passed by Ld. [COURT] is annexed herewith and marked as ANNEXURE A-2." (or [NOT APPLICABLE / FIRST APPLICATION])
+  * "A true copy of the Applicant's identity and proof of permanent residence (Aadhaar / Voter ID) is annexed herewith and marked as ANNEXURE A-3."
+  * "True copies of supporting documents / medical records / financial documents (if applicable) are annexed herewith and marked as ANNEXURE A-4."
+
+SECTION IV: SUBSTANTIVE LEGAL GROUNDS
+- Clearly demarcated grounds (Ground A, Ground B, Ground C, Ground D...)
+- Dual-statute grounding: invoke current governing statute (BNSS, 2023 / BNS, 2023) alongside corresponding legacy provisions (Cr.P.C., 1973 / I.P.C., 1860).
+- Preserve procedural posture integrity (Regular Bail vs Anticipatory Bail).
+- Strict factual discipline (no unsupported negative assertions; reframe tampering as an undertaking).
+
+SECTION V: PRAYER & INTERIM RELIEF
+- Explicit prayer clause praying for grant of regular/anticipatory bail on terms and conditions, and any interim relief pending disposal.
+
+SECTION VI: FORMAL INDEX OF ANNEXURES / EXHIBITS TABLE
+- A clean, professional table:
+  | S.No. | Annexure Mark | Particulars / Description of Document | Relevant Date | Page No. |
+  | 1. | Annexure A-1 | True / Typed copy of FIR No. [NUMBER] dated [DATE] registered at P.S. [NAME] | [DATE] | [ ] |
+  | 2. | Annexure A-2 | Certified / True copy of the Impugned Order dated [DATE] passed by Ld. [COURT] | [DATE] | [ ] |
+  | 3. | Annexure A-3 | Proof of Permanent Residence and Identity of Applicant (Aadhaar / Voter ID / Passport) | [ ] | [ ] |
+  | 4. | Annexure A-4 | [Relevant Supporting Documents / Medical Records / Defense Material] | [DATE] | [ ] |
+
+SECTION VII: AFFIDAVIT IN SUPPORT OF APPLICATION
+- Formal Affidavit of the Deponent (Applicant or Pairokar / Relative):
+  * Deponent particulars (Name, age, S/o, R/o).
+  * Paragraph affirming deponent competence and personal knowledge of facts.
+  * Paragraph affirming that contents of the accompanying application are true and correct to knowledge, and legal submissions are believed to be true upon legal advice.
+  * Paragraph affirming that all annexed documents / Annexures A-1 to A-4 are true copies of their respective originals.
+  * Paragraph declaring that no other similar application has been filed before any other court.
+
+SECTION VIII: FORMAL VERIFICATION & COUNSEL ATTESTATION
+- Formal verification block: "Verified at [PLACE] on this [DAY] day of [MONTH, YEAR] that the contents of the above application and affidavit are true and correct to my knowledge and belief and nothing material has been concealed therefrom."
+- Signatures: DEPONENT | THROUGH COUNSEL / ADVOCATE FOR THE APPLICANT.
+- Oath Commissioner / Notary Public attestation stamp block.
 
 Where information is missing, use [NOT PROVIDED] or [REQUIRES VERIFICATION].
 Do NOT fabricate content to make paragraphs sound complete.
+For Commercial Contracts/Agreements, adapt into Title, Preamble, Recitals/Whereas, Operative Clauses, Representations & Warranties, Termination, Governing Law & Jurisdiction, Execution Block with Signatures & Witnesses, and Schedules/Annexures.
 
 13. FINAL SELF-CHECK
 
@@ -408,13 +458,15 @@ async def generate_draft_stream(req: DraftRequest, local_only: bool, db: Session
         user_message = f"""Draft Request: {req.description}
 {f"Document Category: {req.category}" if req.category else ""}
 
-Structure the document strictly following Rule 12 (Output Design):
-1. Heading / Cause Title
-2. Verified Case Information
-3. Factual Background (state ONLY verified facts; use [NOT PROVIDED] for unknown facts)
-4. Legal Grounds (qualify unverified grounds; use [CASE-SPECIFIC GROUND REQUIRES SUPPORTING FACTS] where factual basis is absent)
-5. Prayer
-6. Verification / Required Completion Fields
+Structure the document strictly following Rule 12 (Output Design & Court-Style Presentation):
+1. SECTION I: Synopsis & Chronological List of Dates and Events
+2. SECTION II: Complete Cause Title & Memo of Parties (with precise governing BNSS/BNS provisions alongside corresponding legacy CrPC/IPC)
+3. SECTION III: Numbered Factual Matrix with explicit In-Text Annexure Citations (Annexure A-1: FIR, Annexure A-2: Impugned Order, Annexure A-3: Identity/Residence Proof, Annexure A-4: Supporting Records; state ONLY verified facts; use [NOT PROVIDED] for unknown facts)
+4. SECTION IV: Substantive Legal Grounds (Ground A, B, C... qualify unverified grounds; use [CASE-SPECIFIC GROUND REQUIRES SUPPORTING FACTS] where factual basis is absent)
+5. SECTION V: Prayer & Interim Relief
+6. SECTION VI: Formal Index of Annexures / Exhibits Table (S.No. | Annexure Mark | Particulars | Relevant Date | Page No.)
+7. SECTION VII: Affidavit in Support of Application (deponent affirmation and confirmation that annexures are true copies)
+8. SECTION VIII: Formal Verification & Counsel Attestation Block
 
 Reference Templates from Database:
 {context}"""

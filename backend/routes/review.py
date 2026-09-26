@@ -20,7 +20,17 @@ def review_draft(req: ReviewRequest):
         raise HTTPException(status_code=400, detail="Draft content cannot be empty")
 
     try:
-        return run_hybrid_review(req.draft, req.document_type)
+        posture = None
+        manifest = None
+        try:
+            from services.legal_reasoning_engine import identify_procedural_posture
+            from services.fact_manifest import build_manifest
+            posture = identify_procedural_posture(req.draft)
+            manifest = build_manifest(req.draft, req.document_type)
+        except Exception as ctx_err:
+            print(f"[ReviewRoute] Context build notice: {ctx_err}")
+
+        return run_hybrid_review(req.draft, req.document_type, fact_manifest=manifest, procedural_posture=posture)
     except Exception as e:
         print(f"[ReviewRoute] Error in review_draft: {e}")
         raise HTTPException(status_code=500, detail=f"Review engine failed: {str(e)}")
@@ -54,7 +64,17 @@ async def review_uploaded_file(
     if not extracted_text.strip():
         raise HTTPException(status_code=400, detail=f"No readable text could be extracted from {file.filename}")
 
-    return run_hybrid_review(extracted_text, document_type)
+    posture = None
+    manifest = None
+    try:
+        from services.legal_reasoning_engine import identify_procedural_posture
+        from services.fact_manifest import build_manifest
+        posture = identify_procedural_posture(extracted_text)
+        manifest = build_manifest(extracted_text, document_type)
+    except Exception as ctx_err:
+        print(f"[ReviewRoute] Context build notice: {ctx_err}")
+
+    return run_hybrid_review(extracted_text, document_type, fact_manifest=manifest, procedural_posture=posture)
 
 
 @router.post("/fix", response_model=FixResponse)
@@ -64,7 +84,24 @@ def fix_draft(req: FixRequest):
         raise HTTPException(status_code=400, detail="Original draft content cannot be empty")
 
     try:
-        return auto_fix_draft(req.draft, req.issues, req.missing_sections, req.missing_fields)
+        posture = None
+        manifest = None
+        try:
+            from services.legal_reasoning_engine import identify_procedural_posture
+            from services.fact_manifest import build_manifest
+            posture = identify_procedural_posture(req.draft)
+            manifest = build_manifest(req.draft)
+        except Exception as ctx_err:
+            print(f"[ReviewRoute] Fix context build notice: {ctx_err}")
+
+        return auto_fix_draft(
+            draft=req.draft,
+            issues=req.issues,
+            missing_sections=req.missing_sections,
+            missing_fields=req.missing_fields,
+            fact_manifest=manifest,
+            procedural_posture=posture
+        )
     except Exception as e:
         print(f"[ReviewRoute] Error in fix_draft: {e}")
         raise HTTPException(status_code=500, detail=f"Auto-fix engine failed: {str(e)}")

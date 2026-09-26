@@ -44,7 +44,9 @@ def test_substance_detection():
     assert is_substance_or_extreme_query("Can landlord evict tenant without court order?") is False
 
 
-def test_auth_upgrade_to_pro(client, db_session):
+def test_auth_upgrade_to_pro():
+    client = get_test_client()
+    db_session = get_db()
     # Create a free test user
     email = "freetest@example.com"
     user = db_session.query(User).filter(User.email == email).first()
