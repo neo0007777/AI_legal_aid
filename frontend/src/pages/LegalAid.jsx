@@ -3,7 +3,9 @@ import {
     Send, Sparkles, Scale, BookOpen, AlertTriangle,
     ShieldAlert, Search, Loader2, FileText, Copy, Check,
     Mic, MicOff, RotateCcw, X, Shield, Gavel, HelpCircle,
-    Crown, Lock, ArrowRight, ShieldCheck, CheckCircle2, FileDown
+    Crown, Lock, ArrowRight, ShieldCheck, CheckCircle2, FileDown,
+    SlidersHorizontal, Bookmark, BookmarkCheck, ListChecks,
+    Briefcase, RefreshCw, Zap
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { downloadFileFromBlob, exportPdfFromApi } from '../utils/downloadHelper';
@@ -42,35 +44,12 @@ const SUGGESTIONS = [
     }
 ];
 
-const parseAnswer = (rawAnswer) => {
-    if (!rawAnswer) return { directAnswer: '', legalBasis: '', precedents: '', insight: '', disclaimer: '' };
-
-    const sections = {
-        directAnswer: '',
-        legalBasis: '',
-        precedents: '',
-        insight: '',
-        disclaimer: '',
-    };
-
-    // Resilient regex that matches markdown headers, asterisks, hashes, colons
-    const directMatch = rawAnswer.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?DIRECT ANSWER:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?LEGAL BASIS:?|$)/i);
-    const legalMatch = rawAnswer.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?LEGAL BASIS:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?BINDING PRECEDENTS:?|$)/i);
-    const precedentsMatch = rawAnswer.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?BINDING PRECEDENTS:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?ACTIONABLE INSIGHT:?|$)/i);
-    const insightMatch = rawAnswer.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?ACTIONABLE INSIGHT:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?DISCLAIMER:?|$)/i);
-    const disclaimerMatch = rawAnswer.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?DISCLAIMER:?(?:\*\*)?\s*([\s\S]*?)$/i);
-
-    if (directMatch && directMatch[1].trim()) sections.directAnswer = directMatch[1].trim();
-    if (legalMatch && legalMatch[1].trim()) sections.legalBasis = legalMatch[1].trim();
-    if (precedentsMatch && precedentsMatch[1].trim()) sections.precedents = precedentsMatch[1].trim();
-    if (insightMatch && insightMatch[1].trim()) sections.insight = insightMatch[1].trim();
-    if (disclaimerMatch && disclaimerMatch[1].trim()) sections.disclaimer = disclaimerMatch[1].trim();
-
-    if (!sections.directAnswer && !sections.legalBasis) {
-        sections.directAnswer = rawAnswer.trim();
-    }
-
-    return sections;
+const cleanAndNormalizeText = (text) => {
+    if (!text) return '';
+    return text
+        .replace(/[\u202F\u00A0\u2000-\u200A]/g, ' ')
+        .replace(/\s*---+$/, '')
+        .trim();
 };
 
 const formatCategoryTag = (cat) => {
@@ -84,23 +63,10 @@ const formatCategoryTag = (cat) => {
     return cat.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
-const cleanAndNormalizeText = (text) => {
-    if (!text) return '';
-    return text
-        .replace(/[\u202F\u00A0\u2000-\u200A]/g, ' ') // normalize all strange unicode spaces
-        .replace(/\s*---+$/, '') // remove trailing markdown lines
-        .trim();
-};
-
 const formatRichInline = (rawText) => {
     if (!rawText) return null;
     const text = cleanAndNormalizeText(rawText);
 
-    // Regex to match:
-    // 1. ***bold italic***
-    // 2. **bold**
-    // 3. *italic* or _italic_
-    // 4. `code`
     const regex = /(\*\*\*[^*]+?\*\*\*|\*\*[^*]+?\*\*|\*[^*]+?\*|_[^_]+?_|`[^`]+?`)/g;
     const parts = [];
     let lastIndex = 0;
@@ -184,7 +150,6 @@ const renderFormattedText = (text) => {
     lines.forEach((line, idx) => {
         const trimmed = line.trim();
 
-        // Check if markdown table line: e.g. | col1 | col2 |
         if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
             const cells = trimmed.split('|').slice(1, -1).map(c => c.trim());
             tableRows.push(cells);
@@ -199,13 +164,11 @@ const renderFormattedText = (text) => {
             return;
         }
 
-        // Horizontal separator line --- or ***
         if (/^[-*]{3,}$/.test(trimmed)) {
             elements.push(<hr key={idx} className="aid-divider" />);
             return;
         }
 
-        // Bullet point: - item, * item, • item
         if (trimmed.startsWith('- ') || trimmed.startsWith('• ') || trimmed.startsWith('* ')) {
             const cleanContent = line.replace(/^[-•*]\s*/, '').trim();
             elements.push(
@@ -217,7 +180,6 @@ const renderFormattedText = (text) => {
             return;
         }
 
-        // Numbered list: e.g. "1. " or "5. "
         const numMatch = trimmed.match(/^(\d+[\.\)])\s*(.*)/);
         if (numMatch) {
             elements.push(
@@ -243,6 +205,175 @@ const renderFormattedText = (text) => {
     return elements;
 };
 
+/**
+ * Multi-mode legal answer parser.
+ * Perfectly formats Standard Judicial, Executive Brief, IRAC, Bullet points, or Custom Guided responses
+ * without ANY structure mismatch.
+ */
+const parseLegalAidAnswer = (rawAnswer, requestedMode = 'standard') => {
+    if (!rawAnswer) return { mode: 'standard', sections: [], disclaimer: '', raw: '' };
+
+    const cleanRaw = cleanAndNormalizeText(rawAnswer);
+    let disclaimer = '';
+    let mainText = cleanRaw;
+
+    const discMatch = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?DISCLAIMER:?(?:\*\*)?\s*([\s\S]*?)$/i);
+    if (discMatch) {
+        disclaimer = discMatch[1].trim();
+        mainText = mainText.substring(0, discMatch.index).trim();
+    }
+
+    // 1. Executive Brief matching
+    const execSummary = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?EXECUTIVE SUMMARY:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?STATUTORY POSITION:?|$)/i);
+    const execStatutory = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?STATUTORY POSITION:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?JUDICIAL PRECEDENTS:?|$)/i);
+    const execPrecedents = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?JUDICIAL PRECEDENTS:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?STRATEGIC RECOMMENDATIONS:?|$)/i);
+    const execStrategy = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?STRATEGIC RECOMMENDATIONS:?(?:\*\*)?\s*([\s\S]*?)$/i);
+
+    if (execSummary || (requestedMode === 'executive_brief' && (execStatutory || execStrategy))) {
+        const sections = [];
+        if (execSummary && execSummary[1].trim()) {
+            sections.push({ id: 'summary', title: 'Executive Summary', icon: 'file', badge: 'Leadership Overview', content: execSummary[1].trim() });
+        }
+        if (execStatutory && execStatutory[1].trim()) {
+            sections.push({ id: 'statutory', title: 'Statutory Position & Codified Sections', icon: 'scale', badge: 'Bare Acts & Codes', content: execStatutory[1].trim() });
+        }
+        if (execPrecedents && execPrecedents[1].trim()) {
+            sections.push({ id: 'precedents', title: 'Judicial Precedents & Decisive Ratios', icon: 'book', badge: 'Binding Precedents', content: execPrecedents[1].trim() });
+        }
+        if (execStrategy && execStrategy[1].trim()) {
+            sections.push({ id: 'strategy', title: 'Strategic Recommendations & Roadmap', icon: 'alert', badge: 'Action Plan', content: execStrategy[1].trim() });
+        }
+        if (sections.length > 0) {
+            return { mode: 'executive_brief', title: 'Executive Legal Brief', sections, disclaimer, raw: rawAnswer };
+        }
+    }
+
+    // 2. IRAC Framework matching
+    const iracIssue = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?(?:LEGAL\s+)?ISSUE:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?RULE:?|$)/i);
+    const iracRule = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?RULE:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?APPLICATION:?|$)/i);
+    const iracApp = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?APPLICATION:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?CONCLUSION:?|$)/i);
+    const iracConcl = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?CONCLUSION:?(?:\*\*)?\s*([\s\S]*?)$/i);
+
+    if (iracIssue || (requestedMode === 'irac' && (iracRule || iracApp))) {
+        const sections = [];
+        if (iracIssue && iracIssue[1].trim()) {
+            sections.push({ id: 'issue', title: 'Legal Issue Presented', icon: 'help', badge: 'I - Issue', content: iracIssue[1].trim() });
+        }
+        if (iracRule && iracRule[1].trim()) {
+            sections.push({ id: 'rule', title: 'Governing Legal Rules & Statutory Provisions', icon: 'scale', badge: 'R - Rule', content: iracRule[1].trim() });
+        }
+        if (iracApp && iracApp[1].trim()) {
+            sections.push({ id: 'application', title: 'Legal Application & Factual Analysis', icon: 'book', badge: 'A - Application', content: iracApp[1].trim() });
+        }
+        if (iracConcl && iracConcl[1].trim()) {
+            sections.push({ id: 'conclusion', title: 'Conclusion & Statutory Remedies', icon: 'gavel', badge: 'C - Conclusion', content: iracConcl[1].trim() });
+        }
+        if (sections.length > 0) {
+            return { mode: 'irac', title: 'IRAC Legal Framework', sections, disclaimer, raw: rawAnswer };
+        }
+    }
+
+    // 3. Bullet Points & Checklist matching
+    const bulletSummary = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?KEY SUMMARY:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?STATUTORY PROVISIONS(?:\s*\(BULLETS\))?:?|$)/i);
+    const bulletStatutes = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?STATUTORY PROVISIONS(?:\s*\(BULLETS\))?:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?LANDMARK PRECEDENTS(?:\s*\(BULLETS\))?:?|$)/i);
+    const bulletPrecedents = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?LANDMARK PRECEDENTS(?:\s*\(BULLETS\))?:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?ACTIONABLE CHECKLIST:?|$)/i);
+    const bulletChecklist = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?ACTIONABLE CHECKLIST:?(?:\*\*)?\s*([\s\S]*?)$/i);
+
+    if (bulletSummary || (requestedMode === 'bullet_points' && (bulletStatutes || bulletChecklist))) {
+        const sections = [];
+        if (bulletSummary && bulletSummary[1].trim()) {
+            sections.push({ id: 'summary', title: 'Key Summary', icon: 'file', badge: 'Quick Take', content: bulletSummary[1].trim() });
+        }
+        if (bulletStatutes && bulletStatutes[1].trim()) {
+            sections.push({ id: 'statutes', title: 'Statutory Provisions', icon: 'scale', badge: 'Applicable Laws', content: bulletStatutes[1].trim() });
+        }
+        if (bulletPrecedents && bulletPrecedents[1].trim()) {
+            sections.push({ id: 'precedents', title: 'Landmark Precedents', icon: 'book', badge: 'Key Rulings', content: bulletPrecedents[1].trim() });
+        }
+        if (bulletChecklist && bulletChecklist[1].trim()) {
+            sections.push({ id: 'checklist', title: 'Actionable Checklist & Timelines', icon: 'checklist', badge: 'Action Steps', content: bulletChecklist[1].trim() });
+        }
+        if (sections.length > 0) {
+            return { mode: 'bullet_points', title: 'Bullet Points & Actionable Checklist', sections, disclaimer, raw: rawAnswer };
+        }
+    }
+
+    // 4. Standard Direct Answer matching
+    const directMatch = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?DIRECT ANSWER:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?LEGAL BASIS:?|$)/i);
+    const legalMatch = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?LEGAL BASIS:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?BINDING PRECEDENTS:?|$)/i);
+    const precMatch = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?BINDING PRECEDENTS:?(?:\*\*)?\s*([\s\S]*?)(?=(?:^|\n)(?:#+\s*)?(?:\*\*)?ACTIONABLE INSIGHT:?|$)/i);
+    const insightMatch = mainText.match(/(?:^|\n)(?:#+\s*)?(?:\*\*)?ACTIONABLE INSIGHT:?(?:\*\*)?\s*([\s\S]*?)$/i);
+
+    if (directMatch || legalMatch) {
+        const sections = [];
+        if (directMatch && directMatch[1].trim()) {
+            sections.push({ id: 'direct', title: 'Direct Answer', icon: 'file', badge: 'Legal Opinion', content: directMatch[1].trim() });
+        }
+        if (legalMatch && legalMatch[1].trim()) {
+            sections.push({ id: 'legal', title: 'Statutory Grounds & Legal Basis', icon: 'scale', badge: 'Statutory Basis', content: legalMatch[1].trim() });
+        }
+        if (precMatch && precMatch[1].trim()) {
+            sections.push({ id: 'precedents', title: 'Judicial Precedents & Authorities Cited', icon: 'book', badge: 'Authorities', content: precMatch[1].trim() });
+        }
+        if (insightMatch && insightMatch[1].trim()) {
+            sections.push({ id: 'insight', title: 'Actionable Counsel & Strategic Steps', icon: 'alert', badge: 'Strategy', content: insightMatch[1].trim() });
+        }
+        return { mode: 'standard', title: 'Standard Judicial', sections, disclaimer, raw: rawAnswer };
+    }
+
+    // 5. Custom Guided Structure (parse markdown headers if any exist)
+    const headerRegex = /(?:^|\n)(?:#+\s*|\*\*)([A-Z0-9\s\&\-\/]{3,60})(?:\*\*|:)?\n([\s\S]*?)(?=(?:^|\n)(?:#+\s*|\*\*)[A-Z0-9\s\&\-\/]{3,60}(?:\*\*|:)?\n|$)/gi;
+    const customSections = [];
+    let hMatch;
+    while ((hMatch = headerRegex.exec(mainText)) !== null) {
+        const title = hMatch[1].replace(/[*#]/g, '').trim();
+        const content = hMatch[2].trim();
+        if (title && content && !title.toUpperCase().includes('DISCLAIMER')) {
+            customSections.push({
+                id: 'custom_' + customSections.length,
+                title: title.replace(/^[0-9\.\-\s]+/, ''),
+                icon: 'file',
+                badge: 'Custom Section',
+                content: content,
+            });
+        }
+    }
+
+    if (customSections.length > 0) {
+        return { mode: 'custom', title: 'Custom Guided Structure', sections: customSections, disclaimer, raw: rawAnswer };
+    }
+
+    // Fallback: single clean response card
+    return {
+        mode: requestedMode || 'custom',
+        title: requestedMode === 'standard' ? 'Standard Judicial' : 'Guided Legal Advisory',
+        sections: [
+            { id: 'content', title: 'Legal Advisory', icon: 'file', badge: 'Analysis', content: mainText }
+        ],
+        disclaimer,
+        raw: rawAnswer,
+    };
+};
+
+const renderSectionIcon = (iconType) => {
+    switch (iconType) {
+        case 'scale':
+            return <Scale size={16} />;
+        case 'book':
+            return <BookOpen size={16} />;
+        case 'alert':
+            return <AlertTriangle size={16} />;
+        case 'gavel':
+            return <Gavel size={16} />;
+        case 'help':
+            return <HelpCircle size={16} />;
+        case 'checklist':
+            return <CheckCircle2 size={16} />;
+        default:
+            return <FileText size={16} />;
+    }
+};
+
 const LegalAid = () => {
     const { getAuthHeaders } = useAuth();
 
@@ -256,9 +387,32 @@ const LegalAid = () => {
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [upgradeRequested, setUpgradeRequested] = useState(false);
 
+    // Structure Memory & Custom Guidance State
+    const [structureMode, setStructureMode] = useState('standard');
+    const [structureTitle, setStructureTitle] = useState('Standard Judicial');
+    const [customInstructions, setCustomInstructions] = useState('');
+    const [hasSavedMemory, setHasSavedMemory] = useState(false);
+    const [showGuidanceModal, setShowGuidanceModal] = useState(false);
+    const [rememberGuidance, setRememberGuidance] = useState(true);
+
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const recognitionRef = useRef(null);
+
+    // Load saved memory structure from database on mount
+    useEffect(() => {
+        fetch('/api/legal-aid/memory', { headers: getAuthHeaders() })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data && data.structure_mode) {
+                    setStructureMode(data.structure_mode);
+                    setStructureTitle(data.structure_title || 'Standard Judicial');
+                    setCustomInstructions(data.custom_instructions || '');
+                    setHasSavedMemory(data.structure_mode !== 'standard' || Boolean(data.custom_instructions));
+                }
+            })
+            .catch(err => console.warn('Could not load legal aid memory:', err));
+    }, []);
 
     const downloadLegalAidPDF = async (msg) => {
         setDownloadingPdfId(msg.id);
@@ -298,13 +452,8 @@ const LegalAid = () => {
                     setIsListening(false);
                 };
 
-                recognition.onerror = () => {
-                    setIsListening(false);
-                };
-
-                recognition.onend = () => {
-                    setIsListening(false);
-                };
+                recognition.onerror = () => setIsListening(false);
+                recognition.onend = () => setIsListening(false);
 
                 recognitionRef.current = recognition;
             } catch (e) {
@@ -319,9 +468,10 @@ const LegalAid = () => {
 
     const toggleListening = () => {
         if (!recognitionRef.current) {
-            alert('Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.');
+            alert("Voice dictation is not supported on this browser.");
             return;
         }
+
         if (isListening) {
             recognitionRef.current.stop();
             setIsListening(false);
@@ -330,63 +480,141 @@ const LegalAid = () => {
                 recognitionRef.current.start();
                 setIsListening(true);
             } catch (err) {
-                console.error('Speech recognition error:', err);
-                setIsListening(false);
+                console.error("Mic start failed", err);
             }
         }
     };
 
-    const handleCopy = (id, text) => {
-        navigator.clipboard.writeText(text);
-        setCopiedId(id);
+    const handleCopy = (msgId, rawText) => {
+        navigator.clipboard.writeText(rawText);
+        setCopiedId(msgId);
         setTimeout(() => setCopiedId(null), 2000);
     };
 
     const handleClearChat = () => {
-        if (messages.length === 0) return;
-        if (window.confirm("Start a new consultation? This will clear current conversation.")) {
-            setMessages([]);
-            setInputValue('');
+        setMessages([]);
+        setInputValue('');
+    };
+
+    const applyPreset = async (mode, title) => {
+        setStructureMode(mode);
+        setStructureTitle(title);
+        setCustomInstructions('');
+
+        if (hasSavedMemory || rememberGuidance) {
+            try {
+                await fetch('/api/legal-aid/memory', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders(),
+                    },
+                    body: JSON.stringify({
+                        structure_mode: mode,
+                        structure_title: title,
+                        custom_instructions: null,
+                    }),
+                });
+                setHasSavedMemory(mode !== 'standard');
+            } catch (e) {
+                console.error('Failed to save preset memory:', e);
+            }
         }
     };
 
-    const handleSend = async (queryText) => {
-        const text = queryText || inputValue;
-        if (!text.trim() || isThinking) return;
+    const handleSaveGuidance = async () => {
+        setShowGuidanceModal(false);
+        if (rememberGuidance) {
+            try {
+                const res = await fetch('/api/legal-aid/memory', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders(),
+                    },
+                    body: JSON.stringify({
+                        structure_mode: structureMode,
+                        structure_title: structureTitle,
+                        custom_instructions: customInstructions || null,
+                    }),
+                });
+                if (res.ok) {
+                    setHasSavedMemory(structureMode !== 'standard' || Boolean(customInstructions));
+                }
+            } catch (e) {
+                console.error('Failed to save memory:', e);
+            }
+        }
+    };
 
-        const userMsg = { id: 'msg_' + Date.now(), type: 'user', text };
+    const handleResetMemory = async () => {
+        try {
+            await fetch('/api/legal-aid/memory', {
+                method: 'DELETE',
+                headers: getAuthHeaders(),
+            });
+        } catch (e) {
+            console.error('Failed to reset memory:', e);
+        }
+        setStructureMode('standard');
+        setStructureTitle('Standard Judicial');
+        setCustomInstructions('');
+        setHasSavedMemory(false);
+    };
+
+    const handleSendMessage = async (textToSend) => {
+        const text = (textToSend || inputValue).trim();
+        if (!text || isThinking) return;
+
+        const userMsg = {
+            id: 'user_' + Date.now(),
+            type: 'user',
+            text: text,
+        };
+
         setMessages(prev => [...prev, userMsg]);
         setInputValue('');
         setIsThinking(true);
         setLoadingStage(0);
 
-        const stageTimer1 = setTimeout(() => setLoadingStage(1), 1200);
-        const stageTimer2 = setTimeout(() => setLoadingStage(2), 2500);
+        const stageInterval = setInterval(() => {
+            setLoadingStage(prev => (prev < 2 ? prev + 1 : prev));
+        }, 1200);
 
         try {
             const response = await fetch('/api/legal-aid/ask', {
                 method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ question: text, n_results: 3 }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders(),
+                },
+                body: JSON.stringify({
+                    question: text,
+                    n_results: 3,
+                    structure_mode: structureMode,
+                    custom_instructions: customInstructions || null,
+                    save_to_memory: false,
+                }),
             });
 
-            clearTimeout(stageTimer1);
-            clearTimeout(stageTimer2);
+            clearInterval(stageInterval);
 
             if (!response.ok) {
-                let msg = 'Request failed';
-                try { const e = await response.json(); msg = e.detail || msg; } catch { msg = `Server error (${response.status})`; }
-                throw new Error(msg);
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.detail || `Server error (${response.status})`);
             }
 
             const data = await response.json();
-            const parsed = parseAnswer(data.answer);
+            const parsed = parseLegalAidAnswer(data.answer, data.applied_structure_mode || structureMode);
 
             const aiMsg = {
                 id: 'ai_' + Date.now(),
                 type: 'structured_ai',
                 question: text,
                 raw: data.answer,
+                applied_structure_mode: data.applied_structure_mode || structureMode,
+                applied_structure_title: data.applied_structure_title || structureTitle,
+                memory_active: data.memory_active,
                 requires_upgrade: Boolean(
                     data.requires_upgrade ||
                     data.answer?.includes('Advocate Pro') ||
@@ -397,12 +625,8 @@ const LegalAid = () => {
                     data.answer?.includes('upgrade to the LexSetu')
                 ),
                 upgrade_tier: data.upgrade_tier || 'LexSetu Advocate Pro / Criminal Defense',
+                parsed: parsed,
                 data: {
-                    answer: parsed.directAnswer,
-                    legal_basis: parsed.legalBasis || 'Refer to relevant Indian statutes and case law.',
-                    references: parsed.precedents ? parsed.precedents.split('\n').map(r => r.trim()).filter(Boolean) : [],
-                    insight: parsed.insight || '',
-                    disclaimer: parsed.disclaimer,
                     tags: data.sources?.map(s => s.category).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3) || [],
                     sources: data.sources || [],
                 }
@@ -410,6 +634,7 @@ const LegalAid = () => {
 
             setMessages(prev => [...prev, aiMsg]);
         } catch (err) {
+            clearInterval(stageInterval);
             const errorMsg = {
                 id: 'err_' + Date.now(),
                 type: 'error',
@@ -455,6 +680,68 @@ const LegalAid = () => {
                 </div>
             </header>
 
+            {/* Structure Memory & Format Customization Bar */}
+            <div className="structure-memory-bar">
+                <div className="memory-info-chip">
+                    <Zap size={14} className="text-copper" />
+                    <span className="memory-label">Structure Mode:</span>
+                    <span className="memory-value">{structureTitle}</span>
+                    {hasSavedMemory && (
+                        <span className="memory-saved-badge" title="This layout is saved in your persistent memory">
+                            <BookmarkCheck size={12} /> Saved in Memory
+                        </span>
+                    )}
+                </div>
+
+                <div className="structure-quick-presets">
+                    <button
+                        type="button"
+                        className={`preset-pill ${structureMode === 'standard' && !customInstructions ? 'active' : ''}`}
+                        onClick={() => applyPreset('standard', 'Standard Judicial')}
+                    >
+                        <Scale size={13} /> Standard
+                    </button>
+                    <button
+                        type="button"
+                        className={`preset-pill ${structureMode === 'executive_brief' ? 'active' : ''}`}
+                        onClick={() => applyPreset('executive_brief', 'Executive Legal Brief')}
+                    >
+                        <Briefcase size={13} /> Executive
+                    </button>
+                    <button
+                        type="button"
+                        className={`preset-pill ${structureMode === 'irac' ? 'active' : ''}`}
+                        onClick={() => applyPreset('irac', 'IRAC Legal Framework')}
+                    >
+                        <Gavel size={13} /> IRAC
+                    </button>
+                    <button
+                        type="button"
+                        className={`preset-pill ${structureMode === 'bullet_points' ? 'active' : ''}`}
+                        onClick={() => applyPreset('bullet_points', 'Bullet Points & Checklist')}
+                    >
+                        <ListChecks size={13} /> Bullets
+                    </button>
+                    <button
+                        type="button"
+                        className={`preset-pill custom-btn ${structureMode === 'custom' || customInstructions ? 'active' : ''}`}
+                        onClick={() => setShowGuidanceModal(true)}
+                    >
+                        <SlidersHorizontal size={13} /> Guide Structure
+                    </button>
+                    {hasSavedMemory && (
+                        <button
+                            type="button"
+                            className="preset-reset-btn"
+                            onClick={handleResetMemory}
+                            title="Reset memory to Standard Judicial default"
+                        >
+                            <RefreshCw size={12} /> Reset
+                        </button>
+                    )}
+                </div>
+            </div>
+
             {/* Compact Informational Notice */}
             <div className="legal-notice-banner">
                 <ShieldAlert size={16} className="notice-icon" />
@@ -468,35 +755,41 @@ const LegalAid = () => {
                 {messages.length === 0 ? (
                     <div className="legal-aid-empty-state">
                         <div className="empty-state-badge">
-                            <Sparkles size={20} />
-                            <span>AI Legal Research Suite</span>
+                            <Sparkles size={18} />
+                            <span>Statute-Grounded Legal Q&A</span>
                         </div>
-                        <h3>How can LexSetu assist your legal research today?</h3>
-                        <p className="empty-state-subtitle">
-                            Ask procedural questions, verify criminal provisions, clarify tenancy issues, or explore remedies under Indian law.
-                        </p>
+                        <h3>How can LexSetu assist your legal inquiry today?</h3>
+                        <p>Ask about substantive penal liabilities, civil procedures, contract enforceability, or statutory bail.</p>
+
+                        <div className="guidance-hint-banner">
+                            <SlidersHorizontal size={15} />
+                            <span><strong>Adaptive Structure:</strong> You can guide the AI to answer in any particular format (bullets, tables, IRAC, or custom). Select a preset above or click <em>Guide Structure</em> to save it into memory.</span>
+                        </div>
 
                         <div className="suggestions-grid">
-                            {SUGGESTIONS.map((sug, idx) => (
-                                <button
-                                    key={idx}
-                                    type="button"
-                                    className="suggestion-card"
-                                    onClick={() => handleSend(sug.text)}
-                                >
-                                    <div className="suggestion-card-header">
-                                        <sug.icon size={18} className="suggestion-icon" />
-                                        <span className="suggestion-category">{sug.category}</span>
-                                    </div>
-                                    <p className="suggestion-text">{sug.text}</p>
-                                </button>
-                            ))}
+                            {SUGGESTIONS.map((item, idx) => {
+                                const Icon = item.icon;
+                                return (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        className="suggestion-card"
+                                        onClick={() => handleSendMessage(item.text)}
+                                    >
+                                        <div className="suggestion-card-header">
+                                            <Icon size={16} className="suggestion-icon" />
+                                            <span className="suggestion-category">{item.category}</span>
+                                        </div>
+                                        <p className="suggestion-text">{item.text}</p>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 ) : (
-                    <div className="messages-container">
+                    <div className="conversation-flow">
                         {messages.map((msg) => (
-                            <div key={msg.id} className={`chat-message-row ${msg.type === 'user' ? 'user-row' : 'ai-row'}`}>
+                            <div key={msg.id} className="message-wrapper">
                                 {msg.type === 'user' && (
                                     <div className="user-bubble">
                                         <p>{msg.text}</p>
@@ -514,179 +807,171 @@ const LegalAid = () => {
                                 )}
 
                                 {msg.type === 'structured_ai' && (
-                                    <div className="ai-response-card">
-                                        <div className="card-header-bar">
-                                            <div className="card-header-title">
-                                                <Scale size={18} className="card-header-icon" />
-                                                <span>LexSetu Legal Analysis</span>
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                <button
-                                                    type="button"
-                                                    className="copy-card-btn"
-                                                    onClick={() => downloadLegalAidPDF(msg)}
-                                                    disabled={downloadingPdfId === msg.id}
-                                                    title="Download formal Legal Opinion as court-grade PDF"
-                                                    style={{ background: '#63120e', color: '#f9eedc', borderColor: '#8c3a2a' }}
-                                                >
-                                                    {downloadingPdfId === msg.id ? (
-                                                        <>
-                                                            <Loader2 size={13} className="spin" />
-                                                            <span>Generating PDF...</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <FileDown size={13} />
-                                                            <span>Download PDF</span>
-                                                        </>
-                                                    )}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="copy-card-btn"
-                                                    onClick={() => handleCopy(msg.id, msg.raw)}
-                                                    title="Copy complete analysis"
-                                                >
-                                                    {copiedId === msg.id ? (
-                                                        <>
-                                                            <Check size={14} className="text-green-600" />
-                                                            <span>Copied!</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Copy size={14} />
-                                                            <span>Copy</span>
-                                                        </>
-                                                    )}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="card-sections-body">
-                                            {/* Direct Answer */}
-                                            {msg.data.answer && (
-                                                <div className="response-section direct-answer-section">
-                                                    <div className="section-heading">
-                                                        <FileText size={16} />
-                                                        <h4>Direct Answer</h4>
-                                                    </div>
-                                                    <div className="section-content text-rich">
-                                                        {renderFormattedText(msg.data.answer)}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Legal Basis */}
-                                            {msg.data.legal_basis && (
-                                                <div className="response-section legal-basis-section">
-                                                    <div className="section-heading">
-                                                        <Scale size={16} />
-                                                        <h4>Statutory Grounds & Legal Basis</h4>
-                                                    </div>
-                                                    <div className="section-content text-rich">
-                                                        {renderFormattedText(msg.data.legal_basis)}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Precedents Cited */}
-                                            {msg.data.references && msg.data.references.length > 0 && (
-                                                <div className="response-section precedents-section">
-                                                    <div className="section-heading">
-                                                        <BookOpen size={16} />
-                                                        <h4>Judicial Precedents & Authorities Cited</h4>
-                                                    </div>
-                                                    <div className="precedents-list">
-                                                        {msg.data.references.map((ref, i) => {
-                                                            const cleanRef = ref
-                                                                .replace(/^(\d+[\.\)]\s*|[-•*]\s*)+/, '')
-                                                                .replace(/\s*---+$/, '')
-                                                                .trim();
-                                                            if (!cleanRef || cleanRef.toLowerCase().includes('no direct precedent required')) {
-                                                                return null;
-                                                            }
-                                                            return (
-                                                                <div key={i} className="precedent-item">
-                                                                    <span className="precedent-index-badge">{i + 1}</span>
-                                                                    <div className="precedent-content">
-                                                                        {formatRichInline(cleanRef)}
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Actionable Insight */}
-                                            {msg.data.insight && (
-                                                <div className="response-section insight-section">
-                                                    <div className="section-heading">
-                                                        <AlertTriangle size={16} />
-                                                        <h4>Actionable Counsel & Strategic Steps</h4>
-                                                    </div>
-                                                    <div className="section-content text-rich">
-                                                        {renderFormattedText(msg.data.insight)}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Professional Upgrade Plan Advisory Banner */}
-                                            {msg.requires_upgrade && (
-                                                <div className="upgrade-advisory-card animate-fade-in">
-                                                    <div className="upgrade-advisory-header">
-                                                        <div className="upgrade-crown-icon">
-                                                            <Crown size={20} />
-                                                        </div>
-                                                        <div className="upgrade-header-text">
-                                                            <h5>Plan Upgrade Required</h5>
-                                                            <p>Your current plan does not allow answering this inquiry. Inquiries regarding illicit substances, sensitive ethical conduct, or active penal liabilities require the LexSetu Advocate Pro tier.</p>
-                                                        </div>
-                                                        <span className="upgrade-plan-pill">{msg.upgrade_tier || 'Advocate Pro'}</span>
-                                                    </div>
-
-                                                    <div className="upgrade-benefits-grid">
-                                                        <div className="upgrade-benefit-item">
-                                                            <Lock size={14} className="benefit-icon-gold" />
-                                                            <span><strong>Privileged Legal Advisory:</strong> Attorney-client privilege under Section 126 Evidence Act / Section 132 BSA.</span>
-                                                        </div>
-                                                        <div className="upgrade-benefit-item">
-                                                            <Gavel size={14} className="benefit-icon-gold" />
-                                                            <span><strong>Empanelled Counsel Connect:</strong> Direct 1-on-1 strategy session with practicing High Court advocates.</span>
-                                                        </div>
-                                                        <div className="upgrade-benefit-item">
-                                                            <ShieldCheck size={14} className="benefit-icon-gold" />
-                                                            <span><strong>Forensic Case & Trial Review:</strong> Customized defense analysis and statutory limitation audit.</span>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="upgrade-card-actions">
-                                                        <button className="primary-btn upgrade-cta-btn" onClick={() => setShowUpgradeModal(true)}>
-                                                            <Crown size={15} /> Upgrade to Advocate Pro
-                                                        </button>
-                                                        <button className="outline btn-sm upgrade-consult-btn" onClick={() => setShowUpgradeModal(true)}>
-                                                            Schedule Privileged Consultation <ArrowRight size={14} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Card Footer with Tags */}
-                                        <div className="card-footer-bar">
-                                            <div className="card-tags-list">
-                                                {msg.data.tags.map((tag, i) => (
-                                                    <span key={i} className="statute-tag">
-                                                        {formatCategoryTag(tag)}
+                                    <div className="ai-result-container">
+                                        <div className="ai-response-card">
+                                            {/* Card Top Bar with Structure Badge */}
+                                            <div className="card-header-bar">
+                                                <div className="card-header-title">
+                                                    <Scale size={18} className="card-header-icon" />
+                                                    <span>LexSetu Legal Analysis</span>
+                                                    <span className="card-structure-badge">
+                                                        {msg.applied_structure_title || 'Standard Judicial'}
                                                     </span>
-                                                ))}
+                                                    {msg.memory_active && (
+                                                        <span className="card-memory-active-pill" title="Generated using your saved structure memory">
+                                                            <BookmarkCheck size={11} /> Memory Active
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                    <button
+                                                        type="button"
+                                                        className="copy-card-btn"
+                                                        onClick={() => downloadLegalAidPDF(msg)}
+                                                        disabled={downloadingPdfId === msg.id}
+                                                        title="Download formal Legal Opinion as court-grade PDF"
+                                                        style={{ background: '#63120e', color: '#f9eedc', borderColor: '#8c3a2a' }}
+                                                    >
+                                                        {downloadingPdfId === msg.id ? (
+                                                            <>
+                                                                <Loader2 size={13} className="spin" />
+                                                                <span>Generating PDF...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <FileDown size={13} />
+                                                                <span>Download PDF</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="copy-card-btn"
+                                                        onClick={() => handleCopy(msg.id, msg.raw)}
+                                                        title="Copy complete analysis"
+                                                    >
+                                                        {copiedId === msg.id ? (
+                                                            <>
+                                                                <Check size={14} className="text-green-600" />
+                                                                <span>Copied!</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Copy size={14} />
+                                                                <span>Copy</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
                                             </div>
-                                            {msg.data.disclaimer && (
-                                                <p className="footer-disclaimer-note">
-                                                    {msg.data.disclaimer}
-                                                </p>
-                                            )}
+
+                                            {/* Dynamic Section Rendering - Zero Mismatch */}
+                                            <div className="card-sections-body">
+                                                {msg.parsed && msg.parsed.sections && msg.parsed.sections.length > 0 ? (
+                                                    msg.parsed.sections.map((sec) => (
+                                                        <div key={sec.id} className={`response-section section-${sec.id}`}>
+                                                            <div className="section-heading">
+                                                                {renderSectionIcon(sec.icon)}
+                                                                <h4>{sec.title}</h4>
+                                                                {sec.badge && <span className="section-type-badge">{sec.badge}</span>}
+                                                            </div>
+                                                            <div className="section-content text-rich">
+                                                                {renderFormattedText(sec.content)}
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="response-section direct-answer-section">
+                                                        <div className="section-heading">
+                                                            <FileText size={16} />
+                                                            <h4>Legal Opinion</h4>
+                                                        </div>
+                                                        <div className="section-content text-rich">
+                                                            {renderFormattedText(msg.raw)}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Professional Upgrade Plan Advisory Banner (When Blocked) */}
+                                                {msg.requires_upgrade && (
+                                                    <div className="upgrade-advisory-card animate-fade-in">
+                                                        <div className="upgrade-advisory-header">
+                                                            <div className="upgrade-crown-icon">
+                                                                <Crown size={20} />
+                                                            </div>
+                                                            <div className="upgrade-header-text">
+                                                                <h5>Plan Upgrade Required</h5>
+                                                                <p>Your current plan does not allow answering this inquiry. Inquiries regarding illicit substances, sensitive ethical conduct, or active penal liabilities require the LexSetu Advocate Pro tier.</p>
+                                                            </div>
+                                                            <span className="upgrade-plan-pill">{msg.upgrade_tier || 'Advocate Pro'}</span>
+                                                        </div>
+
+                                                        <div className="upgrade-benefits-grid">
+                                                            <div className="upgrade-benefit-item">
+                                                                <Lock size={14} className="benefit-icon-gold" />
+                                                                <span><strong>Privileged Legal Advisory:</strong> Attorney-client privilege under Section 126 Evidence Act / Section 132 BSA.</span>
+                                                            </div>
+                                                            <div className="upgrade-benefit-item">
+                                                                <Gavel size={14} className="benefit-icon-gold" />
+                                                                <span><strong>Empanelled Counsel Connect:</strong> Direct 1-on-1 strategy session with practicing High Court advocates.</span>
+                                                            </div>
+                                                            <div className="upgrade-benefit-item">
+                                                                <ShieldCheck size={14} className="benefit-icon-gold" />
+                                                                <span><strong>Forensic Case & Trial Review:</strong> Customized defense analysis and statutory limitation audit.</span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="upgrade-card-actions">
+                                                            <button className="primary-btn upgrade-cta-btn" onClick={() => setShowUpgradeModal(true)}>
+                                                                <Crown size={15} /> Upgrade to Advocate Pro
+                                                            </button>
+                                                            <button className="outline btn-sm upgrade-consult-btn" onClick={() => setShowUpgradeModal(true)}>
+                                                                Schedule Privileged Consultation <ArrowRight size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Card Footer with Tags and Disclaimer */}
+                                            <div className="card-footer-bar">
+                                                <div className="card-tags-list">
+                                                    {msg.data.tags.map((tag, i) => (
+                                                        <span key={i} className="statute-tag">
+                                                            {formatCategoryTag(tag)}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                {msg.parsed?.disclaimer && (
+                                                    <p className="footer-disclaimer-note">
+                                                        {msg.parsed.disclaimer}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
+
+                                        {/* Upgrade to Pro for better reasoning and features - Presented after EVERY result */}
+                                        {!msg.requires_upgrade && (
+                                            <div className="pro-reasoning-callout animate-fade-in">
+                                                <div className="pro-callout-left">
+                                                    <div className="pro-crown-badge">
+                                                        <Crown size={16} />
+                                                        <span>LEXSETU PRO</span>
+                                                    </div>
+                                                    <div className="pro-callout-text">
+                                                        <h5>Upgrade to Pro for Deeper Multi-Step Legal Reasoning</h5>
+                                                        <p>Unlock Groq extended reasoning chains, verbatim Supreme Court precedent ratios, and instant court pleading drafts.</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="primary-btn pro-callout-cta"
+                                                    onClick={() => setShowUpgradeModal(true)}
+                                                >
+                                                    <Sparkles size={14} /> Upgrade to Pro
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -705,7 +990,7 @@ const LegalAid = () => {
                                     {loadingStage === 1 && "Cross-referencing statutory database (IPC, CrPC, CPC)..."}
                                     {loadingStage === 2 && "Synthesizing binding precedents and actionable insight..."}
                                 </strong>
-                                <span className="thinking-subtext">LexSetu Neural Engine active</span>
+                                <span className="thinking-subtext">LexSetu Neural Engine active • Applying {structureTitle}</span>
                             </div>
                         </div>
                     </div>
@@ -718,51 +1003,40 @@ const LegalAid = () => {
             <div className="legal-aid-input-area">
                 <div className="input-box-wrapper">
                     <Search size={20} className="input-leading-icon" />
-                    <input
+                    <textarea
                         ref={inputRef}
-                        type="text"
-                        className="legal-query-input"
-                        placeholder="Ask about bail, property partition, cheques, contracts, consumer redressal..."
+                        className="legal-aid-textarea"
+                        placeholder="Ask any legal question (e.g. 'Can anticipatory bail be granted in non-bailable offences?') or guide format..."
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
-                                handleSend();
+                                handleSendMessage();
                             }
                         }}
+                        rows={1}
                         disabled={isThinking}
                     />
-
-                    {inputValue.trim() && (
+                    <div className="input-actions-cluster">
                         <button
                             type="button"
-                            className="input-clear-btn"
-                            onClick={() => setInputValue('')}
-                            title="Clear input"
+                            className={`mic-button ${isListening ? 'listening' : ''}`}
+                            onClick={toggleListening}
+                            title={isListening ? "Listening... click to stop" : "Voice dictation (Indian English)"}
                         >
-                            <X size={16} />
+                            {isListening ? <MicOff size={18} /> : <Mic size={18} />}
                         </button>
-                    )}
-
-                    <button
-                        type="button"
-                        className={`input-voice-btn ${isListening ? 'listening' : ''}`}
-                        onClick={toggleListening}
-                        title={isListening ? "Listening... click to stop" : "Voice dictation (English / Hindi)"}
-                    >
-                        {isListening ? <MicOff size={18} /> : <Mic size={18} />}
-                    </button>
-
-                    <button
-                        type="button"
-                        className={`input-submit-btn ${inputValue.trim() ? 'can-send' : ''}`}
-                        onClick={() => handleSend()}
-                        disabled={!inputValue.trim() || isThinking}
-                        title="Submit query (Enter)"
-                    >
-                        <Send size={18} />
-                    </button>
+                        <button
+                            type="button"
+                            className="send-button"
+                            onClick={() => handleSendMessage()}
+                            disabled={!inputValue.trim() || isThinking}
+                            title="Submit legal inquiry"
+                        >
+                            {isThinking ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="input-footer-note">
@@ -770,6 +1044,109 @@ const LegalAid = () => {
                     <span>Confidential queries: Personal identifying information is not required. LexSetu complies with Indian privacy norms.</span>
                 </div>
             </div>
+
+            {/* Guide AI Structure & Memory Modal */}
+            {showGuidanceModal && (
+                <div className="legal-aid-modal-backdrop" onClick={() => setShowGuidanceModal(false)}>
+                    <div className="guidance-modal-card animate-fade-in" onClick={e => e.stopPropagation()}>
+                        <button className="modal-close-btn" onClick={() => setShowGuidanceModal(false)}><X size={18} /></button>
+                        <div className="guidance-modal-header">
+                            <div className="modal-icon-glow"><SlidersHorizontal size={24} /></div>
+                            <h3>Guide AI Output Structure & Memory</h3>
+                            <p>Customize how LexSetu AI presents answers so it matches your preferred layout without mismatch.</p>
+                        </div>
+
+                        <div className="guidance-modal-body">
+                            <label className="guidance-input-label">Select a Structure Preset:</label>
+                            
+                            <div className="guidance-presets-grid">
+                                <button
+                                    type="button"
+                                    className={`guidance-preset-btn ${structureMode === 'standard' && !customInstructions ? 'selected' : ''}`}
+                                    onClick={() => {
+                                        setStructureMode('standard');
+                                        setStructureTitle('Standard Judicial');
+                                        setCustomInstructions('');
+                                    }}
+                                >
+                                    <strong>🏛️ Standard Judicial</strong>
+                                    <span>Direct Answer, Statutory Grounds, Precedents, Actionable Insight</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`guidance-preset-btn ${structureMode === 'executive_brief' ? 'selected' : ''}`}
+                                    onClick={() => {
+                                        setStructureMode('executive_brief');
+                                        setStructureTitle('Executive Legal Brief');
+                                        setCustomInstructions('');
+                                    }}
+                                >
+                                    <strong>📋 Executive Brief</strong>
+                                    <span>Executive Summary, Statutory Position, Precedents, Strategic Roadmap</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`guidance-preset-btn ${structureMode === 'irac' ? 'selected' : ''}`}
+                                    onClick={() => {
+                                        setStructureMode('irac');
+                                        setStructureTitle('IRAC Legal Framework');
+                                        setCustomInstructions('');
+                                    }}
+                                >
+                                    <strong>⚖️ IRAC Methodology</strong>
+                                    <span>Issue, Governing Rule, Factual Application, Legal Conclusion</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`guidance-preset-btn ${structureMode === 'bullet_points' ? 'selected' : ''}`}
+                                    onClick={() => {
+                                        setStructureMode('bullet_points');
+                                        setStructureTitle('Actionable Bullet Points');
+                                        setCustomInstructions('');
+                                    }}
+                                >
+                                    <strong>📝 Bullet & Checklist</strong>
+                                    <span>Key Summary, Statutory Provisions bullets, Actionable Checklist</span>
+                                </button>
+                            </div>
+
+                            <div className="custom-guidance-field">
+                                <label>Or write custom structural instructions for the AI:</label>
+                                <textarea
+                                    rows={3}
+                                    value={customInstructions}
+                                    onChange={(e) => {
+                                        setCustomInstructions(e.target.value);
+                                        if (e.target.value.trim()) {
+                                            setStructureMode('custom');
+                                            setStructureTitle('Custom Guided Structure');
+                                        }
+                                    }}
+                                    placeholder="e.g. 'Format in 3 numbered sections: 1. Legal Position, 2. Strategy Table, 3. Urgent Deadlines. Keep it under 250 words.'"
+                                />
+                            </div>
+
+                            <div className="memory-toggle-row">
+                                <label className="memory-checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={rememberGuidance}
+                                        onChange={(e) => setRememberGuidance(e.target.checked)}
+                                    />
+                                    <span>💾 <strong>Save this structure in memory</strong> for all future AI Legal Aid answers</span>
+                                </label>
+                            </div>
+
+                            <div className="modal-action-row">
+                                <button type="button" className="outline" onClick={() => setShowGuidanceModal(false)}>Cancel</button>
+                                <button type="button" className="primary-btn cta-upgrade-now" onClick={handleSaveGuidance}>
+                                    Apply & Save Structure
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Professional Upgrade to Pro Modal */}
             {showUpgradeModal && (
@@ -779,19 +1156,23 @@ const LegalAid = () => {
                         <div className="upgrade-modal-header">
                             <div className="modal-crown-glow"><Crown size={28} /></div>
                             <h3>LexSetu Advocate Pro & Enterprise</h3>
-                            <p>Privileged Legal Advisory, High-Stakes Defense & Direct Empanelled Counsel</p>
+                            <p>High-Compute Reasoning, Full Landmark Precedents & Direct Empanelled Counsel</p>
                         </div>
 
                         {upgradeRequested ? (
                             <div className="upgrade-success-state animate-fade-in">
                                 <CheckCircle2 size={40} className="text-success-gold" />
-                                <h4>Consultation Request Received</h4>
-                                <p>Our senior legal practice coordinator has received your privileged inquiry. We will contact your verified account within 15 minutes.</p>
+                                <h4>Pro Upgrade Request Received</h4>
+                                <p>Our senior legal practice coordinator has received your account inquiry. We will contact your verified account within 15 minutes.</p>
                                 <button className="primary-btn" onClick={() => { setShowUpgradeModal(false); setUpgradeRequested(false); }}>Close</button>
                             </div>
                         ) : (
                             <div className="upgrade-modal-body">
                                 <div className="plan-comparison-box">
+                                    <div className="plan-feature-row">
+                                        <span className="feature-name">Deep Legal Reasoning Models</span>
+                                        <span className="feature-val included">Groq gpt-oss-120b Chain-of-Thought</span>
+                                    </div>
                                     <div className="plan-feature-row">
                                         <span className="feature-name">Attorney-Client Privilege Protection</span>
                                         <span className="feature-val included">Sec. 126 IEA / Sec. 132 BSA Protected</span>
@@ -805,8 +1186,8 @@ const LegalAid = () => {
                                         <span className="feature-val included">Custom Trial Briefs & Precedents</span>
                                     </div>
                                     <div className="plan-feature-row">
-                                        <span className="feature-name">Turnaround SLA</span>
-                                        <span className="feature-val included">Priority 1-Hour SLA</span>
+                                        <span className="feature-name">Dedicated GPU Compute</span>
+                                        <span className="feature-val included">Zero-Queue Priority SLA</span>
                                     </div>
                                 </div>
 

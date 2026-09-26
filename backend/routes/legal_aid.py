@@ -4,8 +4,11 @@ from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
-from models.database import get_db, User, QueryLog
-from models.schemas import LegalAidRequest, LegalAidResponse, SearchSource
+from models.database import get_db, User, QueryLog, LegalAidMemory
+from models.schemas import (
+    LegalAidRequest, LegalAidResponse, SearchSource,
+    LegalAidMemoryRequest, LegalAidMemoryResponse
+)
 from services.rag import search_drafts
 from services.llm import call_llm
 from utils.auth import get_current_user, get_optional_current_user
@@ -131,6 +134,188 @@ def is_unlawful_query(question: str) -> bool:
     return any(re.search(pat, q) for pat in ILLEGAL_FACILITATION_PATTERNS)
 
 
+STRUCTURE_TITLES = {
+    "standard": "Standard Judicial",
+    "executive_brief": "Executive Legal Brief",
+    "irac": "IRAC Framework (Issue, Rule, Application, Conclusion)",
+    "bullet_points": "Actionable Bullet Points & Checklist",
+    "custom": "Custom Guided Structure",
+}
+
+
+def detect_structure_from_query(question: str) -> tuple[Optional[str], Optional[str]]:
+    """
+    Detects if the user explicitly guided the format/structure inside their question text.
+    Returns (detected_mode, custom_instructions).
+    """
+    q_lower = question.lower()
+    if re.search(r"\b(irac|issue\s+rule\s+application)\b", q_lower):
+        return "irac", None
+    if re.search(r"\b(executive\s+brief|executive\s+summary\s+format|brief\s+for\s+board)\b", q_lower):
+        return "executive_brief", None
+    if re.search(r"\b(in\s+bullets?|bullet\s+points?|bulleted|checklist\s+format)\b", q_lower):
+        return "bullet_points", None
+
+    # Check for direct custom guidance like "format as:", "structure as:", "give me in table", "only 3 points"
+    format_guide_match = re.search(
+        r"\b(format\s+(it\s+)?as|structure\s+(it\s+)?as|give\s+(it\s+)?in|present\s+(it\s+)?as|in\s+the\s+form\s+of)\s*[:\-]?\s*([^\.\n]+)",
+        q_lower,
+    )
+    if format_guide_match:
+        guidance = format_guide_match.group(0).strip()
+        return "custom", guidance
+
+    return None, None
+
+
+def build_structure_prompt_instructions(structure_mode: str, custom_instructions: Optional[str]) -> str:
+    """
+    Dynamically generates the structural prompt contract for the LLM based on user preferences or memory.
+    """
+    if structure_mode == "executive_brief":
+        return """You MUST structure your response as an EXECUTIVE LEGAL BRIEF for counsel and leadership:
+EXECUTIVE SUMMARY:
+[2-3 punchy, high-impact sentences stating the core legal holding, commercial/personal impact, and direct answer]
+
+STATUTORY POSITION:
+[Codified provisions under relevant Indian Acts (e.g. BNS, BNSS, CPC, NI Act) with exact section titles]
+
+JUDICIAL PRECEDENTS:
+[Binding landmark Supreme Court and High Court precedents upholding this posture, with citation and ratio]
+
+STRATEGIC RECOMMENDATIONS:
+[Actionable operational steps, mitigation precautions, and statutory limitation deadlines]
+
+DISCLAIMER:
+This is for informational purposes only. Please consult a qualified advocate for formal court representation."""
+
+    elif structure_mode == "irac":
+        return """You MUST structure your response using the formal legal IRAC (Issue, Rule, Application, Conclusion) methodology:
+LEGAL ISSUE:
+[The specific questions of Indian law and controversy presented]
+
+RULE:
+[Governing statutory provisions, codified sections, and established legal tests/ratios in Indian jurisprudence]
+
+APPLICATION:
+[Rigorous legal analysis applying the statutory rules and precedents directly to the factual inquiry]
+
+CONCLUSION:
+[Definitive legal conclusion, remedies available, and procedural next steps]
+
+DISCLAIMER:
+This is for informational purposes only. Please consult a qualified advocate for formal court representation."""
+
+    elif structure_mode == "bullet_points":
+        return """You MUST structure your response cleanly into clear, scannable BULLET POINTS & CHECKLIST:
+KEY SUMMARY:
+[1 concise paragraph summarizing the bottom-line legal answer]
+
+STATUTORY PROVISIONS (BULLETS):
+• [Section and Act name]: [Concise explanation of legal mandate]
+• [Section and Act name]: [Concise explanation of legal mandate]
+
+LANDMARK PRECEDENTS (BULLETS):
+• [Case Name (Year Citation)]: [Core binding holding]
+
+ACTIONABLE CHECKLIST:
+1. [First procedural or documentary step with timeline]
+2. [Second procedural step]
+3. [Third procedural step]
+
+DISCLAIMER:
+This is for informational purposes only. Please consult a qualified advocate for formal court representation."""
+
+    elif structure_mode == "custom" and custom_instructions:
+        return f"""CRITICAL USER GUIDANCE - CUSTOM STRUCTURE REQUESTED:
+The user has specifically guided the AI to format this answer in the following structure:
+"{custom_instructions}"
+
+MANDATORY INSTRUCTIONS:
+- You MUST strictly follow the user's requested structure, headings, and presentation style rather than default templates.
+- Do NOT output "DIRECT ANSWER" or standard rigid headers unless requested by the user.
+- Ensure all legal positions remain rigorously grounded in Indian law, statutes, and citations.
+- Conclude with a brief standard legal disclaimer."""
+
+    else:
+        # Default standard structure
+        return """Always structure your response EXACTLY like this:
+DIRECT ANSWER:
+[Clear, direct explanation. Format key legal terms and act names cleanly without extraneous asterisks or markdown clutter.]
+
+LEGAL BASIS:
+[Relevant sections, statutory acts, and constitutional provisions in Indian law]
+
+BINDING PRECEDENTS:
+[Relevant Supreme Court or High Court landmark citations if applicable, formatted as: Case Name, Citation – Brief principle. Do NOT add unnecessary asterisks or stray symbols, or write "No direct precedent required"]
+
+ACTIONABLE INSIGHT:
+[Practical next steps, procedural precautions, limitation periods, or warnings]
+
+DISCLAIMER:
+This is for informational purposes only. Please consult a qualified advocate for legal advice."""
+
+
+@router.get("/memory", response_model=LegalAidMemoryResponse)
+def get_legal_aid_memory(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Retrieve saved structure and formatting memory for AI Legal Aid."""
+    mem = db.query(LegalAidMemory).filter(LegalAidMemory.user_id == current_user.id).first()
+    if not mem:
+        return LegalAidMemoryResponse(
+            structure_mode="standard",
+            structure_title="Standard Judicial",
+            custom_instructions=None,
+            updated_at=None,
+        )
+    return LegalAidMemoryResponse(
+        structure_mode=mem.structure_mode,
+        structure_title=mem.structure_title or STRUCTURE_TITLES.get(mem.structure_mode, "Custom Guided"),
+        custom_instructions=mem.custom_instructions,
+        updated_at=mem.updated_at,
+    )
+
+
+@router.post("/memory", response_model=LegalAidMemoryResponse)
+def save_legal_aid_memory(
+    req: LegalAidMemoryRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Save or update user's preferred output structure in memory."""
+    mem = db.query(LegalAidMemory).filter(LegalAidMemory.user_id == current_user.id).first()
+    if not mem:
+        mem = LegalAidMemory(user_id=current_user.id)
+        db.add(mem)
+
+    mem.structure_mode = req.structure_mode
+    mem.structure_title = req.structure_title or STRUCTURE_TITLES.get(req.structure_mode, "Custom Guided")
+    mem.custom_instructions = req.custom_instructions
+    db.commit()
+    db.refresh(mem)
+    return LegalAidMemoryResponse(
+        structure_mode=mem.structure_mode,
+        structure_title=mem.structure_title,
+        custom_instructions=mem.custom_instructions,
+        updated_at=mem.updated_at,
+    )
+
+
+@router.delete("/memory")
+def reset_legal_aid_memory(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Reset structure memory back to standard default."""
+    mem = db.query(LegalAidMemory).filter(LegalAidMemory.user_id == current_user.id).first()
+    if mem:
+        db.delete(mem)
+        db.commit()
+    return {"status": "reset", "structure_mode": "standard", "structure_title": "Standard Judicial"}
+
+
 @router.post("/ask", response_model=LegalAidResponse)
 def ask_legal_aid(
     req: LegalAidRequest,
@@ -147,6 +332,9 @@ def ask_legal_aid(
             answer=NON_LEGAL_ANSWER,
             sources=[],
             requires_upgrade=False,
+            applied_structure_mode="standard",
+            applied_structure_title="Standard Judicial",
+            memory_active=False,
         )
 
     # Scope Rule 2: Illicit substances, weed, narcotics, extreme personal penal matters — upgrade plan required
@@ -157,6 +345,9 @@ def ask_legal_aid(
             sources=[],
             requires_upgrade=True,
             upgrade_tier="LexSetu Advocate Pro / Criminal Defense",
+            applied_structure_mode="standard",
+            applied_structure_title="Standard Judicial",
+            memory_active=False,
         )
 
     # Scope Rule 3: Active crime facilitation, bribery, forgery, evasion — upgrade plan required
@@ -167,9 +358,34 @@ def ask_legal_aid(
             sources=[],
             requires_upgrade=True,
             upgrade_tier="LexSetu Advocate Pro / Enterprise",
+            applied_structure_mode="standard",
+            applied_structure_title="Standard Judicial",
+            memory_active=False,
         )
 
     try:
+        # 1. Resolve user formatting memory and structure guidance
+        saved_memory = db.query(LegalAidMemory).filter(LegalAidMemory.user_id == current_user.id).first()
+        detected_mode, detected_guidance = detect_structure_from_query(req.question)
+
+        # Precedence: Explicit Request param > Query detection > Saved memory > Standard default
+        effective_mode = req.structure_mode or detected_mode or (saved_memory.structure_mode if saved_memory else "standard")
+        effective_custom = req.custom_instructions or detected_guidance or (saved_memory.custom_instructions if saved_memory else None)
+
+        # If user asked to save to memory, persist it
+        if req.save_to_memory:
+            if not saved_memory:
+                saved_memory = LegalAidMemory(user_id=current_user.id)
+                db.add(saved_memory)
+            saved_memory.structure_mode = effective_mode
+            saved_memory.structure_title = STRUCTURE_TITLES.get(effective_mode, "Custom Guided")
+            saved_memory.custom_instructions = effective_custom
+            db.commit()
+            db.refresh(saved_memory)
+
+        structure_prompt_contract = build_structure_prompt_instructions(effective_mode, effective_custom)
+        effective_title = STRUCTURE_TITLES.get(effective_mode, "Custom Guided")
+
         results = search_drafts(req.question, n_results=req.n_results)
         kanoon_results = scrape_indian_kanoon(req.question)
 
@@ -185,7 +401,7 @@ def ask_legal_aid(
 
         context = "\n\n---\n\n".join(context_parts) if context_parts else ""
 
-        system_prompt = """You are LexSetu, an authoritative Indian legal aid intelligence assistant.
+        system_prompt = f"""You are LexSetu, an authoritative Indian legal aid intelligence assistant.
 You provide clear, accurate, and actionable legal guidance based on Indian statutory law and jurisprudence.
 
 CORE SCOPE & OPERATING POLICIES:
@@ -205,21 +421,8 @@ Your DIRECT ANSWER must begin with:
 Your ACTIONABLE INSIGHT must explicitly tell the user:
 "Please upgrade your plan to the LexSetu Advocate Pro tier to consult with an empanelled Senior Criminal Defense Advocate under statutory advocate-client privilege."
 
-Always structure your response EXACTLY like this:
-DIRECT ANSWER:
-[Clear, direct explanation. Format key legal terms and act names cleanly without extraneous asterisks or markdown clutter.]
-
-LEGAL BASIS:
-[Relevant sections, statutory acts, and constitutional provisions in Indian law]
-
-BINDING PRECEDENTS:
-[Relevant Supreme Court or High Court landmark citations if applicable, formatted as: Case Name, Citation – Brief principle. Do NOT add unnecessary asterisks or stray symbols, or write "No direct precedent required"]
-
-ACTIONABLE INSIGHT:
-[Practical next steps, procedural precautions, limitation periods, or warnings]
-
-DISCLAIMER:
-This is for informational purposes only. Please consult a qualified advocate for legal advice.
+3. OUTPUT STRUCTURE CONTRACT:
+{structure_prompt_contract}
 
 Formatting Rules:
 - Present legal holdings and statutory citations cleanly using standard legal formatting.
@@ -261,6 +464,10 @@ Formatting Rules:
             ],
             requires_upgrade=requires_upgrade,
             upgrade_tier="LexSetu Advocate Pro / Criminal Defense" if requires_upgrade else None,
+            applied_structure_mode=effective_mode,
+            applied_structure_title=effective_title,
+            memory_active=bool(saved_memory),
+            custom_instructions=effective_custom,
         )
     except HTTPException:
         raise

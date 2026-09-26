@@ -204,6 +204,22 @@ class KeywordSearchRequest(BaseModel):
 class LegalAidRequest(BaseModel):
     question: str
     n_results: Optional[int] = 3
+    structure_mode: Optional[str] = None  # standard | executive_brief | irac | bullet_points | custom
+    custom_instructions: Optional[str] = None
+    save_to_memory: Optional[bool] = False
+
+
+class LegalAidMemoryRequest(BaseModel):
+    structure_mode: str = "standard"  # standard | executive_brief | irac | bullet_points | custom
+    structure_title: Optional[str] = "Standard Judicial"
+    custom_instructions: Optional[str] = None
+
+
+class LegalAidMemoryResponse(BaseModel):
+    structure_mode: str
+    structure_title: str
+    custom_instructions: Optional[str] = None
+    updated_at: Optional[datetime] = None
 
 
 class LegalAidResponse(BaseModel):
@@ -212,6 +228,10 @@ class LegalAidResponse(BaseModel):
     sources: List[SearchSource]
     requires_upgrade: Optional[bool] = False
     upgrade_tier: Optional[str] = None
+    applied_structure_mode: Optional[str] = "standard"
+    applied_structure_title: Optional[str] = "Standard Judicial"
+    memory_active: Optional[bool] = False
+    custom_instructions: Optional[str] = None
 
 
 # ─── Correction Memory & Translation ──────────────────

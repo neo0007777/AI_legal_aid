@@ -1200,3 +1200,408 @@
     line-height: 1.5;
     margin-bottom: 1.25rem;
 }
+
+/* --------------------------------------------------------------------------
+   Structure Memory & Custom Guidance Bar
+   -------------------------------------------------------------------------- */
+.structure-memory-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 1rem;
+    background: rgba(246, 226, 198, 0.55);
+    border-bottom: 1px solid rgba(201, 134, 89, 0.25);
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.memory-info-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.8rem;
+    color: #63120e;
+}
+
+.text-copper {
+    color: #8c3a2a;
+}
+
+.memory-label {
+    font-weight: 500;
+    color: #8c3a2a;
+}
+
+.memory-value {
+    font-weight: 700;
+    color: #63120e;
+}
+
+.memory-saved-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 9999px;
+    background: #ecbf89;
+    color: #63120e;
+    font-size: 0.7rem;
+    font-weight: 700;
+    margin-left: 0.35rem;
+    box-shadow: 0 1px 3px rgba(99, 18, 14, 0.1);
+}
+
+.structure-quick-presets {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.preset-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.65rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(140, 58, 42, 0.25);
+    background: #fdfaf6;
+    color: #63120e;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.preset-pill:hover {
+    background: #f6e2c6;
+    border-color: #8c3a2a;
+}
+
+.preset-pill.active {
+    background: #63120e;
+    color: #f9eedc;
+    border-color: #63120e;
+    box-shadow: 0 2px 6px rgba(99, 18, 14, 0.2);
+}
+
+.preset-pill.custom-btn {
+    border-style: dashed;
+    border-color: #8c3a2a;
+}
+
+.preset-reset-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    border: none;
+    background: transparent;
+    color: #8c3a2a;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    transition: color 0.15s;
+}
+
+.preset-reset-btn:hover {
+    color: #b91c1c;
+}
+
+/* --------------------------------------------------------------------------
+   Card Structure & Memory Badges
+   -------------------------------------------------------------------------- */
+.card-structure-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 9999px;
+    background: rgba(223, 164, 111, 0.25);
+    border: 1px solid #dfa46f;
+    color: #63120e;
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin-left: 0.5rem;
+}
+
+.card-memory-active-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.18rem 0.45rem;
+    border-radius: 9999px;
+    background: #f1d1a6;
+    border: 1px solid #dfa46f;
+    color: #63120e;
+    font-size: 0.7rem;
+    font-weight: 700;
+    margin-left: 0.35rem;
+}
+
+.section-type-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.12rem 0.45rem;
+    border-radius: 6px;
+    background: rgba(140, 58, 42, 0.1);
+    color: #8c3a2a;
+    margin-left: auto;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* Guidance Hint in Empty State */
+.guidance-hint-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    max-width: 650px;
+    margin: 0.75rem auto 1.25rem;
+    padding: 0.65rem 0.95rem;
+    background: rgba(236, 191, 137, 0.35);
+    border: 1px solid #dfa46f;
+    border-radius: 10px;
+    color: #63120e;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    text-align: left;
+}
+
+/* --------------------------------------------------------------------------
+   Pro Reasoning Upgrade Callout (Rendered after EVERY result)
+   -------------------------------------------------------------------------- */
+.ai-result-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    width: 100%;
+}
+
+.pro-reasoning-callout {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    padding: 0.9rem 1.25rem;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(99, 18, 14, 0.04) 0%, rgba(223, 164, 111, 0.18) 100%);
+    border: 1px solid rgba(223, 164, 111, 0.45);
+    box-shadow: 0 2px 8px rgba(99, 18, 14, 0.04);
+}
+
+.pro-callout-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    flex: 1;
+}
+
+.pro-crown-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.65rem;
+    border-radius: 9999px;
+    background: #63120e;
+    color: #f9eedc;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(99, 18, 14, 0.25);
+}
+
+.pro-callout-text h5 {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #63120e;
+}
+
+.pro-callout-text p {
+    margin: 0.25rem 0 0;
+    font-size: 0.8rem;
+    color: #555;
+    line-height: 1.4;
+}
+
+.pro-callout-cta {
+    background: linear-gradient(135deg, #63120e 0%, #8c3a2a 100%) !important;
+    color: #f9eedc !important;
+    border-radius: 9999px !important;
+    padding: 0.55rem 1.15rem !important;
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.4rem !important;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(99, 18, 14, 0.2) !important;
+    transition: transform 0.15s, box-shadow 0.15s !important;
+}
+
+.pro-callout-cta:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 16px rgba(99, 18, 14, 0.3) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Guidance Modal Styling
+   -------------------------------------------------------------------------- */
+.guidance-modal-card {
+    background: #fdfaf6;
+    border: 1px solid #dfa46f;
+    border-radius: 16px;
+    max-width: 620px;
+    width: 90%;
+    padding: 1.75rem;
+    box-shadow: 0 20px 45px rgba(99, 18, 14, 0.25);
+    position: relative;
+}
+
+.guidance-modal-header {
+    text-align: center;
+    margin-bottom: 1.25rem;
+}
+
+.guidance-modal-header .modal-icon-glow {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #f6e2c6;
+    color: #63120e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.75rem;
+    border: 1px solid #dfa46f;
+}
+
+.guidance-modal-header h3 {
+    margin: 0;
+    color: #63120e;
+    font-family: var(--font-heading, 'Playfair Display', serif);
+    font-size: 1.35rem;
+}
+
+.guidance-modal-header p {
+    margin: 0.35rem 0 0;
+    color: #8c3a2a;
+    font-size: 0.85rem;
+}
+
+.guidance-input-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #63120e;
+    margin-bottom: 0.5rem;
+}
+
+.guidance-presets-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+    margin-bottom: 1rem;
+}
+
+.guidance-preset-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.75rem 0.85rem;
+    border-radius: 10px;
+    border: 1px solid rgba(140, 58, 42, 0.25);
+    background: #f9eedc;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.guidance-preset-btn:hover {
+    background: #f6e2c6;
+    border-color: #8c3a2a;
+}
+
+.guidance-preset-btn.selected {
+    background: #63120e;
+    border-color: #63120e;
+    color: #f9eedc;
+    box-shadow: 0 4px 10px rgba(99, 18, 14, 0.25);
+}
+
+.guidance-preset-btn strong {
+    font-size: 0.85rem;
+    margin-bottom: 0.2rem;
+}
+
+.guidance-preset-btn span {
+    font-size: 0.72rem;
+    opacity: 0.85;
+    line-height: 1.3;
+}
+
+.custom-guidance-field label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #63120e;
+    margin-bottom: 0.35rem;
+}
+
+.custom-guidance-field textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #dfa46f;
+    background: #fff;
+    font-size: 0.85rem;
+    color: #333;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.custom-guidance-field textarea:focus {
+    border-color: #63120e;
+    box-shadow: 0 0 0 2px rgba(99, 18, 14, 0.15);
+}
+
+.memory-toggle-row {
+    margin: 0.85rem 0 1.25rem;
+    padding: 0.65rem 0.85rem;
+    background: rgba(241, 209, 166, 0.35);
+    border-radius: 8px;
+    border: 1px dashed #dfa46f;
+}
+
+.memory-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    color: #63120e;
+    cursor: pointer;
+}
+
+.memory-checkbox-label input {
+    cursor: pointer;
+    accent-color: #63120e;
+}
+
+@media (max-width: 768px) {
+    .structure-memory-bar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .pro-reasoning-callout {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .guidance-presets-grid {
+        grid-template-columns: 1fr;
+    }
+}
