@@ -5,7 +5,7 @@ import {
     Mic, MicOff, RotateCcw, X, Shield, Gavel, HelpCircle,
     Crown, Lock, ArrowRight, ShieldCheck, CheckCircle2, FileDown,
     SlidersHorizontal, Bookmark, BookmarkCheck, ListChecks,
-    Briefcase, RefreshCw, Zap
+    Briefcase, RefreshCw, Zap, Loader2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { downloadFileFromBlob, exportPdfFromApi } from '../utils/downloadHelper';
