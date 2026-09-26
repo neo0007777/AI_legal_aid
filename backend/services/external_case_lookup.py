@@ -24,7 +24,7 @@ import requests
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-IK_API_TOKEN = os.getenv("IK_API_TOKEN", "")
+IK_API_TOKEN = (os.getenv("IK_API_TOKEN", "") or os.getenv("INDIAN_KANOON_TOKEN", "")).strip()
 IK_API_BASE  = "https://api.indiankanoon.org"
 
 _CONNECT_TIMEOUT = 5   # seconds

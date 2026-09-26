@@ -144,84 +144,76 @@ def extract_statute_references(text: str) -> List[Dict[str, str]]:
 
 def verify_single_statute(act_id: str, section_number: str) -> Dict[str, Any]:
     """
-    Verifies a single statute section against local SQLite database.
-    Fetches exact title/heading, checks transition mappings (IPC ↔ BNS, CrPC ↔ BNSS),
+    Verifies a single statute section against the official India Code database (PostgreSQL/SQLite).
+    Fetches exact title/heading, checks transition mappings (IPC <-> BNS, CrPC <-> BNSS),
     and determines verified status.
     """
-    conn = _get_db_connection()
-    if not conn:
+    try:
+        from models.database import SessionLocal, Provision, StatuteMapping
+        db = SessionLocal()
+    except Exception as e:
+        logger.error(f"Failed to obtain database session: {e}")
         return {
             "act_id": act_id,
             "section_number": section_number,
             "status": "UNVERIFIED",
             "heading": "",
-            "note": "Database connection unavailable for statute lookup."
+            "note": f"Database unavailable: {e}"
         }
 
-    c = conn.cursor()
     try:
         # 1. Query the section in provisions table
-        row = c.execute(
-            "SELECT heading, raw_text FROM provisions WHERE act_source_id = ? AND provision_number = ?;",
-            (act_id, section_number)
-        ).fetchone()
+        prov = db.query(Provision).filter(
+            Provision.act_source_id == act_id,
+            Provision.provision_number == section_number
+        ).first()
 
-        if row:
-            heading = row["heading"] or ""
-            raw_text = (row["raw_text"] or "")[:250] + ("..." if row["raw_text"] and len(row["raw_text"]) > 250 else "")
+        if prov:
+            heading = prov.heading or ""
+            raw_text = (prov.raw_text or "")[:250] + ("..." if prov.raw_text and len(prov.raw_text) > 250 else "")
             status = "VERIFIED"
 
             # 2. Query transition mappings for corresponding new/old law
-            mapping_row = c.execute(
-                """
-                SELECT to_act, to_provision, to_heading 
-                FROM statute_mappings 
-                WHERE from_act = ? AND from_provision = ? 
-                LIMIT 1;
-                """,
-                (act_id, section_number)
-            ).fetchone()
+            mapping_row = db.query(StatuteMapping).filter(
+                StatuteMapping.from_act == act_id,
+                StatuteMapping.from_provision == section_number
+            ).first()
 
             equivalent = None
             transition_note = ""
 
             if mapping_row:
-                to_act = mapping_row["to_act"].lower()
+                to_act = mapping_row.to_act.lower()
                 equivalent = {
                     "act": to_act.upper(),
                     "act_name": ACT_DISPLAY_NAMES.get(to_act, to_act.upper()),
-                    "section": mapping_row["to_provision"],
-                    "heading": mapping_row["to_heading"]
+                    "section": mapping_row.to_provision,
+                    "heading": mapping_row.to_heading
                 }
                 if act_id in ["ipc", "crpc", "iea"]:
                     transition_note = (
-                        f"Under post-1 July 2024 criminal laws, this maps to Section {mapping_row['to_provision']} of {to_act.upper()} "
+                        f"Under post-1 July 2024 criminal laws, this maps to Section {mapping_row.to_provision} of {to_act.upper()} "
                         f"({ACT_DISPLAY_NAMES.get(to_act, to_act.upper())})."
                     )
                 else:
                     transition_note = (
-                        f"Corresponding prior law: Section {mapping_row['to_provision']} of {to_act.upper()}."
+                        f"Corresponding prior law: Section {mapping_row.to_provision} of {to_act.upper()}."
                     )
             elif act_id in ["bns", "bnss", "bsa"]:
                 # Reverse check
-                rev_row = c.execute(
-                    """
-                    SELECT from_act, from_provision, from_heading 
-                    FROM statute_mappings 
-                    WHERE to_act = ? AND to_provision = ? 
-                    LIMIT 1;
-                    """,
-                    (act_id, section_number)
-                ).fetchone()
+                rev_row = db.query(StatuteMapping).filter(
+                    StatuteMapping.to_act == act_id,
+                    StatuteMapping.to_provision == section_number
+                ).first()
                 if rev_row:
-                    from_act = rev_row["from_act"].lower()
+                    from_act = rev_row.from_act.lower()
                     equivalent = {
                         "act": from_act.upper(),
                         "act_name": ACT_DISPLAY_NAMES.get(from_act, from_act.upper()),
-                        "section": rev_row["from_provision"],
-                        "heading": rev_row["from_heading"]
+                        "section": rev_row.from_provision,
+                        "heading": rev_row.from_heading
                     }
-                    transition_note = f"Corresponding prior provision: Section {rev_row['from_provision']} of {from_act.upper()}."
+                    transition_note = f"Corresponding prior provision: Section {rev_row.from_provision} of {from_act.upper()}."
 
             return {
                 "act_id": act_id,
@@ -235,7 +227,7 @@ def verify_single_statute(act_id: str, section_number: str) -> Dict[str, Any]:
                 "is_in_force": True,
             }
         else:
-            # Not found in local database
+            # Not found in database
             return {
                 "act_id": act_id,
                 "act_name": ACT_DISPLAY_NAMES.get(act_id, act_id.upper()),
@@ -247,8 +239,17 @@ def verify_single_statute(act_id: str, section_number: str) -> Dict[str, Any]:
                 "transition_note": f"Section {section_number} could not be confirmed in {ACT_DISPLAY_NAMES.get(act_id, act_id.upper())}.",
                 "is_in_force": False,
             }
+    except Exception as e:
+        logger.error(f"Statute query error for {act_id} {section_number}: {e}")
+        return {
+            "act_id": act_id,
+            "section_number": section_number,
+            "status": "UNVERIFIED",
+            "heading": "",
+            "note": f"Query error: {e}"
+        }
     finally:
-        conn.close()
+        db.close()
 
 
 def verify_draft_statutes(draft_text: str, document_category: str = "") -> Dict[str, Any]:

@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "workspace": "कार्यक्षेत्र",
+    "dashboard": "डॅशबोर्ड",
+    "verifyFiling": "फायलिंग सत्यापित करा",
+    "caseFinder": "केस शोधक",
+    "draftAssistant": "मसुदा सहाय्यक",
+    "draftReview": "मसुदा पुनरावलोकन",
+    "contractAnalysis": "करार विश्लेषण",
+    "bareActsStatutes": "कायदे व नियम",
+    "aiLegalAid": "एआय कायदेशीर मदत",
+    "correctionMemory": "सुधारणा स्मृती",
+    "recentActivity": "अलीकडील क्रियाकलाप",
+    "login": "लॉगिन / साइन अप",
+    "logout": "लॉगआउट"
+  },
+  "language": {
+    "switcherLabel": "भाषा",
+    "switcherTitle": "कायदेशीर उत्तरे आणि अ‍ॅप मजकुरासाठी तुमची भाषा निवडा"
+  },
+  "translate": {
+    "button": "{{language}} मध्ये भाषांतर करा",
+    "translating": "भाषांतर होत आहे...",
+    "viewOriginal": "मूळ पहा (इंग्रजी)",
+    "viewTranslated": "भाषांतर पहा",
+    "disclaimer": "इंग्रजीतून भाषांतरित — पडताळणी इंग्रजीत करण्यात आली होती",
+    "error": "भाषांतर सेवा उपलब्ध नव्हती. कृपया पुन्हा प्रयत्न करा.",
+    "hideTranslation": "भाषांतर लपवा"
+  },
+  "statutes": {
+    "title": "इंडिया कोड सांविधिक अन्वेषक",
+    "sourceOfTruth": "निश्चयात्मक मूळ स्रोत",
+    "selectStatute": "कायदा निवडा",
+    "loadingActs": "कायदे लोड होत आहेत...",
+    "inForce": "लागू",
+    "tableOfProvisions": "तरतुदींची तालिका",
+    "notAvailable": "स्रोतावरून उपलब्ध नाही.",
+    "notAvailableShort": "स्रोतावरून उपलब्ध नाही",
+    "verbatimSourceText": "जसेच्या तसे मूळ मजकूर",
+    "unalteredText": "अपरिवर्तित कायदेशीर मजकूर",
+    "englishOnlyNotice": "सांविधिक मजकूर केवळ इंग्रजीत दाखवला आहे — यामुळे स्रोताविरुद्ध पडताळलेले नेमके शब्द जपले जातात आणि तुमच्या भाषा निवडीचा त्यावर परिणाम होत नाही.",
+    "provenanceAudit": "उगम व सचोटी लेखापरीक्षण"
+  }
+}

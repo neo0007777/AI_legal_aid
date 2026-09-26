@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "workspace": "কর্মক্ষেত্র",
+    "dashboard": "ড্যাশবোর্ড",
+    "verifyFiling": "ফাইলিং যাচাই করুন",
+    "caseFinder": "মামলা অনুসন্ধানকারী",
+    "draftAssistant": "খসড়া সহায়ক",
+    "draftReview": "খসড়া পর্যালোচনা",
+    "contractAnalysis": "চুক্তি বিশ্লেষণ",
+    "bareActsStatutes": "আইন ও বিধি",
+    "aiLegalAid": "এআই আইনি সহায়তা",
+    "correctionMemory": "সংশোধন স্মৃতি",
+    "recentActivity": "সাম্প্রতিক কার্যকলাপ",
+    "login": "লগইন / সাইন আপ",
+    "logout": "লগআউট"
+  },
+  "language": {
+    "switcherLabel": "ভাষা",
+    "switcherTitle": "আইনি উত্তর এবং অ্যাপ টেক্সটের জন্য আপনার ভাষা বেছে নিন"
+  },
+  "translate": {
+    "button": "{{language}}-এ অনুবাদ করুন",
+    "translating": "অনুবাদ করা হচ্ছে...",
+    "viewOriginal": "মূল দেখুন (ইংরেজি)",
+    "viewTranslated": "অনুবাদ দেখুন",
+    "disclaimer": "ইংরেজি থেকে অনূদিত — যাচাইকরণ ইংরেজিতে সম্পন্ন হয়েছিল",
+    "error": "অনুবাদ পরিষেবা উপলব্ধ ছিল না। অনুগ্রহ করে আবার চেষ্টা করুন।",
+    "hideTranslation": "অনুবাদ লুকান"
+  },
+  "statutes": {
+    "title": "ইন্ডিয়া কোড সংবিধিবদ্ধ অনুসন্ধানকারী",
+    "sourceOfTruth": "নিশ্চিত মূল উৎস",
+    "selectStatute": "আইন নির্বাচন করুন",
+    "loadingActs": "আইন লোড হচ্ছে...",
+    "inForce": "বলবৎ",
+    "tableOfProvisions": "বিধানের তালিকা",
+    "notAvailable": "উৎস থেকে উপলব্ধ নয়।",
+    "notAvailableShort": "উৎস থেকে উপলব্ধ নয়",
+    "verbatimSourceText": "যথাযথ মূল পাঠ্য",
+    "unalteredText": "অপরিবর্তিত আইনি পাঠ্য",
+    "englishOnlyNotice": "সংবিধিবদ্ধ পাঠ্য শুধুমাত্র ইংরেজিতে দেখানো হয়েছে — এটি উৎসের বিপরীতে যাচাইকৃত সঠিক শব্দ সংরক্ষণ করে এবং আপনার ভাষা নির্বাচনের দ্বারা প্রভাবিত হয় না।",
+    "provenanceAudit": "উৎপত্তি ও সততা নিরীক্ষা"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "nav": {
+    "workspace": "ਕਾਰਜ ਖੇਤਰ",
+    "dashboard": "ਡੈਸ਼ਬੋਰਡ",
+    "verifyFiling": "ਫਾਈਲਿੰਗ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
+    "caseFinder": "ਕੇਸ ਖੋਜੀ",
+    "draftAssistant": "ਡਰਾਫਟ ਸਹਾਇਕ",
+    "draftReview": "ਡਰਾਫਟ ਸਮੀਖਿਆ",
+    "contractAnalysis": "ਇਕਰਾਰਨਾਮਾ ਵਿਸ਼ਲੇਸ਼ਣ",
+    "bareActsStatutes": "ਕਾਨੂੰਨ ਅਤੇ ਨਿਯਮ",
+    "aiLegalAid": "AI ਕਾਨੂੰਨੀ ਸਹਾਇਤਾ",
+    "correctionMemory": "ਸੁਧਾਈ ਯਾਦਦਾਸ਼ਤ",
+    "recentActivity": "ਹਾਲੀਆ ਗਤੀਵਿਧੀ",
+    "login": "ਲੌਗਇਨ / ਸਾਈਨ ਅੱਪ",
+    "logout": "ਲੌਗਆਉਟ"
+  },
+  "language": {
+    "switcherLabel": "ਭਾਸ਼ਾ",
+    "switcherTitle": "ਕਾਨੂੰਨੀ ਜਵਾਬਾਂ ਅਤੇ ਐਪ ਟੈਕਸਟ ਲਈ ਆਪਣੀ ਭਾਸ਼ਾ ਚੁਣੋ"
+  },
+  "translate": {
+    "button": "{{language}} ਵਿੱਚ ਅਨੁਵਾਦ ਕਰੋ",
+    "translating": "ਅਨੁਵਾਦ ਹੋ ਰਿਹਾ ਹੈ...",
+    "viewOriginal": "ਮੂਲ ਵੇਖੋ (ਅੰਗਰੇਜ਼ੀ)",
+    "viewTranslated": "ਅਨੁਵਾਦ ਵੇਖੋ",
+    "disclaimer": "ਅੰਗਰੇਜ਼ੀ ਤੋਂ ਅਨੁਵਾਦਿਤ — ਪੁਸ਼ਟੀਕਰਨ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਕੀਤਾ ਗਿਆ ਸੀ",
+    "error": "ਅਨੁਵਾਦ ਸੇਵਾ ਉਪਲਬਧ ਨਹੀਂ ਸੀ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "hideTranslation": "ਅਨੁਵਾਦ ਲੁਕਾਓ"
+  },
+  "statutes": {
+    "title": "ਇੰਡੀਆ ਕੋਡ ਸੰਵਿਧਾਨਕ ਖੋਜੀ",
+    "sourceOfTruth": "ਨਿਸ਼ਚਿਤ ਮੂਲ ਸਰੋਤ",
+    "selectStatute": "ਕਾਨੂੰਨ ਚੁਣੋ",
+    "loadingActs": "ਕਾਨੂੰਨ ਲੋਡ ਹੋ ਰਹੇ ਹਨ...",
+    "inForce": "ਲਾਗੂ",
+    "tableOfProvisions": "ਵਿਵਸਥਾਵਾਂ ਦੀ ਸੂਚੀ",
+    "notAvailable": "ਸਰੋਤ ਤੋਂ ਉਪਲਬਧ ਨਹੀਂ।",
+    "notAvailableShort": "ਸਰੋਤ ਤੋਂ ਉਪਲਬਧ ਨਹੀਂ",
+    "verbatimSourceText": "ਜਿਉਂ ਦਾ ਤਿਉਂ ਮੂਲ ਪਾਠ",
+    "unalteredText": "ਅਣਬਦਲਿਆ ਕਾਨੂੰਨੀ ਪਾਠ",
+    "englishOnlyNotice": "ਸੰਵਿਧਾਨਕ ਪਾਠ ਸਿਰਫ਼ ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਦਿਖਾਇਆ ਗਿਆ ਹੈ — ਇਹ ਸਰੋਤ ਦੇ ਵਿਰੁੱਧ ਪੁਸ਼ਟੀ ਕੀਤੇ ਸਹੀ ਸ਼ਬਦਾਂ ਨੂੰ ਸੁਰੱਖਿਅਤ ਰੱਖਦਾ ਹੈ ਅਤੇ ਤੁਹਾਡੀ ਭਾਸ਼ਾ ਚੋਣ ਤੋਂ ਪ੍ਰਭਾਵਿਤ ਨਹੀਂ ਹੁੰਦਾ।",
+    "provenanceAudit": "ਮੂਲ ਅਤੇ ਇਕਸਾਰਤਾ ਆਡਿਟ"
+  }
+}

@@ -268,7 +268,7 @@ def search_cases(query: str, max_results: int = 5, db=None) -> list:
         print(f"[CaseSearch] cache hit — {len(cached)} results for {query[:60]!r}")
         return cached
 
-    token = os.getenv("INDIAN_KANOON_TOKEN", "").strip()
+    token = (os.getenv("INDIAN_KANOON_TOKEN", "") or os.getenv("IK_API_TOKEN", "")).strip()
 
     # Bias search results based on query context.
     lower_court_terms = ("sessions", "district", "magistrate", "bail", "anticipatory bail")

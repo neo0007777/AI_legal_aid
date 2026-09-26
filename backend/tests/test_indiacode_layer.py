@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import unittest
 import hashlib
 import json
@@ -24,6 +27,9 @@ class TestIndiaCodeDataLayer(unittest.TestCase):
         cls.db: Session = SessionLocal()
         cls.client = IndiaCodeClient()
         cls.service = IngestionService(cls.client)
+        if not cls.db.query(Act).filter(Act.source_act_id == "bns").first():
+            cls.service.ingest_act("bns", store_provisions=True)
+            cls.service.ingest_mappings()
 
     @classmethod
     def tearDownClass(cls):

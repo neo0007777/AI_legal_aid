@@ -8,7 +8,7 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import './Statutes.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const Statutes = () => {
     const { t } = useTranslation();

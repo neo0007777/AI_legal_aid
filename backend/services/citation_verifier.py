@@ -686,18 +686,22 @@ async def _verify_filing_stream_inner(filing_text: str):
     }
 
 
-# ── Report Rendering (Hindi / Hinglish Translation) ───────────────────────────
-TRANSLATION_LABEL = "Translated from a result verified in English"
+# ── Report Rendering (app-wide language switcher + Hinglish) ─────────────────
+from services.translate_output import SUPPORTED_LANGUAGES as _TRANSLATE_LANGUAGES, TRANSLATION_DISCLAIMER as TRANSLATION_LABEL
 
+# Reuses the same curated language list as translate_output.py (shared source
+# of truth for the app-wide switcher) so Verify-a-Filing responds to every
+# language the switcher offers, not just Hindi. Hinglish stays a page-specific
+# extra (colloquial Roman-script Hindi), not part of the app-wide list.
 _RENDER_LANGUAGE_INSTRUCTIONS = {
-    "hindi": "Translate into formal Hindi, written in the Devanagari script.",
+    **{code: f"Translate into {desc}." for code, desc in _TRANSLATE_LANGUAGES.items()},
     "hinglish": "Translate into Hinglish -- colloquial Hindi written in the Roman/Latin alphabet, the way Indian speakers commonly write it in chat/text (not Devanagari).",
 }
 
 
 def render_report_in_language(report: dict, language: str) -> dict:
     if language not in _RENDER_LANGUAGE_INSTRUCTIONS:
-        raise ValueError(f"Unsupported language: {language!r}. Use 'hindi' or 'hinglish'.")
+        raise ValueError(f"Unsupported language: {language!r}. Use one of {list(_RENDER_LANGUAGE_INSTRUCTIONS)}.")
 
     citations = report.get("citations", [])
     texts = {}

@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
 import { usePersona } from '../context/PersonaContext';
+import { useLanguage, SUPPORTED_LANGUAGES } from '../context/LanguageContext';
 import PersonaSwitcher from '../components/PersonaSwitcher';
 import CitationStatusBadge, {
     ConfidenceBars, TechnicalFailureNote, RetrievalSourceBadge,
@@ -71,6 +72,7 @@ const VerifyFiling = () => {
     const { token } = useAuth();
     const { localOnly } = useLocalMode();
     const { personaId, persona } = usePersona();
+    const { languageCode } = useLanguage();
 
     const [coverage, setCoverage] = useState(null);
     const [file, setFile] = useState(null);
@@ -142,6 +144,18 @@ const VerifyFiling = () => {
             setRendering(false);
         }
     };
+
+    // Auto-follow the app-wide language switcher: as soon as a report is
+    // ready, or the global language changes, render the citation report in
+    // that language without requiring a separate click inside this page.
+    // Hinglish stays a manual-only option below (it isn't part of the
+    // app-wide switcher), and the manual buttons still work as an override.
+    useEffect(() => {
+        if (!reportId) return;
+        if (languageCode === renderLanguage) return;
+        changeLanguage(languageCode);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [reportId, languageCode]);
 
     const handleFlagged = (idx, newStatus, meta) => {
         setCitationResults((prev) => {
@@ -242,7 +256,8 @@ const VerifyFiling = () => {
         if (!reportId) return;
         setExporting(format);
         try {
-            const response = await fetch(`/api/citations/export/${reportId}.${format}`, {
+            const langParam = format === 'pdf' && renderLanguage !== 'en' ? `?lang=${encodeURIComponent(renderLanguage)}` : '';
+            const response = await fetch(`/api/citations/export/${reportId}.${format}${langParam}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!response.ok) throw new Error(`Export failed (${response.status})`);
@@ -452,14 +467,14 @@ const VerifyFiling = () => {
                             </div>
 
                             <div className="language-toggle" role="tablist">
-                                {[['en', 'English'], ['hindi', 'हिंदी'], ['hinglish', 'Hinglish']].map(([code, label]) => (
+                                {[{ code: 'en', nativeLabel: 'English' }, ...SUPPORTED_LANGUAGES.filter(l => l.code !== 'en'), { code: 'hinglish', nativeLabel: 'Hinglish' }].map(({ code, nativeLabel }) => (
                                     <button
                                         key={code}
                                         className={renderLanguage === code ? 'active' : ''}
                                         onClick={() => changeLanguage(code)}
                                         disabled={rendering}
                                     >
-                                        {rendering && renderLanguage === code ? <Loader2 size={13} className="spin" /> : null} {label}
+                                        {rendering && renderLanguage === code ? <Loader2 size={13} className="spin" /> : null} {nativeLabel}
                                     </button>
                                 ))}
                             </div>
