@@ -1,13 +1,17 @@
 import re
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from models.database import get_db, User, QueryLog
 from models.schemas import LegalAidRequest, LegalAidResponse, SearchSource
 from services.rag import search_drafts
 from services.llm import call_llm
-from utils.auth import get_current_user
+from utils.auth import get_current_user, get_optional_current_user
 from utils.encryption import encrypt
 from services.scraper import scrape_indian_kanoon
+from services.pdf_generator import generate_legal_aid_pdf
 
 router = APIRouter()
 
@@ -263,4 +267,43 @@ Formatting Rules:
     except Exception as e:
         print(f"[LegalAid] Unhandled error: {e}")
         raise HTTPException(status_code=500, detail="Legal aid request failed. Please try again.")
+
+
+class LegalAidExportRequest(BaseModel):
+    question: str
+    answer: str
+    sources: Optional[List[Dict[str, Any]]] = []
+
+
+@router.post("/export-pdf")
+def export_legal_aid_pdf(
+    req: LegalAidExportRequest,
+    current_user: Optional[User] = Depends(get_optional_current_user)
+):
+    """Generates and downloads a structured formal Legal Advisory & Research Opinion PDF."""
+    try:
+        user_display = (current_user.full_name if current_user and current_user.full_name else "Advocate / Counsel")
+        pdf_bytes = generate_legal_aid_pdf(
+            question=req.question,
+            answer=req.answer,
+            sources=req.sources,
+            user_name=user_display
+        )
+        safe_slug = re.sub(r"[^a-zA-Z0-9]+", "-", req.question.strip()[:35]).strip("-").lower()
+        if not safe_slug:
+            safe_slug = "opinion"
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=lexsetu-legal-opinion-{safe_slug}.pdf",
+                "Content-Length": str(len(pdf_bytes)),
+                "Access-Control-Expose-Headers": "Content-Disposition",
+            }
+        )
+    except Exception as e:
+        print(f"[LegalAid] PDF export failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
+
 

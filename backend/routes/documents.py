@@ -1,8 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+import re
 import logging
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
+from services.pdf_generator import generate_court_draft_pdf
 from models.database import get_db, User, QueryLog
 from models.schemas import (
     DraftRequest, DraftResponse,
@@ -26,7 +29,7 @@ from services.india_code_grounding import (
     build_source_locked_prompt_block,
     enforce_consistency_and_regenerate,
 )
-from utils.auth import get_current_user
+from utils.auth import get_current_user, get_optional_current_user
 from utils.encryption import encrypt
 
 router = APIRouter()
@@ -534,3 +537,45 @@ def verify_statutes(req: StatuteVerifyReq):
             for r in refs
         ],
     }
+
+
+class DraftExportRequest(BaseModel):
+    title: str
+    draft_text: str
+    court_name: Optional[str] = None
+    case_number: Optional[str] = None
+    applicant: Optional[str] = None
+    respondent: Optional[str] = None
+
+
+@router.post("/export-pdf")
+def export_draft_pdf(
+    req: DraftExportRequest,
+    current_user: Optional[User] = Depends(get_optional_current_user)
+):
+    """Generates and downloads a court-ready A4 Court Pleading PDF with standard Indian legal margins."""
+    try:
+        pdf_bytes = generate_court_draft_pdf(
+            title=req.title,
+            draft_text=req.draft_text,
+            court_name=req.court_name,
+            case_number=req.case_number,
+            applicant=req.applicant,
+            respondent=req.respondent,
+        )
+        safe_slug = re.sub(r"[^a-zA-Z0-9]+", "-", req.title.strip()[:35]).strip("-").lower()
+        if not safe_slug:
+            safe_slug = "court-pleading"
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=lexsetu-court-draft-{safe_slug}.pdf",
+                "Content-Length": str(len(pdf_bytes)),
+                "Access-Control-Expose-Headers": "Content-Disposition",
+            }
+        )
+    except Exception as e:
+        print(f"[Documents] Draft PDF export failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate Court Draft PDF: {str(e)}")

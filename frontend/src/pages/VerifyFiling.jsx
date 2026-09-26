@@ -17,6 +17,7 @@ import ContradictionDiff from '../components/ContradictionDiff';
 import AdjustmentBadge from '../components/AdjustmentBadge';
 import FlagCorrectionButton from '../components/FlagCorrectionButton';
 import PrivilegeShield from '../components/PrivilegeShield';
+import { downloadFileFromBlob } from '../utils/downloadHelper';
 import './VerifyFiling.css';
 
 
@@ -246,12 +247,8 @@ const VerifyFiling = () => {
             });
             if (!response.ok) throw new Error(`Export failed (${response.status})`);
             const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `citation-integrity-report-${reportId.slice(0, 8)}.${format}`;
-            a.click();
-            URL.revokeObjectURL(url);
+            const mimeType = format === 'pdf' ? 'application/pdf' : 'text/csv';
+            downloadFileFromBlob(blob, `citation-integrity-report-${reportId.slice(0, 8)}.${format}`, mimeType);
         } catch (err) {
             setErrorMsg('Export failed: ' + err.message);
         } finally {

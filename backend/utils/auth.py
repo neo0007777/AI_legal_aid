@@ -66,7 +66,31 @@ def get_current_user(
     return user
 
 
+optional_bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def get_optional_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_bearer_scheme),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """Retrieves authenticated user if valid token is provided, or returns None without failing."""
+    if not credentials or not credentials.credentials:
+        return None
+    token = str(credentials.credentials).strip()
+    if not token or token in ("null", "undefined", "None", ""):
+        return None
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        return db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    except Exception:
+        return None
+
+
 def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role not in ("admin", "advocate"):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+

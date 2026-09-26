@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatErrorMessage } from '../utils/formatError';
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -106,7 +107,7 @@ export const AuthProvider = ({ children }) => {
                 navigate('/');
                 return { success: true };
             } else {
-                return { success: false, message: data.detail || 'Login failed.' };
+                return { success: false, message: formatErrorMessage(data.detail, 'Login failed.') };
             }
         } catch (error) {
             return { success: false, message: 'Server connection failed. Is the backend running?' };
@@ -136,7 +137,7 @@ export const AuthProvider = ({ children }) => {
                 navigate('/');
                 return { success: true };
             } else {
-                return { success: false, message: data.detail || 'Registration failed.' };
+                return { success: false, message: formatErrorMessage(data.detail, 'Registration failed.') };
             }
         } catch (error) {
             return { success: false, message: 'Server connection failed.' };

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import {
     Search, BookOpen, Gavel, Sparkles, TrendingUp, AlertCircle,
-    ChevronDown, ExternalLink, Tag
+    ChevronDown, ExternalLink, Tag, FileDown, Loader2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { downloadFileFromBlob, exportPdfFromApi } from '../utils/downloadHelper';
 import './CaseFinder.css';
 
 const SUGGESTIONS = [
@@ -29,6 +30,31 @@ const CaseFinder = () => {
 
     const [activeCourt, setActiveCourt] = useState('All Courts');
     const [activeYear, setActiveYear] = useState('All Years');
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+    const handleExportPdf = async () => {
+        if (!aiAnswer && liveCases.length === 0) return;
+        setIsExportingPdf(true);
+        try {
+            const slug = (searchQuery || 'case-brief').slice(0, 30).replace(/[^a-zA-Z0-9]+/g, '_');
+            await exportPdfFromApi({
+                endpoint: '/api/cases/export-pdf',
+                body: {
+                    query: searchQuery || 'Case Law Briefing',
+                    answer: aiAnswer,
+                    live_cases: liveCases,
+                    sources: localSources,
+                },
+                filename: `LexSetu_Case_Research_${slug}.pdf`,
+                headers: getAuthHeaders(),
+            });
+        } catch (err) {
+            console.error('Case Finder PDF export error:', err);
+            alert('PDF Export failed: ' + err.message);
+        } finally {
+            setIsExportingPdf(false);
+        }
+    };
 
     const handleSearch = async (e) => {
         if (e) e.preventDefault();
@@ -226,9 +252,34 @@ const CaseFinder = () => {
                     {hasSearched && !isSearching && (
                         <div className="results-display animate-fade-in">
                             <div className="ai-summary-banner glass-panel">
-                                <div className="ai-banner-header">
-                                    <Sparkles size={18} className="text-primary glow-icon" />
-                                    <h4>AI Research Synthesis</h4>
+                                <div className="ai-banner-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Sparkles size={18} className="text-primary glow-icon" />
+                                        <h4>AI Research Synthesis</h4>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="outline btn-sm"
+                                        onClick={handleExportPdf}
+                                        disabled={isExportingPdf}
+                                        title="Download complete Case Law Research Dossier as PDF"
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            cursor: 'pointer',
+                                            padding: '0.35rem 0.75rem',
+                                            borderRadius: '6px',
+                                            background: '#63120e',
+                                            color: '#f9eedc',
+                                            border: '1px solid #8c3a2a',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        {isExportingPdf ? <Loader2 size={14} className="spin" /> : <FileDown size={14} />}
+                                        <span>Export PDF Dossier</span>
+                                    </button>
                                 </div>
                                 <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.7' }}>{aiAnswer}</p>
                             </div>

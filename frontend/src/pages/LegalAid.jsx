@@ -3,9 +3,10 @@ import {
     Send, Sparkles, Scale, BookOpen, AlertTriangle,
     ShieldAlert, Search, Loader2, FileText, Copy, Check,
     Mic, MicOff, RotateCcw, X, Shield, Gavel, HelpCircle,
-    Crown, Lock, ArrowRight, ShieldCheck, CheckCircle2
+    Crown, Lock, ArrowRight, ShieldCheck, CheckCircle2, FileDown
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { downloadFileFromBlob, exportPdfFromApi } from '../utils/downloadHelper';
 import './LegalAid.css';
 
 const SUGGESTIONS = [
@@ -250,6 +251,7 @@ const LegalAid = () => {
     const [isThinking, setIsThinking] = useState(false);
     const [loadingStage, setLoadingStage] = useState(0);
     const [copiedId, setCopiedId] = useState(null);
+    const [downloadingPdfId, setDownloadingPdfId] = useState(null);
     const [isListening, setIsListening] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [upgradeRequested, setUpgradeRequested] = useState(false);
@@ -257,6 +259,28 @@ const LegalAid = () => {
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const recognitionRef = useRef(null);
+
+    const downloadLegalAidPDF = async (msg) => {
+        setDownloadingPdfId(msg.id);
+        try {
+            const slug = (msg.question || 'legal-opinion').slice(0, 30).replace(/[^a-zA-Z0-9]+/g, '_');
+            await exportPdfFromApi({
+                endpoint: '/api/legal-aid/export-pdf',
+                body: {
+                    question: msg.question || 'Legal Inquiry',
+                    answer: msg.raw,
+                    sources: msg.data?.sources || [],
+                },
+                filename: `LexSetu_Opinion_${slug}.pdf`,
+                headers: getAuthHeaders(),
+            });
+        } catch (err) {
+            console.error('Legal Aid PDF export error:', err);
+            alert('Failed to generate PDF: ' + err.message);
+        } finally {
+            setDownloadingPdfId(null);
+        }
+    };
 
     // Initialize Web Speech API for voice dictation
     useEffect(() => {
@@ -361,6 +385,7 @@ const LegalAid = () => {
             const aiMsg = {
                 id: 'ai_' + Date.now(),
                 type: 'structured_ai',
+                question: text,
                 raw: data.answer,
                 requires_upgrade: Boolean(
                     data.requires_upgrade ||
@@ -495,24 +520,46 @@ const LegalAid = () => {
                                                 <Scale size={18} className="card-header-icon" />
                                                 <span>LexSetu Legal Analysis</span>
                                             </div>
-                                            <button
-                                                type="button"
-                                                className="copy-card-btn"
-                                                onClick={() => handleCopy(msg.id, msg.raw)}
-                                                title="Copy complete analysis"
-                                            >
-                                                {copiedId === msg.id ? (
-                                                    <>
-                                                        <Check size={14} className="text-green-600" />
-                                                        <span>Copied!</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Copy size={14} />
-                                                        <span>Copy</span>
-                                                    </>
-                                                )}
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <button
+                                                    type="button"
+                                                    className="copy-card-btn"
+                                                    onClick={() => downloadLegalAidPDF(msg)}
+                                                    disabled={downloadingPdfId === msg.id}
+                                                    title="Download formal Legal Opinion as court-grade PDF"
+                                                    style={{ background: '#63120e', color: '#f9eedc', borderColor: '#8c3a2a' }}
+                                                >
+                                                    {downloadingPdfId === msg.id ? (
+                                                        <>
+                                                            <Loader2 size={13} className="spin" />
+                                                            <span>Generating PDF...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <FileDown size={13} />
+                                                            <span>Download PDF</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="copy-card-btn"
+                                                    onClick={() => handleCopy(msg.id, msg.raw)}
+                                                    title="Copy complete analysis"
+                                                >
+                                                    {copiedId === msg.id ? (
+                                                        <>
+                                                            <Check size={14} className="text-green-600" />
+                                                            <span>Copied!</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Copy size={14} />
+                                                            <span>Copy</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <div className="card-sections-body">

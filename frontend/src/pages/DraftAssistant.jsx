@@ -5,15 +5,16 @@ import {
     Sparkles, CornerDownRight, Check, Loader2, ShieldAlert, AlertOctagon,
     Scale, BookmarkMinus, Briefcase, Users, Lock, FileSignature,
     UploadCloud, X, AlertTriangle, ListChecks, ArrowRightCircle,
-    ChevronLeft, ChevronRight, FileCheck, CheckCircle2, Info, CircleAlert, Eye
+    ChevronLeft, ChevronRight, FileCheck, CheckCircle2, Info, CircleAlert, Eye, FileDown
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
 import VoiceInputButton from '../components/VoiceInputButton';
 import PrivilegeShield from '../components/PrivilegeShield';
+import { downloadFileFromBlob, exportPdfFromApi } from '../utils/downloadHelper';
 import './DraftAssistant.css';
 
-export const sanitizeDraftText = (text) => {
+const sanitizeDraftText = (text) => {
     if (!text) return '';
     return text
         .replace(/^#{1,6}\s*/gm, '')
@@ -295,6 +296,7 @@ const DraftAssistant = () => {
     const [viewMode, setViewMode] = useState('court'); // 'court' | 'edit'
     const [statuteAudit, setStatuteAudit] = useState(null);
     const [isVerifyingStatutes, setIsVerifyingStatutes] = useState(false);
+    const [exportingPdf, setExportingPdf] = useState(false);
     const editorRef = useRef(null);
 
     const switchTemplate = (id) => {
@@ -430,15 +432,37 @@ const DraftAssistant = () => {
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const handleExportPdf = async () => {
+        if (!documentContent) return;
+        setExportingPdf(true);
+        try {
+            const slug = (currentTemplate?.title || 'Court_Pleading').replace(/\s+/g, '_');
+            await exportPdfFromApi({
+                endpoint: '/api/documents/export-pdf',
+                body: {
+                    title: currentTemplate?.title || 'Court Application',
+                    draft_text: sanitizeDraftText(documentContent),
+                    court_name: formData?.court || formData?.court_name || 'IN THE COURT OF THE PRINCIPAL DISTRICT & SESSIONS JUDGE',
+                    case_number: formData?.case_number || (formData?.fir_number ? `CASE / FIR NO. ${formData.fir_number}` : 'APPLICATION NO. _____ OF 2026'),
+                    applicant: formData?.applicant_name || formData?.client_name || formData?.complainant || formData?.tenant_name || formData?.landlord_name || 'APPLICANT / PETITIONER',
+                    respondent: formData?.respondent_name || formData?.opposite_party || formData?.state || 'STATE / OPPOSITE PARTY',
+                },
+                filename: `${slug}_Court_Ready.pdf`,
+                headers: getAuthHeaders(),
+            });
+        } catch (err) {
+            console.error('Court PDF export error:', err);
+            alert('Failed to export Court PDF: ' + err.message);
+        } finally {
+            setExportingPdf(false);
+        }
+    };
+
     const handleDownload = () => {
         const cleanText = sanitizeDraftText(documentContent);
         const blob = new Blob([cleanText], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${currentTemplate.title.replace(/ /g, '_')}_LexSetu.txt`;
-        a.click();
-        URL.revokeObjectURL(url);
+        const slug = (currentTemplate?.title || 'Draft').replace(/\s+/g, '_');
+        downloadFileFromBlob(blob, `${slug}_LexSetu.txt`, 'text/plain;charset=utf-8');
     };
 
     const handleOpenInReview = () => {
@@ -629,8 +653,17 @@ const DraftAssistant = () => {
                                 <button className="editor-action-btn secondary" onClick={handleCopy}>
                                     {copied ? <><Check size={15} /> Copied!</> : <><Copy size={15} /> Copy</>}
                                 </button>
-                                <button className="editor-action-btn primary" onClick={handleDownload}>
-                                    <Download size={15} /> Download
+                                <button
+                                    className="editor-action-btn primary"
+                                    onClick={handleExportPdf}
+                                    disabled={exportingPdf}
+                                    title="Download court-formatted A4 Pleading PDF with official legal margins"
+                                    style={{ background: '#63120e', color: '#f9eedc', borderColor: '#8c3a2a' }}
+                                >
+                                    {exportingPdf ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} Export Court PDF
+                                </button>
+                                <button className="editor-action-btn secondary" onClick={handleDownload} title="Download plain text (.txt)">
+                                    <Download size={15} /> Download (.txt)
                                 </button>
                             </div>
                         </div>

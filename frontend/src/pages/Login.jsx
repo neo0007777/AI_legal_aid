@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { Shield, Lock, Mail, ArrowRight, AlertCircle, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Shield, Lock, Mail, ArrowRight, AlertCircle, User, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { formatErrorMessage } from '../utils/formatError';
 import './Login.css';
 
 const Login = () => {
@@ -12,27 +14,47 @@ const Login = () => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const { login, register } = useAuth();
+    const { login, register, isAuthenticated } = useAuth();
+    const navigate = useNavigate();
+
+    // If already logged in, redirect to workspace
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/', { replace: true });
+        }
+    }, [isAuthenticated, navigate]);
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         setError('');
         setIsLoading(true);
 
         let result;
         if (tab === 'login') {
-            result = await login(email, password);
+            result = await login(email.trim(), password);
         } else {
             if (!fullName.trim()) {
                 setError('Full name is required.');
                 setIsLoading(false);
                 return;
             }
-            result = await register(fullName, email, password, role);
+            result = await register(fullName.trim(), email.trim(), password, role);
         }
 
         if (!result.success) {
-            setError(result.message);
+            setError(formatErrorMessage(result.message, 'Authentication failed. Please verify your credentials.'));
+            setIsLoading(false);
+        }
+    };
+
+    const handleDemoLogin = async () => {
+        setError('');
+        setIsLoading(true);
+        setEmail('test@lexsetu.com');
+        setPassword('password123');
+        const result = await login('test@lexsetu.com', 'password123');
+        if (!result.success) {
+            setError(formatErrorMessage(result.message, 'Demo sign-in failed. Please check backend connection.'));
             setIsLoading(false);
         }
     };
@@ -82,9 +104,9 @@ const Login = () => {
                     </p>
 
                     {error && (
-                        <div className="login-error-flag animate-fade-in">
-                            <AlertCircle size={18} />
-                            <span>{error}</span>
+                        <div className="login-error-flag animate-fade-in" role="alert">
+                            <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                            <span>{formatErrorMessage(error)}</span>
                         </div>
                     )}
 
@@ -162,6 +184,34 @@ const Login = () => {
                             )}
                         </button>
                     </form>
+
+                    {tab === 'login' && (
+                        <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid #c98659' }}>
+                            <button
+                                type="button"
+                                onClick={handleDemoLogin}
+                                disabled={isLoading}
+                                style={{
+                                    width: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem',
+                                    padding: '0.75rem 1rem',
+                                    background: 'rgba(99, 18, 14, 0.08)',
+                                    color: '#63120e',
+                                    border: '1px dashed #63120e',
+                                    borderRadius: '8px',
+                                    fontWeight: 600,
+                                    fontSize: '0.88rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                }}
+                            >
+                                <Sparkles size={16} color="#8c3a2a" /> Quick Demo Sign-in (Advocate)
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

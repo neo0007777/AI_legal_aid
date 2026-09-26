@@ -1,12 +1,17 @@
+import re
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from models.database import get_db, User, QueryLog
 from models.schemas import CaseSearchRequest, CaseSearchResponse, SearchSource, LiveCase
 from services.rag import search_drafts
 from services.scraper import search_cases as fetch_live_cases
 from services.llm import call_llm
-from utils.auth import get_current_user
+from utils.auth import get_current_user, get_optional_current_user
 from utils.encryption import encrypt
+from services.pdf_generator import generate_case_finder_pdf
 
 router = APIRouter()
 
@@ -116,3 +121,41 @@ Identify ALL landmark and leading cases for this query. Use the search results a
     except Exception as e:
         print(f"[Cases] Unhandled error: {e}")
         raise HTTPException(status_code=500, detail="Case search failed. Please try again.")
+
+
+class CaseExportRequest(BaseModel):
+    query: str
+    answer: str
+    live_cases: Optional[List[Dict[str, Any]]] = []
+    sources: Optional[List[Dict[str, Any]]] = []
+
+
+@router.post("/export-pdf")
+def export_case_finder_pdf(
+    req: CaseExportRequest,
+    current_user: Optional[User] = Depends(get_optional_current_user)
+):
+    """Generates and downloads a structured Case Law Research Brief & Judicial Precedent Dossier PDF."""
+    try:
+        pdf_bytes = generate_case_finder_pdf(
+            query=req.query,
+            ai_synthesis=req.answer,
+            live_cases=req.live_cases,
+            local_sources=req.sources,
+        )
+        safe_slug = re.sub(r"[^a-zA-Z0-9]+", "-", req.query.strip()[:35]).strip("-").lower()
+        if not safe_slug:
+            safe_slug = "case-brief"
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=lexsetu-case-research-{safe_slug}.pdf",
+                "Content-Length": str(len(pdf_bytes)),
+                "Access-Control-Expose-Headers": "Content-Disposition",
+            }
+        )
+    except Exception as e:
+        print(f"[Cases] PDF export failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate Case Finder PDF: {str(e)}")
