@@ -2,12 +2,21 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+
+# Loophole fix #1 (follow-up): this used to run AFTER `from routes import ...`
+# below, so by the time utils/auth.py read JWT_SECRET_KEY from the environment,
+# .env hadn't been loaded yet. That's exactly what masked the insecure
+# fallback in the first place -- the module-level checks that should have
+# caught a missing key never saw it as missing, because it had every chance
+# to be there by request time (uvicorn --reload, gunicorn workers, etc. often
+# re-import lazily). Loading .env before any local imports means the fail-fast
+# check in utils/auth.py sees the real environment, not a partially-loaded one.
+load_dotenv()
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from models.database import create_tables, SessionLocal
 from services.compliance_fetcher import refresh_compliance_alerts
 from routes import auth, workflow, compliance, documents, cases, legal_aid, review, citations, statutes, admin
-
-load_dotenv()
 
 app = FastAPI(
     title="LexSetu API",

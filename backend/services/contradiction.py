@@ -73,13 +73,17 @@ Use exactly this structure:
 If no contradictions exist, return exactly:
 {"total_contradictions": 0, "overall_compatibility": "High - documents are compatible", "contradictions": []}"""
 
+    # Was [:2000] -- silently dropped any contradiction sitting past the first
+    # ~2 pages of either document. Raised to 6000 chars each to match the
+    # _CHUNK_SIZE convention already used in citation_verifier.py, which
+    # openai/gpt-oss-120b's context window handles comfortably for a single call.
     user_message = f"""Analyze these two legal documents and return a JSON object listing all contradictions.
 
 === DOCUMENT A ===
-{document_a[:2000]}
+{document_a[:6000]}
 
 === DOCUMENT B ===
-{document_b[:2000]}
+{document_b[:6000]}
 
 Start your response with {{ and end with }}. Raw JSON only."""
 

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import List, Optional
 from datetime import datetime
 
@@ -10,6 +10,22 @@ class UserRegister(BaseModel):
     full_name: str
     password: str
     role: Optional[str] = "user"
+
+    # Loophole fix #4: password was a bare `str` -- a 1-character password was
+    # accepted. Minimum bar only (length + one letter + one digit), not a full
+    # complexity policy -- the hashing (argon2, S1-era) is what actually
+    # carries the real security weight; this just stops trivially-guessable
+    # passwords like "a" or "123456" at the door.
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not any(c.isalpha() for c in v):
+            raise ValueError("Password must contain at least one letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit")
+        return v
 
 
 class UserLogin(BaseModel):

@@ -84,6 +84,37 @@ class QueryLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class UserSession(Base):
+    """Loophole fix #2: auth was pure stateless JWT with no way to revoke a
+    token before its natural expiry -- /logout did nothing server-side. Every
+    issued access token now gets a row here (id = the token's jti claim), so
+    logout, admin-forced logout, and "log out of all devices" all become a
+    single UPDATE rather than being architecturally impossible."""
+    __tablename__ = "user_sessions"
+
+    id = Column(String, primary_key=True)  # the JWT's jti claim
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    issued_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    user_agent = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+
+
+class LoginAttempt(Base):
+    """Loophole fix #3: /login had no brute-force protection at all -- unlimited
+    password guesses against any account. Every attempt (success or failure)
+    is logged here; the login route checks recent failures for an email
+    before even touching the password hash."""
+    __tablename__ = "login_attempts"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String, nullable=False, index=True)
+    success = Column(Boolean, nullable=False)
+    attempted_at = Column(DateTime, default=datetime.utcnow, index=True)
+    ip_address = Column(String, nullable=True)
+
+
 class Correction(Base):
     """Correction Memory: a deterministic, auditable log of
     human-flagged verdict corrections, checked BEFORE the normal verification
