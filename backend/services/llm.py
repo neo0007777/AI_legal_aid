@@ -24,12 +24,12 @@ def call_groq(system_prompt: str, user_message: str, json_mode: bool = False, mo
     from groq import Groq
     global _ACTIVE_GROQ_MODEL
 
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"), timeout=25.0)
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"), timeout=25.0, max_retries=1)
     target_model = model or get_active_model()
 
     # Respect free tier token limits (Groq free tier limits TPM to 8000; total requested = prompt + max_tokens)
     if max_tokens:
-        tokens_limit = min(max_tokens, 2048)
+        tokens_limit = min(max_tokens, 2800)
     else:
         tokens_limit = 750 if "qwen" in target_model.lower() else 2048
 

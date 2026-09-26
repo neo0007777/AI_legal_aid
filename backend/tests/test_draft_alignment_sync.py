@@ -133,3 +133,60 @@ def test_documents_draft_system_prompt_has_full_court_pleading_sections():
     assert "SECTION VII: AFFIDAVIT IN SUPPORT OF APPLICATION" in DRAFT_SYSTEM_PROMPT
     assert "SECTION VIII: FORMAL VERIFICATION & COUNSEL ATTESTATION" in DRAFT_SYSTEM_PROMPT
 
+
+def test_complete_draft_review_scoring_never_clamped_to_15(monkeypatch):
+    """Verify that a complete, court-ready 8-section draft receives a high score (85+) and never clamps to 15."""
+    complete_draft = """
+SECTION I: SYNOPSIS & LIST OF DATES AND EVENTS
+SYNOPSIS:
+The Applicant seeks regular bail under Section 483 BNSS (Section 439 CrPC) in FIR No. 101/2024.
+LIST OF DATES AND EVENTS:
+01.08.2024: FIR registered.
+10.08.2024: Applicant arrested.
+
+SECTION II: COMPLETE CAUSE TITLE & MEMO OF PARTIES
+IN THE COURT OF SESSIONS JUDGE AT NEW DELHI
+BAIL APPLICATION NO. 101 OF 2024
+IN THE MATTER OF:
+Applicant ... APPLICANT
+VERSUS
+State ... RESPONDENT
+APPLICATION UNDER SECTION 483 BNSS, 2023 (SECTION 439 CrPC, 1973)
+
+SECTION III: APPLICATION / FACTUAL MATRIX WITH IN-TEXT ANNEXURE CITATIONS
+MOST RESPECTFULLY SHOWETH:
+1. That the Applicant was arrested and copy of FIR is marked as ANNEXURE A-1.
+2. That the investigation is complete and charge-sheet has been filed.
+
+SECTION IV: SUBSTANTIVE LEGAL GROUNDS
+Ground A: Dual statute compliance under Section 483 BNSS read with Section 439 CrPC.
+Ground B: No prima facie case is made out against the Applicant.
+Ground C: Undertaking that Applicant shall not tamper with evidence.
+
+SECTION V: PRAYER & INTERIM RELIEF
+PRAYER: Grant regular bail to the applicant.
+
+SECTION VI: FORMAL INDEX OF ANNEXURES / EXHIBITS TABLE
+| S.No. | Annexure Mark | Description | Date | Page No. |
+| 1. | Annexure A-1 | True copy of FIR | 01.08.2024 | 1-5 |
+
+SECTION VII: AFFIDAVIT IN SUPPORT OF APPLICATION
+I, Deponent, do hereby solemnly affirm that Annexure A-1 is a true copy of original.
+
+SECTION VIII: FORMAL VERIFICATION & COUNSEL ATTESTATION
+Verified at New Delhi on this 26th day of September 2026.
+THROUGH COUNSEL FOR THE APPLICANT
+    """
+
+    def mock_review_llm(sys_prompt, user_msg, json_mode=False, **kwargs):
+        return '{"overall_score": 92, "strengths": ["All 8 pleading sections are properly formatted", "Dual-statute BNSS/CrPC invocation included", "Index of Annexures table provided"], "critical": [], "warnings": [], "suggestions": [], "missing_sections": []}'
+
+    monkeypatch.setattr("services.review_engine.call_llm", mock_review_llm)
+
+    review = run_hybrid_review(complete_draft, "Bail Application")
+    assert review.overall_score >= 85, f"Score was {review.overall_score}, expected >= 85"
+    assert review.overall_score != 15, "Score should not be clamped to 15!"
+    assert len(review.missing_sections) == 0, f"Expected 0 missing sections, got {review.missing_sections}"
+    assert len(review.critical) == 0, f"Expected 0 critical issues, got {review.critical}"
+
+

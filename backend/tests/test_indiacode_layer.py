@@ -1,7 +1,14 @@
 import unittest
 import hashlib
 import json
+import os
 from unittest.mock import patch, MagicMock
+from dotenv import load_dotenv
+
+load_dotenv()
+if not os.getenv("JWT_SECRET_KEY"):
+    os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-unit-testing-32chars"
+
 from sqlalchemy.orm import Session
 
 from models.database import SessionLocal, create_tables, Act, Provision, StatuteMapping, IngestionLog
@@ -430,21 +437,31 @@ class TestIndiaCodeDataLayer(unittest.TestCase):
             ]
         )
 
+        import asyncio
+        from routes.documents import generate_draft_stream, DraftRequest
+
+        async def _run():
+            events = []
+            async for ev in generate_draft_stream(
+                req=DraftRequest(description="Bail under Section 483 BNSS for accused in custody"),
+                local_only=False,
+                db=self.db,
+                current_user=dummy_user,
+            ):
+                events.append(ev)
+            return events
+
         with patch("routes.documents.resolve_and_lock_statutory_metadata", return_value=conflicted_corpus):
-            with self.assertRaises(HTTPException) as cm:
-                generate_draft(
-                    req=DraftRequest(description="Bail under Section 483 BNSS for accused in custody"),
-                    request=mock_req,
-                    db=self.db,
-                    current_user=dummy_user,
-                )
-            self.assertEqual(cm.exception.status_code, 409)
-            self.assertIn("SOURCE_CONFLICT", str(cm.exception.detail))
-            self.assertIn("Do not generate a legal document from it until resolved", str(cm.exception.detail))
+            events = asyncio.run(_run())
+            err = next((e for e in events if e.get("type") == "error"), None)
+            self.assertIsNotNone(err)
+            self.assertIn("SOURCE_CONFLICT", err["message"])
+            self.assertIn("Do not generate a legal document from it until resolved", err["message"])
 
     def test_30_clean_generation_proceeds_when_verified(self):
         """TEST 30: Document generation proceeds normally without 409 when provisions are verified."""
-        from routes.documents import generate_draft, DraftRequest
+        import asyncio
+        from routes.documents import generate_draft_stream, DraftRequest
         from models.database import User
         from unittest.mock import MagicMock
 
@@ -452,18 +469,25 @@ class TestIndiaCodeDataLayer(unittest.TestCase):
         mock_req = MagicMock()
         mock_req.headers = {"x-local-only": "false"}
 
+        async def _run():
+            events = []
+            async for ev in generate_draft_stream(
+                req=DraftRequest(description="Application for regular bail under Section 483 BNSS for accused in custody"),
+                local_only=False,
+                db=self.db,
+                current_user=dummy_user,
+            ):
+                events.append(ev)
+            return events
+
         # Patch call_llm and search_drafts so it completes without external APIs
         with patch("routes.documents.search_drafts", return_value=[{"metadata": {"filename": "test.txt", "category": "criminal"}, "text": "Sample template text", "score": 0.95}]), \
              patch("routes.documents.call_llm", return_value="1. Heading: In the High Court...\n2. Verified Facts: Accused in custody...\n3. Grounds: Section 483 BNSS...\n4. Prayer: Grant bail."):
-            resp = generate_draft(
-                req=DraftRequest(description="Application for regular bail under Section 483 BNSS for accused in custody"),
-                request=mock_req,
-                db=self.db,
-                current_user=dummy_user,
-            )
-            self.assertIsNotNone(resp.draft)
-            self.assertIn("Section 483", resp.draft)
-            self.assertFalse(resp.provenance_report.get("source_locked_corpus", {}).get("has_source_conflict", False))
+            events = asyncio.run(_run())
+            done_ev = next((e for e in events if e.get("type") == "done"), None)
+            self.assertIsNotNone(done_ev)
+            self.assertIn("Section 483", done_ev["draft"])
+            self.assertFalse(done_ev.get("provenance_report", {}).get("source_locked_corpus", {}).get("has_source_conflict", False))
 
 
 if __name__ == "__main__":

@@ -465,14 +465,45 @@ def enforce_consistency_and_regenerate(
     3. Deterministically enforces exact database values for any residual variations.
     Never returns a document violating the India Code source lock.
     """
-    violations = audit_document_consistency(document_text, locked_corpus)
+    current_text = document_text
+
+    # Fast deterministic pass: Programmatically replace known corrupted phrases with exact DB titles
+    for act_id, act in locked_corpus.acts.items():
+        db_title = act.title
+        # Replace "BNSS Act" or "BNS Act" -> exact title
+        current_text = re.sub(rf"\b{act_id.upper()}\s+Act\b", db_title, current_text, flags=re.IGNORECASE)
+        # Replace "Brihanmumbai..." -> exact title
+        current_text = re.sub(r"\bBrihanmumbai[\w\s\-]+Sanhita\b", db_title, current_text, flags=re.IGNORECASE)
+
+    # Cross-sanhita procedural section typos (e.g. Section 483 / 482 / 480 is BNSS, not BNS)
+    for bnss_sec in ["483", "482", "480", "479"]:
+        current_text = re.sub(rf"\bSection\s+{bnss_sec}\s+BNS\b", f"Section {bnss_sec} BNSS", current_text, flags=re.IGNORECASE)
+
+    violations = audit_document_consistency(current_text, locked_corpus)
+    if violations:
+        # Deterministically tag unverified section citations with [REQUIRES VERIFICATION]
+        has_unverified_tags = False
+        for v in violations:
+            if v.get("type") == "unverified_section_not_flagged":
+                sec_num = v.get("section", "")
+                act_hint = v.get("act", "")
+                if sec_num and act_hint:
+                    current_text = re.sub(
+                        rf"\bSection\s+{re.escape(sec_num)}\s+{re.escape(act_hint.upper())}\b(?!\s*\[REQUIRES)",
+                        f"Section {sec_num} {act_hint.upper()} [REQUIRES VERIFICATION]",
+                        current_text,
+                        flags=re.IGNORECASE,
+                    )
+                    has_unverified_tags = True
+        if has_unverified_tags:
+            violations = audit_document_consistency(current_text, locked_corpus)
+
     if not violations:
         logger.info("Post-generation India Code source-lock audit PASSED.")
-        return document_text, []
+        return current_text, []
 
     logger.warning(f"Post-generation audit found {len(violations)} violations: {violations}")
 
-    current_text = document_text
     retries = 0
 
     while violations and retries < max_retries and llm_regenerate_fn:

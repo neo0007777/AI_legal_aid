@@ -161,42 +161,51 @@ def run_hybrid_review(
 
 
     # 5. LLM Comparison & Legal Quality Reasoning
-    system_prompt = f"""You are a Senior Indian Legal Reviewer performing a comprehensive review of a {doc_type}.
+    system_prompt = f"""You are a Senior Indian Legal Reviewer performing a comprehensive, objective review of a {doc_type}.
 
 You are provided with:
-1. The User's Draft
-2. Top-5 Retrieved Landmark Reference Templates from Qdrant
+1. The User's Complete Draft
+2. Highlights of Reference Templates from Qdrant
 
 YOUR TASK:
-Compare the User's Draft against the Top-5 Reference Templates to evaluate:
-1. Missing essential sections or clauses present in standard reference templates
-2. Structural differences or formatting inconsistencies (e.g. missing execution block, unnumbered clauses)
-3. Legal quality, strength of arguments/grounds, and ambiguous phrasing
-4. Substantive legal risk analysis
+Perform an objective legal review of the draft against standard Indian court practice.
 
-CRITICAL CONSTRAINTS:
-- Do NOT rewrite the document.
-- Base structural expectations on the retrieved Top-5 templates.
-- Output MUST be valid JSON strictly adhering to this schema:
+STRICT REVIEW & CALIBRATION GUIDELINES:
+1. ACCURATE SECTION RECOGNITION (DO NOT HALLUCINATE MISSING SECTIONS):
+   - Check if standard sections exist: Synopsis & Dates, Cause Title & Parties, Factual Matrix, Substantive Grounds, Prayer / Relief, Annexures Index, Affidavit, Verification.
+   - If a section exists under equivalent or standard headings, it is PRESENT. Do NOT list it under "missing_sections"!
+   - Do NOT invent artificial missing sections (e.g. do not invent Section IX, X, XI, etc.).
+   - Only list genuinely missing essential sections in "missing_sections".
+
+2. STRICT SEVERITY CLASSIFICATION:
+   - "critical": ONLY fatal legal or procedural defects that would cause immediate court rejection (e.g., completely missing Prayer/Relief, citing repealed laws without governing 2023 Sanhitas, or wrong relief type such as claiming anticipatory bail for an accused in custody).
+   - "warning": Missing standard procedural components (e.g. missing formal index of annexures table, unverified placeholders, missing verification).
+   - "suggestions": Stylistic advice, case law citations, or drafting polish. NEVER categorize lack of case law or stylistic improvements as critical!
+
+3. PLACEHOLDER CONSOLIDATION:
+   - Do NOT create separate warnings for individual [NOT PROVIDED] or bracketed placeholders (such as dates, case number, or personal details). Consolidate all unfilled placeholders into at most ONE single warning: "Unfilled Placeholders / Particulars".
+
+4. CONSTRAINTS:
+   - Do NOT rewrite the document.
+   - Output MUST be valid JSON strictly adhering to this schema:
 {{
   "summary": "2-sentence executive legal review summary",
-  "missing_sections": ["Section / Clause 1", "Section / Clause 2"],
+  "missing_sections": ["Only genuinely omitted essential sections"],
   "critical": [
-     {{"id": "CRIT_1", "category": "critical", "title": "Title", "description": "Legal/structural deficiency", "suggested_fix": "Remedial action"}}
+     {{"id": "CRIT_1", "category": "critical", "title": "Title", "description": "Fatal defect", "suggested_fix": "Remedial action"}}
   ],
   "warnings": [
-     {{"id": "WARN_1", "category": "warning", "title": "Title", "description": "Minor omission/ambiguity", "suggested_fix": "Remedial action"}}
+     {{"id": "WARN_1", "category": "warning", "title": "Title", "description": "Procedural issue / placeholder", "suggested_fix": "Remedial action"}}
   ],
   "suggestions": [
-     {{"id": "SUGG_1", "category": "suggestion", "title": "Title", "description": "Style/drafting tip", "suggested_fix": "Remedial action"}}
+     {{"id": "SUGG_1", "category": "suggestion", "title": "Title", "description": "Style/case law recommendation", "suggested_fix": "Remedial action"}}
   ]
 }}"""
-
 
     user_msg = f"""Document Type: {doc_type}
 
 User Draft to Review:
-{draft[:2500]}
+{draft[:14000]}
 
 Reference Structure Highlights:
 {ref_templates_text[:1200]}"""
@@ -254,8 +263,8 @@ Reference Structure Highlights:
     # ── Annexure & Document Handling Structural Checks ──
     is_court_doc = doc_type in ("Bail Application", "Petition", "Affidavit") or any(kw in draft_lower for kw in ["in the court of", "bail application", "petition", "appellant", "applicant", "respondent"])
     if is_court_doc:
-        has_annexure_index = "index of annexures" in draft_lower or "list of documents" in draft_lower or ("annexure" in draft_lower and "particulars" in draft_lower)
-        has_annexure_cites = any(k in draft_lower for k in ["annexure a-", "annexure p-", "annexure 1", "annexure-1", "annexure i"])
+        has_annexure_index = any(k in draft_lower for k in ["index of annexures", "list of annexures", "list of documents", "table of annexures", "formal index of annexures"]) or ("annexure" in draft_lower and any(p in draft_lower for p in ["particulars", "s.no", "|"]))
+        has_annexure_cites = any(k in draft_lower for k in ["annexure a-", "annexure a‑", "annexure p-", "annexure 1", "annexure-1", "annexure i"])
         if not has_annexure_index or not has_annexure_cites:
             warning_issues.append(ReviewIssue(
                 id="MISSING_ANNEXURE_INDEX",
@@ -267,12 +276,12 @@ Reference Structure Highlights:
             if "Index of Annexures (Annexures A-1 to A-4)" not in missing_sections:
                 missing_sections.append("Index of Annexures (Annexures A-1 to A-4)")
 
-        has_synopsis_dates = ("synopsis" in draft_lower and "list of dates" in draft_lower) or "dates & events" in draft_lower or "dates and events" in draft_lower
+        has_synopsis_dates = ("synopsis" in draft_lower and any(d in draft_lower for d in ["date", "events"])) or "dates & events" in draft_lower or "dates and events" in draft_lower
         if not has_synopsis_dates:
             if "Synopsis & List of Dates and Events" not in missing_sections:
                 missing_sections.append("Synopsis & List of Dates and Events")
 
-        has_affidavit_support = "affidavit in support" in draft_lower or ("affidavit" in draft_lower and "deponent" in draft_lower and "solemnly affirm" in draft_lower)
+        has_affidavit_support = "affidavit" in draft_lower and any(k in draft_lower for k in ["deponent", "solemnly affirm", "support of application", "support of the"])
         if not has_affidavit_support:
             if "Affidavit in Support of Application with Verification" not in missing_sections:
                 missing_sections.append("Affidavit in Support of Application with Verification")
@@ -280,16 +289,30 @@ Reference Structure Highlights:
     # ── Deterministic Procedural Posture Checks ──
     if procedural_posture:
         if procedural_posture.relief_type == "regular_bail":
-            if any(k in draft_lower for k in ["482 bnss", "section 482", "438 crpc", "section 438", "anticipatory bail"]):
+            is_captioned_anticipatory = any(p in draft_lower for p in [
+                "for grant of anticipatory bail",
+                "application for anticipatory bail",
+                "praying for anticipatory bail",
+                "pleased to grant anticipatory bail",
+                "under section 438 cr.p.c. for anticipatory",
+                "under section 482 bnss for anticipatory"
+            ])
+            if is_captioned_anticipatory:
                 critical_issues.append(ReviewIssue(
                     id="PROCEDURAL_POSTURE_MISMATCH",
                     category="critical",
                     title="Procedural Posture Mismatch: Anticipatory vs Regular Bail",
-                    description="The matter is Regular Bail (custody), but the draft invokes Anticipatory Bail provisions (Section 482 BNSS / 438 CrPC). Do not use provisions governing one type of relief for another.",
+                    description="The matter is Regular Bail (custody), but the draft invokes Anticipatory Bail relief. Do not use provisions governing one type of relief for another.",
                     suggested_fix="Replace with governing regular bail provision (Section 483 BNSS / 439 CrPC)."
                 ))
         elif procedural_posture.relief_type == "anticipatory_bail":
-            if any(k in draft_lower for k in ["483 bnss", "section 483", "439 crpc", "section 439", "judicial custody", "in custody since"]):
+            is_captioned_regular = any(p in draft_lower for p in [
+                "for grant of regular bail",
+                "application for regular bail",
+                "in custody since",
+                "presently detained in judicial custody"
+            ])
+            if is_captioned_regular:
                 critical_issues.append(ReviewIssue(
                     id="PROCEDURAL_POSTURE_MISMATCH",
                     category="critical",
@@ -334,8 +357,32 @@ Reference Structure Highlights:
                 suggested_fix="Reframe as an undertaking: 'The Applicant undertakes not to tamper with evidence or influence witnesses.'"
             ))
 
+    def section_actually_missing(section_name: str, text_lower: str) -> bool:
+        sec_l = section_name.lower()
+        if any(k in sec_l for k in ["synopsis", "dates and events", "dates & events"]):
+            return not (("synopsis" in text_lower and "date" in text_lower) or "dates & events" in text_lower or "dates and events" in text_lower)
+        if any(k in sec_l for k in ["cause title", "memo of parties", "parties"]):
+            return not (any(k in text_lower for k in ["in the court of", "versus", "memo of parties", "applicant", "respondent"]))
+        if any(k in sec_l for k in ["factual matrix", "facts"]):
+            return not (any(k in text_lower for k in ["factual matrix", "facts", "most respectfully showeth"]))
+        if any(k in sec_l for k in ["ground", "grounds"]):
+            return not (any(k in text_lower for k in ["ground", "grounds", "substantive legal grounds"]))
+        if any(k in sec_l for k in ["prayer", "relief"]):
+            return not (any(k in text_lower for k in ["prayer", "prayed that", "pray that", "grant of bail"]))
+        if any(k in sec_l for k in ["annexure", "index of annexures", "list of annexures"]):
+            return not (any(k in text_lower for k in ["index of annexures", "list of annexures", "annexure a-", "annexure a‑", "annexure-1", "annexure 1"]))
+        if any(k in sec_l for k in ["affidavit", "affirmation"]):
+            return not (any(k in text_lower for k in ["affidavit", "deponent", "solemnly affirm"]))
+        if any(k in sec_l for k in ["verification", "verify"]):
+            return not (any(k in text_lower for k in ["verification", "verified at", "verified on"]))
+        if any(k in sec_l for k in ["undertaking", "surety"]):
+            return not (any(k in text_lower for k in ["undertake", "undertakes", "undertaking"]))
+        if any(k in sec_l for k in ["counsel", "signature", "execution"]):
+            return not (any(k in text_lower for k in ["through counsel", "advocate", "deponent", "applicant", "signature", "signed"]))
+        return sec_l not in text_lower
+
     try:
-        raw_llm_json = call_llm(system_prompt, user_msg, json_mode=True)
+        raw_llm_json = call_llm(system_prompt, user_msg, json_mode=True, max_tokens=1500)
         clean_json = raw_llm_json
         if "```json" in clean_json:
             clean_json = clean_json.split("```json")[1].split("```")[0].strip()
@@ -345,27 +392,38 @@ Reference Structure Highlights:
         parsed = json.loads(clean_json)
         summary_text = parsed.get("summary", "")
         for ms in parsed.get("missing_sections", []):
-            if ms not in missing_sections:
-                missing_sections.append(ms)
+            if isinstance(ms, str) and section_actually_missing(ms, draft_lower):
+                if ms not in missing_sections:
+                    missing_sections.append(ms)
 
         for c in parsed.get("critical", []):
-            critical_issues.append(ReviewIssue(**c))
+            if isinstance(c, dict):
+                critical_issues.append(ReviewIssue(**c))
+            elif isinstance(c, str):
+                critical_issues.append(ReviewIssue(id=f"CRIT_{len(critical_issues)+1}", category="critical", title=c[:40], description=c, suggested_fix="Address this critical defect."))
+
         for w in parsed.get("warnings", []):
-            warning_issues.append(ReviewIssue(**w))
+            if isinstance(w, dict):
+                warning_issues.append(ReviewIssue(**w))
+            elif isinstance(w, str):
+                warning_issues.append(ReviewIssue(id=f"WARN_{len(warning_issues)+1}", category="warning", title=w[:40], description=w, suggested_fix="Address this procedural warning."))
+
         for s in parsed.get("suggestions", []):
-            suggestion_issues.append(ReviewIssue(**s))
+            if isinstance(s, dict):
+                suggestion_issues.append(ReviewIssue(**s))
+            elif isinstance(s, str):
+                suggestion_issues.append(ReviewIssue(id=f"SUGG_{len(suggestion_issues)+1}", category="suggestion", title=s[:40], description=s, suggested_fix="Consider this drafting suggestion."))
     except Exception as e:
         print(f"[ReviewEngine] Generic LLM comparison error: {e}")
 
     # 6. Score & Risk Assessment
     base_score = 100
-    base_score -= len(critical_issues) * 15
-    base_score -= len(warning_issues) * 7
-    base_score -= len(suggestion_issues) * 3
-    base_score -= len(missing_sections) * 8
+    base_score -= len(critical_issues) * 12
+    base_score -= len(warning_issues) * 4
+    base_score -= len(missing_sections) * 6
     # Cap missing fields penalty so [NOT PROVIDED] / [REQUIRES VERIFICATION] markers
-    # (which are grounded behaviors, not hallucinations) do not brand the draft as High Risk.
-    base_score -= min(15, len(missing_fields) * 2)
+    # do not penalize more than 5 points total.
+    base_score -= min(5, len(missing_fields))
 
     overall_score = max(15, min(100, base_score))
 
