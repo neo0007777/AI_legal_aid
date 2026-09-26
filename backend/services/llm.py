@@ -7,9 +7,7 @@ CANDIDATE_GROQ_MODELS = [
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
     "qwen/qwen3.8-27b",
-    "groq/compound-mini",
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
+    "allam-2-7b",
 ]
 
 _ACTIVE_GROQ_MODEL = None
@@ -29,9 +27,9 @@ def call_groq(system_prompt: str, user_message: str, json_mode: bool = False, mo
     client = Groq(api_key=os.getenv("GROQ_API_KEY"), timeout=25.0)
     target_model = model or get_active_model()
 
-    # Respect free tier token limits (qwen has a strict 1000 OTPM limit on free tier)
+    # Respect free tier token limits (Groq free tier limits TPM to 8000; total requested = prompt + max_tokens)
     if max_tokens:
-        tokens_limit = max_tokens
+        tokens_limit = min(max_tokens, 2048)
     else:
         tokens_limit = 750 if "qwen" in target_model.lower() else 2048
 
@@ -109,6 +107,17 @@ def call_llm(system_prompt: str, user_message: str, json_mode: bool = False, for
             except Exception as e:
                 err_str = str(e)
                 print(f"[LLM] Groq model '{target_model}' failed: {e}")
+
+                # If request is too large for TPM limit (e.g. 413 / rate limit exceeded)
+                if "413" in err_str or "too large" in err_str.lower() or "limit 8000" in err_str.lower() or "itpm" in err_str.lower() or "otpm" in err_str.lower():
+                    print(f"[LLM] Payload too large for Groq TPM limit. Retrying with compressed payload & lower max_tokens...")
+                    try:
+                        # Trim user message / context if very long and reduce token limit
+                        trimmed_user = user_message[:3500] if len(user_message) > 3500 else user_message
+                        trimmed_sys = system_prompt[:12000] if len(system_prompt) > 12000 else system_prompt
+                        return call_groq(trimmed_sys, trimmed_user, json_mode=json_mode, model=target_model, max_tokens=1500)
+                    except Exception as retry_tpm_err:
+                        print(f"[LLM] Compressed retry for '{target_model}' failed: {retry_tpm_err}")
 
                 # If rate limited or model not found, try next candidate model immediately
                 if "rate_limit" in err_str or "model_not_found" in err_str or "does not exist" in err_str or "429" in err_str or "404" in err_str:

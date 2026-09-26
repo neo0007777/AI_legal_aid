@@ -439,9 +439,10 @@ async def generate_draft_stream(req: DraftRequest, local_only: bool, db: Session
             yield {"type": "error", "message": "No templates found. Make sure you have run ingest.py first."}
             return
 
+        # Cap reference templates to Top 2 and max 1500 chars each to respect Groq token limits
         context = "\n\n---\n\n".join([
-            f"Template: {r['metadata']['filename']}\nCategory: {r['metadata']['category']}\n\n{r['text']}"
-            for r in results
+            f"Template: {r['metadata']['filename']}\nCategory: {r['metadata']['category']}\n\n{r['text'][:1500]}"
+            for r in results[:2]
         ])
         yield {"type": "stage", "stage": "retrieving_templates", "status": "done"}
 
@@ -476,7 +477,7 @@ Reference Templates from Database:
         initial_draft = call_llm(
             full_system_prompt, user_message,
             force_local=local_only,
-            max_tokens=4096,
+            max_tokens=2048,
         )
 
         if not initial_draft or initial_draft.strip().startswith("⚠️ AI service temporarily unavailable"):
@@ -493,7 +494,7 @@ Reference Templates from Database:
 
         # ── Step 7: Post-Generation Consistency Check & Source-Lock Enforcement ──
         def regenerate_callback(sys_p: str, usr_m: str) -> str:
-            return call_llm(sys_p, usr_m, force_local=local_only, max_tokens=4096)
+            return call_llm(sys_p, usr_m, force_local=local_only, max_tokens=2048)
 
         final_draft, audit_violations = enforce_consistency_and_regenerate(
             document_text=initial_draft,
