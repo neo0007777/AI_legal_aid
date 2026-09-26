@@ -389,7 +389,11 @@ const renderSectionIcon = (iconType) => {
 };
 
 const LegalAid = () => {
-    const { getAuthHeaders } = useAuth();
+    const { user, upgradeToPro, getAuthHeaders } = useAuth();
+    // Advocate Pro is NOT active by default. It is only activated when the user clicks on upgrade to pro.
+    const [isProActive, setIsProActive] = useState(() => {
+        return sessionStorage.getItem('lexsetu_pro_active') === 'true';
+    });
 
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
@@ -576,19 +580,43 @@ const LegalAid = () => {
         setHasSavedMemory(false);
     };
 
-    const handleSendMessage = async (textToSend) => {
+    const handleUpgradeAndRetry = async (targetQuestion) => {
+        setIsProActive(true);
+        sessionStorage.setItem('lexsetu_pro_active', 'true');
+        try {
+            await upgradeToPro();
+        } catch (e) {
+            console.error("Upgrade error:", e);
+        }
+        await handleSendMessage(targetQuestion, true);
+    };
+
+    const handleActivatePro = async () => {
+        setIsProActive(true);
+        sessionStorage.setItem('lexsetu_pro_active', 'true');
+        try {
+            await upgradeToPro();
+        } catch (e) {
+            console.error("Upgrade error:", e);
+        }
+    };
+
+    const handleSendMessage = async (textToSend, forcePro = false) => {
         const text = (textToSend || inputValue).trim();
         if (!text || isThinking) return;
 
-        const userMsg = {
-            id: 'user_' + Date.now(),
-            type: 'user',
-            text: text,
-        };
-
-        setMessages(prev => [...prev, userMsg]);
+        if (!forcePro) {
+            const userMsg = {
+                id: 'user_' + Date.now(),
+                type: 'user',
+                text: text,
+            };
+            setMessages(prev => [...prev, userMsg]);
+        }
         setInputValue('');
         setIsThinking(true);
+
+        const activePro = Boolean(isProActive || forcePro);
 
         try {
             await runStageStream(
@@ -600,16 +628,31 @@ const LegalAid = () => {
                     },
                     body: JSON.stringify({
                         question: text,
-                        n_results: 3,
+                        n_results: activePro ? 5 : 3,
                         structure_mode: structureMode,
                         custom_instructions: customInstructions || null,
                         save_to_memory: false,
+                        upgrade_to_pro: activePro,
                     }),
                 }),
                 {
                     onDone: (data) => {
                         const effectiveMode = data.applied_structure_mode || structureMode;
                         const parsed = parseLegalAidAnswer(data.answer, effectiveMode);
+                        const isProResult = Boolean(data.is_pro || activePro);
+
+                        // If user is pro (or forcePro), they should NEVER be prompted to upgrade
+                        const isBlocked = Boolean(
+                            !isProResult && (
+                                data.requires_upgrade ||
+                                data.answer?.includes('Advocate Pro') ||
+                                data.answer?.toLowerCase().includes('upgrade your plan') ||
+                                data.answer?.toLowerCase().includes('plan does not allow') ||
+                                data.answer?.toLowerCase().includes("plan don't allow") ||
+                                data.answer?.toLowerCase().includes('exceed the scope of the standard') ||
+                                data.answer?.includes('upgrade to the LexSetu')
+                            )
+                        );
 
                         const aiMsg = {
                             id: 'ai_' + Date.now(),
@@ -619,16 +662,9 @@ const LegalAid = () => {
                             applied_structure_mode: effectiveMode,
                             applied_structure_title: data.applied_structure_title || structureTitle,
                             memory_active: data.memory_active,
-                            requires_upgrade: Boolean(
-                                data.requires_upgrade ||
-                                data.answer?.includes('Advocate Pro') ||
-                                data.answer?.toLowerCase().includes('upgrade your plan') ||
-                                data.answer?.toLowerCase().includes('plan does not allow') ||
-                                data.answer?.toLowerCase().includes("plan don't allow") ||
-                                data.answer?.toLowerCase().includes('exceed the scope of the standard') ||
-                                data.answer?.includes('upgrade to the LexSetu')
-                            ),
+                            requires_upgrade: isBlocked,
                             upgrade_tier: data.upgrade_tier || 'LexSetu Advocate Pro / Criminal Defense',
+                            is_pro: isProResult,
                             parsed: parsed,
                             data: {
                                 tags: data.sources?.map(s => s.category).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3) || [],
@@ -636,7 +672,13 @@ const LegalAid = () => {
                             }
                         };
 
-                        setMessages(prev => [...prev, aiMsg]);
+                        setMessages(prev => {
+                            if (forcePro) {
+                                const cleanPrev = prev.filter(m => !(m.requires_upgrade && m.question === text));
+                                return [...cleanPrev, aiMsg];
+                            }
+                            return [...prev, aiMsg];
+                        });
                     },
                     onError: (message) => {
                         setMessages(prev => [...prev, { id: 'err_' + Date.now(), type: 'error', text: message }]);
@@ -665,6 +707,23 @@ const LegalAid = () => {
                 </div>
 
                 <div className="header-actions">
+                    {isProActive ? (
+                        <div className="status-pill pro-status-pill" title="Advocate Pro privileges active">
+                            <Crown size={14} className="text-gold" />
+                            <span>Advocate Pro Active • Dual-Statute Mode</span>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            className="status-pill free-upgrade-pill"
+                            onClick={() => setShowUpgradeModal(true)}
+                            title="Upgrade to Advocate Pro for dual statutes & senior counsel reasoning"
+                        >
+                            <Crown size={14} />
+                            <span>Free Tier • Upgrade to Pro</span>
+                        </button>
+                    )}
+
                     <div className="status-pill">
                         <span className="pulse-dot" />
                         <span>India Kanoon & Bare Acts Grounded</span>
@@ -793,7 +852,7 @@ const LegalAid = () => {
                 ) : (
                     <div className="conversation-flow">
                         {messages.map((msg) => (
-                            <div key={msg.id} className="message-wrapper">
+                            <div key={msg.id} className={`message-wrapper ${msg.type === 'user' ? 'message-wrapper-user' : 'message-wrapper-ai'}`}>
                                 {msg.type === 'user' && (
                                     <div className="user-bubble">
                                         <p>{msg.text}</p>
@@ -811,8 +870,20 @@ const LegalAid = () => {
                                 )}
 
                                 {msg.type === 'structured_ai' && (
-                                    <div className="ai-result-container">
-                                        <div className="ai-response-card">
+                                    <div className={`ai-result-container ${msg.is_pro ? 'pro-result-container' : ''}`}>
+                                        <div className={`ai-response-card ${msg.is_pro ? 'card-pro-tier' : ''}`}>
+                                            {msg.is_pro && (
+                                                <div className="pro-tier-active-ribbon">
+                                                    <div className="pro-ribbon-content">
+                                                        <Crown size={14} className="ribbon-crown" />
+                                                        <span className="ribbon-title">ADVOCATE PRO INTELLIGENCE</span>
+                                                        <span className="ribbon-sub">• Dual Codification (BNS 2023 / Legacy) & Landmark SC Ratio</span>
+                                                    </div>
+                                                    <span className="pro-confidential-tag">
+                                                        <Lock size={11} /> Sec. 126 IEA / Sec. 132 BSA Privileged
+                                                    </span>
+                                                </div>
+                                            )}
                                             {/* Card Top Bar with Structure Badge */}
                                             <div className="card-header-bar">
                                                 <div className="card-header-title">
@@ -926,11 +997,20 @@ const LegalAid = () => {
                                                         </div>
 
                                                         <div className="upgrade-card-actions">
-                                                            <button className="primary-btn upgrade-cta-btn" onClick={() => setShowUpgradeModal(true)}>
-                                                                <Crown size={15} /> Upgrade to Advocate Pro
+                                                            <button
+                                                                type="button"
+                                                                className="primary-btn upgrade-cta-btn"
+                                                                onClick={() => handleUpgradeAndRetry(msg.question)}
+                                                                disabled={isThinking}
+                                                            >
+                                                                <Crown size={15} /> Upgrade to Advocate Pro & Answer Question
                                                             </button>
-                                                            <button className="outline btn-sm upgrade-consult-btn" onClick={() => setShowUpgradeModal(true)}>
-                                                                Schedule Privileged Consultation <ArrowRight size={14} />
+                                                            <button
+                                                                type="button"
+                                                                className="outline btn-sm upgrade-consult-btn"
+                                                                onClick={() => setShowUpgradeModal(true)}
+                                                            >
+                                                                View Pro Privileges <ArrowRight size={14} />
                                                             </button>
                                                         </div>
                                                     </div>
@@ -960,8 +1040,8 @@ const LegalAid = () => {
                                             citations={msg.data.sources}
                                         />
 
-                                        {/* Upgrade to Pro for better reasoning and features - Presented after EVERY result */}
-                                        {!msg.requires_upgrade && (
+                                        {/* Upgrade to Pro for better reasoning and features - Presented after result for Free tier */}
+                                        {!msg.requires_upgrade && !isProActive && !msg.is_pro && (
                                             <div className="pro-reasoning-callout animate-fade-in">
                                                 <div className="pro-callout-left">
                                                     <div className="pro-crown-badge">
@@ -970,16 +1050,37 @@ const LegalAid = () => {
                                                     </div>
                                                     <div className="pro-callout-text">
                                                         <h5>Upgrade to Pro for Deeper Multi-Step Legal Reasoning</h5>
-                                                        <p>Unlock Groq extended reasoning chains, verbatim Supreme Court precedent ratios, and instant court pleading drafts.</p>
+                                                        <p>Unlock dual statutory mapping (BNS/IPC, BNSS/CrPC, BSA/IEA), binding Supreme Court precedent ratios, and courtroom defense strategies.</p>
                                                     </div>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     className="primary-btn pro-callout-cta"
-                                                    onClick={() => setShowUpgradeModal(true)}
+                                                    onClick={() => handleUpgradeAndRetry(msg.question)}
+                                                    disabled={isThinking}
                                                 >
                                                     <Sparkles size={14} /> Upgrade to Pro
                                                 </button>
+                                            </div>
+                                        )}
+
+                                        {/* Advocate Pro Active Badge footer for Pro users */}
+                                        {!msg.requires_upgrade && (isProActive || msg.is_pro) && (
+                                            <div className="pro-active-callout animate-fade-in">
+                                                <div className="pro-callout-left">
+                                                    <div className="pro-crown-badge active">
+                                                        <Crown size={16} />
+                                                        <span>ADVOCATE PRO ACTIVE</span>
+                                                    </div>
+                                                    <div className="pro-callout-text">
+                                                        <h5>Senior Advocate Multi-Step Reasoning Enabled</h5>
+                                                        <p>Dual statutory mapping (BNS/IPC, BNSS/CrPC, BSA/IEA), authoritative Supreme Court ratio decidendi, and Section 126/132 privileged advisory active.</p>
+                                                    </div>
+                                                </div>
+                                                <div className="pro-active-tag">
+                                                    <CheckCircle2 size={16} className="text-gold" />
+                                                    <span>Dual-Statute Intelligence</span>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -999,7 +1100,7 @@ const LegalAid = () => {
                                 stages={legalAidStages}
                                 stageOrder={LEGAL_AID_STAGE_ORDER}
                                 stageLabels={LEGAL_AID_STAGE_LABELS}
-                                title={`LexSetu Neural Engine active • Applying ${structureTitle}`}
+                                title={isProActive ? `👑 Advocate Pro Neural Engine • Dual-Statute & Precedent Ratio Mode` : `LexSetu Neural Engine active • Applying ${structureTitle}`}
                             />
                         </div>
                         {connectionLost && (
@@ -1207,8 +1308,19 @@ const LegalAid = () => {
 
                                 <div className="modal-action-row">
                                     <button className="outline" onClick={() => setShowUpgradeModal(false)}>Cancel</button>
-                                    <button className="primary-btn cta-upgrade-now" onClick={() => setUpgradeRequested(true)}>
-                                        Request Advocate Pro Upgrade
+                                    <button
+                                        type="button"
+                                        className="primary-btn cta-upgrade-now"
+                                        onClick={async () => {
+                                            await handleActivatePro();
+                                            setShowUpgradeModal(false);
+                                            const lastBlocked = [...messages].reverse().find(m => m.requires_upgrade);
+                                            if (lastBlocked) {
+                                                handleUpgradeAndRetry(lastBlocked.question);
+                                            }
+                                        }}
+                                    >
+                                        <Crown size={15} /> Confirm & Upgrade to Advocate Pro
                                     </button>
                                 </div>
                             </div>

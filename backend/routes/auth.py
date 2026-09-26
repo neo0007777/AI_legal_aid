@@ -87,6 +87,18 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+@router.post("/upgrade-pro", response_model=UserResponse)
+def upgrade_to_advocate_pro(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Upgrades user account to Advocate Pro tier, unlocking criminal defense, NDPS research, and deep multi-step statutory reasoning."""
+    current_user.role = "advocate"
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
 @router.patch("/me/language", response_model=UserResponse)
 def set_preferred_language(
     payload: LanguagePreferenceRequest,

@@ -144,6 +144,26 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const upgradeToPro = async () => {
+        try {
+            const response = await fetch('/api/auth/upgrade-pro', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setUser(prev => ({
+                    ...prev,
+                    plan: data.role,
+                }));
+                return { success: true, user: data };
+            }
+            return { success: false, message: 'Failed to upgrade tier.' };
+        } catch (error) {
+            return { success: false, message: 'Server connection failed.' };
+        }
+    };
+
     const logout = () => {
         setToken(null);
         setUser(null);
@@ -159,7 +179,7 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={{
             user, token, isAuthenticated: !!token,
-            login, register, logout, loading, getAuthHeaders, serverStatus
+            login, register, logout, upgradeToPro, loading, getAuthHeaders, serverStatus
         }}>
             {children}
         </AuthContext.Provider>

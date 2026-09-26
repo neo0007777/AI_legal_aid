@@ -224,6 +224,7 @@ class LegalAidRequest(BaseModel):
     structure_mode: Optional[str] = None  # standard | executive_brief | irac | bullet_points | custom
     custom_instructions: Optional[str] = None
     save_to_memory: Optional[bool] = False
+    upgrade_to_pro: Optional[bool] = False
 
 
 class LegalAidMemoryRequest(BaseModel):
@@ -249,6 +250,7 @@ class LegalAidResponse(BaseModel):
     applied_structure_title: Optional[str] = "Standard Judicial"
     memory_active: Optional[bool] = False
     custom_instructions: Optional[str] = None
+    is_pro: Optional[bool] = False
 
 
 # ─── Correction Memory & Translation ──────────────────

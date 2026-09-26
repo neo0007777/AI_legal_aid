@@ -23,13 +23,17 @@ router = APIRouter()
 NON_LEGAL_PATTERNS = [
     # Code generation and programming requests
     r"\b(write|create|generate|give\s+me|build|provide|show|share)\s+(a\s+)?(python|javascript|java|c\+\+|c#|golang|rust|html|css|sql|bash|shell|node|php|react)\s*(code|script|program|function|app)?\b",
-    r"\b(write|create|generate|provide)\s+(a\s+)?(code|script|program|software|algorithm)\b",
-    r"\b(python|javascript|java|c\+\+|bash)\s+(code|script|program)\b",
+    r"\b(write|create|generate|provide|give)\s+(me\s+)?(a\s+)?(code|script|program|software|algorithm)\b",
+    r"\bcode\s+(for\s+me|in\s+python|in\s+javascript|to\s+solve|to\s+do)\b",
     r"^(write\s+python|python\s+code|write\s+code|give\s+code|script\s+for|code\s+for)\b",
     r"\b(how\s+to\s+code|debug|fix\s+my\s+code|compile|syntax\s+error|pip\s+install|npm\s+install)\b",
+    r"\b(write|give)\s+code\b",
+    # Culinary recipes and cooking requests
+    r"\b(recip(e|ie)s?)\b",
+    r"\b(how\s+to\s+(cook|bake|make\s+food|make\s+tea|make\s+coffee)|cooking\s+instructions?|ingredients?\s+for)\b",
+    r"\b(tell\s+me\s+.*recip(e|ie)|give\s+me\s+.*recip(e|ie)|how\s+to\s+make\s+(pasta|pizza|biryani|paneer|cake|curry|soup|bread))\b",
     # Non-legal creative writing and general topics
     r"\b(write\s+a\s+(poem|song|story|essay|joke|script\s+for\s+a\s+movie))\b",
-    r"\b(recipe\s+for|how\s+to\s+cook|how\s+to\s+bake|ingredients\s+for)\b",
     r"\b(solve\s+this\s+(math|equation|algebra|calculus))\b",
     r"\b(weather\s+in|who\s+won\s+the\s+match|cricket\s+score|movie\s+recommendation)\b",
 ]
@@ -64,19 +68,20 @@ ILLEGAL_FACILITATION_PATTERNS = [
 ]
 
 NON_LEGAL_ANSWER = """DIRECT ANSWER:
-LexSetu is exclusively an Indian legal intelligence platform. We only reply to legal questions, statutory research inquiries, and court procedural matters. We do not generate programming code, software scripts, or non-legal general technical solutions.
+LexSetu is exclusively an Indian legal intelligence platform. We only answer legal questions, statutory research inquiries, and courtroom procedural matters. We do not generate programming code, culinary recipes, software scripts, or non-legal general technical/creative solutions.
 
 LEGAL BASIS:
-Platform Domain Scope: LexSetu Legal Intelligence Terms of Service.
+Platform Domain Scope: LexSetu Legal Intelligence Terms of Service & Exclusive Legal Aid Mandate.
 
 BINDING PRECEDENTS:
-Not applicable for non-legal software or coding requests.
+Not applicable for non-legal queries.
 
 ACTIONABLE INSIGHT:
-Please ask a question regarding Indian law—such as provisions under the Bharatiya Nyaya Sanhita (BNS), Code of Civil Procedure (CPC), Bharatiya Nagarik Suraksha Sanhita (BNSS), contract enforceability, bail procedure, consumer rights, or judicial precedents. For software development or coding scripts, please consult general programming tools.
+1. Legal Inquiries Only: Please ask questions relating to Indian law, such as provisions under the Bharatiya Nyaya Sanhita (BNS), Code of Criminal Procedure (BNSS/CrPC), Civil Procedure (CPC), Indian Evidence Act / BSA, contract laws, property disputes, bail procedures, or court precedents.
+2. Non-Legal Refusal: For software development, coding scripts, cooking recipes, or general knowledge, please consult specialized general-purpose tools.
 
 DISCLAIMER:
-LexSetu standard tier is strictly dedicated to Indian legal aid, statutory provisions, and judicial research."""
+LexSetu is strictly restricted to Indian legal advisory and statutory intelligence. Non-legal queries (such as coding requests or recipes) cannot be processed on either Free or Advocate Pro tiers."""
 
 SUBSTANCE_OR_EXTREME_UPGRADE_ANSWER = """DIRECT ANSWER:
 Your current plan does not allow answering this question.
@@ -330,11 +335,23 @@ async def ask_legal_question_stream(
     structure_mode: Optional[str] = None,
     custom_instructions: Optional[str] = None,
     save_to_memory: bool = False,
+    upgrade_to_pro: bool = False,
 ):
     """Mirrors citation_verifier.verify_filing_stream's shape: one {"type": "stage",
     stage, status} event per real transition, a single terminal {"type": "done", ...}
     event carrying today's /ask response body, or {"type": "error", message} on failure."""
     try:
+        # Check if user requested an instant upgrade or already has Advocate Pro tier
+        if upgrade_to_pro and current_user:
+            user_in_db = db.query(User).filter(User.id == current_user.id).first()
+            if user_in_db and user_in_db.role != "advocate":
+                user_in_db.role = "advocate"
+                db.commit()
+            current_user.role = "advocate"
+
+        # Advocate Pro is NOT active by default; it is only activated when explicitly requested via upgrade_to_pro
+        is_pro = bool(upgrade_to_pro)
+
         # 1. Resolve user formatting memory and structure guidance
         saved_memory = db.query(LegalAidMemory).filter(LegalAidMemory.user_id == current_user.id).first()
         detected_mode, detected_guidance = detect_structure_from_query(question)
@@ -361,13 +378,32 @@ async def ask_legal_question_stream(
         unlawful = False if (non_legal or substance) else is_unlawful_query(question)
         yield {"type": "stage", "stage": "parsing_query", "status": "done"}
 
-        if non_legal or substance or unlawful:
-            skip_reason = "Scope rule matched — answered directly, no retrieval or generation needed"
+        # Scope Rule 1: Strictly Indian legal queries only — reject code, recipes, poems for ALL users (Free & Pro alike)
+        if non_legal:
+            skip_reason = "Platform domain policy: strictly Indian legal queries only (no code/recipes)"
             for stage in ("retrieving_sources", "generating_answer", "attaching_sources"):
                 yield {"type": "stage", "stage": stage, "status": "skipped", "reason": skip_reason}
-            if non_legal:
-                payload = {"answer": NON_LEGAL_ANSWER, "requires_upgrade": False, "upgrade_tier": None}
-            elif substance:
+            yield {
+                "type": "done",
+                "question": question,
+                "sources": [],
+                "applied_structure_mode": "standard",
+                "applied_structure_title": "Standard Judicial",
+                "memory_active": bool(saved_memory),
+                "custom_instructions": None,
+                "answer": NON_LEGAL_ANSWER,
+                "requires_upgrade": False,
+                "upgrade_tier": None,
+                "is_pro": is_pro,
+            }
+            return
+
+        # Scope Rule 2: Inquiries regarding substances, NDPS, or active penal defense require Advocate Pro tier
+        if (substance or unlawful) and not is_pro:
+            skip_reason = "Plan limitation: inquiries on substances or penal exposure require Advocate Pro tier"
+            for stage in ("retrieving_sources", "generating_answer", "attaching_sources"):
+                yield {"type": "stage", "stage": stage, "status": "skipped", "reason": skip_reason}
+            if substance:
                 payload = {
                     "answer": SUBSTANCE_OR_EXTREME_UPGRADE_ANSWER,
                     "requires_upgrade": True,
@@ -387,12 +423,15 @@ async def ask_legal_question_stream(
                 "applied_structure_title": "Standard Judicial",
                 "memory_active": bool(saved_memory),
                 "custom_instructions": None,
+                "is_pro": False,
                 **payload
             }
             return
 
         yield {"type": "stage", "stage": "retrieving_sources", "status": "started"}
-        results = search_drafts(question, n_results=n_results)
+        # For Advocate Pro users, search more in-depth precedents (n_results=5)
+        search_count = n_results if not is_pro else max(n_results, 5)
+        results = search_drafts(question, n_results=search_count)
         kanoon_results = scrape_indian_kanoon(question)
 
         context_parts = []
@@ -412,43 +451,73 @@ async def ask_legal_question_stream(
 {"Relevant Legal References:" + chr(10) + context if context else "Answer based on your knowledge of Indian law."}"""
 
         yield {"type": "stage", "stage": "generating_answer", "status": "started"}
-        system_prompt = f"""You are LexSetu, an authoritative Indian legal aid intelligence assistant.
+
+        if is_pro:
+            # Advocate Pro System Prompt with Dual Statutory Mapping & Supreme Court Ratios
+            system_prompt = f"""You are LexSetu Advocate Pro, an elite Indian Senior Advocate & Legal Intelligence Engine operating under statutory advocate-client privilege (Section 126 Indian Evidence Act, 1872 / Section 132 Bharatiya Sakshya Adhiniyam, 2023).
+
+You provide deep multi-step legal reasoning, high-stakes litigation analysis, and courtroom-tested strategic defense.
+
+CRITICAL TIER DIRECTIVES (ADVOCATE PRO TIER):
+1. DUAL STATUTORY CODIFICATION (MANDATORY):
+   - Map governing legal provisions across BOTH the newly codified 2023 Sanhitas and legacy enactments:
+     * Bharatiya Nyaya Sanhita (BNS, 2023) alongside corresponding Indian Penal Code (IPC, 1860) sections
+     * Bharatiya Nagarik Suraksha Sanhita (BNSS, 2023) alongside corresponding Code of Criminal Procedure (CrPC, 1973) sections
+     * Bharatiya Sakshya Adhiniyam (BSA, 2023) alongside corresponding Indian Evidence Act (IEA, 1872) sections
+     * Special Statutes where applicable (e.g. NDPS Act 1985 Sections 20, 27, 37, 50, 64A; Negotiable Instruments Act 1881 Section 138; Prevention of Money Laundering Act 2002; Consumer Protection Act 2019; Commercial Courts Act 2015).
+   - Specify exact sub-sections, punishment terms, cognizable/non-cognizable, bailable/non-bailable classifications.
+
+2. BINDING LANDMARK PRECEDENTS & RATIO DECIDENDI:
+   - Cite authoritative Supreme Court of India rulings (Constitution Bench or Division Bench) and relevant High Court authorities.
+   - Include standard official citations (AIR, SCC, SCR, INSC) and articulate the binding legal test (*ratio decidendi*) established in the judgment.
+
+3. COURTROOM LITIGATION PLAYBOOK & PROCEDURAL SAFEGUARDS:
+   - Provide concrete procedural steps, mandatory compliance checkpoints (e.g., Notice under Section 35(3) BNSS / 41A CrPC; mandatory search presence under Section 50 NDPS; D.K. Basu arrest guidelines; Section 480/482 BNSS/CrPC bail/quashing standards).
+   - Detail statutory limitation periods under the Limitation Act, 1963 or specific enactments.
+   - Outline evidentiary defense strategies and pre-trial mitigation tactics.
+
+4. SENSITIVE PENAL INQUIRIES & SUBSTANCES (NDPS / PERSONAL EXPOSURE):
+   - If inquiry touches narcotics, illicit substances (NDPS Act), or penal exposure, provide comprehensive, lawful statutory legal defense guidance under Section 126 IEA / Section 132 BSA privilege.
+   - Analyze statutory exemptions (e.g. Section 27 NDPS penalty vs Section 64A NDPS statutory immunity for voluntary medical detox before chargesheet; small vs commercial quantity thresholds under NDPS Schedule; mandatory compliance with Section 42 & 50 search and seizure rules).
+   - Do NOT encourage crime or evidence tampering, but provide complete legal remedies, bail jurisprudence (Section 37 NDPS twin conditions), and constitutional protection against self-incrimination (Article 20(3)).
+
+5. STRICT NON-LEGAL REFUSAL (NO CODING / NO RECIPES / NO GENERAL TOPICS):
+   - You MUST NEVER write programming code, recipes, or answer non-legal general technical/lifestyle requests.
+
+6. OUTPUT STRUCTURE CONTRACT:
+{structure_prompt_contract}
+
+Style: Authoritative, rigorously analytical, court-ready, and deeply grounded in Indian jurisprudence."""
+        else:
+            # Standard Free Tier System Prompt
+            system_prompt = f"""You are LexSetu, an authoritative Indian legal aid intelligence assistant.
 You provide clear, accurate, and actionable legal guidance based on Indian statutory law and jurisprudence.
 
 CORE SCOPE & OPERATING POLICIES:
-
 1. STRICTLY LEGAL QUERIES ONLY (NO CODING / NO NON-LEGAL TOPICS):
 You exclusively answer questions on Indian law, statutes, court procedures, contract clauses, and judicial precedents.
 You MUST NEVER write programming code (such as Python, JavaScript, HTML, C++, etc.), generate software scripts, debug software, or answer non-legal general questions (recipes, poems, stories, homework math, tech support).
-If the user's question asks to write code, develop software, or covers non-legal general subjects, you MUST refuse immediately. Your DIRECT ANSWER must state:
-"LexSetu is exclusively an Indian legal intelligence platform. We only reply to legal questions, statutory research inquiries, and court procedural matters. We do not generate programming code, software scripts, or non-legal general technical solutions."
-In your ACTIONABLE INSIGHT, instruct them to ask a legal question or consult standard programming tools.
+If the user's question asks to write code, develop software, or covers non-legal general subjects, you MUST refuse immediately.
 
-2. ILLICIT SUBSTANCES, WEED, ETHICALLY SENSITIVE CONDUCT & CRIMINAL EXPOSURE:
-If the user's question involves illicit substances (e.g. weed, cannabis, ganja, drugs, narcotics), sensitive personal penal conduct, or asking for assistance/tricks to commit crimes, evade police, forge documents, or tamper with evidence:
-You MUST NOT answer the question or provide instructions on this standard tier.
-Your DIRECT ANSWER must begin with:
-"Your current plan does not allow answering this question. Inquiries involving illicit substances, sensitive ethical conduct, or active personal penal liabilities cannot be addressed under the standard AI Legal Aid tier. Please upgrade your plan to LexSetu Advocate Pro to access privileged, confidential advocate consultation under Section 126 Evidence Act / Section 132 BSA."
-Your ACTIONABLE INSIGHT must explicitly tell the user:
-"Please upgrade your plan to the LexSetu Advocate Pro tier to consult with an empanelled Senior Criminal Defense Advocate under statutory advocate-client privilege."
-
-3. OUTPUT STRUCTURE CONTRACT:
+2. OUTPUT STRUCTURE CONTRACT:
 {structure_prompt_contract}
 
 Formatting Rules:
 - Present legal holdings and statutory citations cleanly using standard legal formatting.
 - Avoid gratuitous markdown signs, repeated asterisks, or raw formatting artifacts.
-- Be precise, authoritative, empathetic, and clear."""
+- Be concise, accurate, empathetic, and clear."""
 
         answer = call_llm(system_prompt, user_message)
         yield {"type": "stage", "stage": "generating_answer", "status": "done"}
 
-        requires_upgrade = (
-            "Advocate Pro" in answer or
-            ("upgrade" in answer.lower() and "plan" in answer.lower()) or
-            "plan does not allow" in answer.lower() or
-            "does not allow answering" in answer.lower()
-        )
+        requires_upgrade = False
+        if not is_pro:
+            requires_upgrade = (
+                "Advocate Pro" in answer or
+                ("upgrade" in answer.lower() and "plan" in answer.lower()) or
+                "plan does not allow" in answer.lower() or
+                "does not allow answering" in answer.lower()
+            )
 
         yield {"type": "stage", "stage": "attaching_sources", "status": "started"}
         try:
@@ -482,6 +551,7 @@ Formatting Rules:
             "applied_structure_title": effective_title,
             "memory_active": bool(saved_memory),
             "custom_instructions": effective_custom,
+            "is_pro": is_pro,
         }
     except Exception as e:
         print(f"[LegalAid] Unhandled error: {e}")
@@ -506,6 +576,7 @@ async def ask_legal_aid(
             structure_mode=getattr(req, "structure_mode", None),
             custom_instructions=getattr(req, "custom_instructions", None),
             save_to_memory=getattr(req, "save_to_memory", False),
+            upgrade_to_pro=getattr(req, "upgrade_to_pro", False),
         ):
             yield f"data: {json.dumps(event)}\n\n"
 
