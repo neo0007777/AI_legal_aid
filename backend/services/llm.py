@@ -47,9 +47,27 @@ def call_groq(system_prompt: str, user_message: str, json_mode: bool = False, mo
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
 
+    # Reasoning models (like gpt-oss) consume token budgets on internal reasoning;
+    # requesting hidden reasoning ensures all tokens go to the user-facing content.
+    if "gpt-oss" in target_model.lower():
+        kwargs["extra_body"] = {"reasoning_format": "hidden"}
+
     response = client.chat.completions.create(**kwargs)
+    choice = response.choices[0]
+    raw_content = choice.message.content or ""
+
+    # If content is empty but model emitted reasoning, use reasoning as safety fallback
+    if not raw_content.strip() and hasattr(choice.message, "reasoning"):
+        reasoning_text = getattr(choice.message, "reasoning", "") or ""
+        if reasoning_text.strip():
+            raw_content = reasoning_text
+
+    clean_content = raw_content.strip()
+    if not clean_content:
+        raise ValueError(f"Model '{target_model}' returned empty content (finish_reason: {choice.finish_reason})")
+
     _ACTIVE_GROQ_MODEL = target_model
-    return response.choices[0].message.content.strip()
+    return clean_content
 
 
 def call_ollama(system_prompt: str, user_message: str, json_mode: bool = False) -> str:
