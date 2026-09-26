@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Lock, Mail, ArrowRight, AlertCircle, User, Sparkles } from 'lucide-react';
+import {
+    Shield, Lock, Mail, ArrowRight, AlertCircle, User, Sparkles,
+    ShieldCheck, Eye, EyeOff, KeyRound, CheckCircle2, Scale, FileCheck, Database
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { formatErrorMessage } from '../utils/formatError';
 import './Login.css';
@@ -11,6 +14,7 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
     const [role, setRole] = useState('advocate');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -61,34 +65,132 @@ const Login = () => {
 
     return (
         <div className="login-matrix">
+            {/* Left Sovereign Security Showcase Panel */}
             <div className="login-graphic-panel">
-                <div className="logo-vertical">
-                    <img src="/ai-legal-bg.png" alt="LexSetu Logo" className="login-logo-img" />
-                    <h1>LexSetu</h1>
-                    <p>Enterprise Legal Intelligence</p>
-                </div>
-                <div className="graphic-features">
-                    <div className="graphic-item">
-                        <div className="g-icon"><Lock size={18} /></div>
-                        <span>End-to-end AES-256 Document Encryption</span>
+                <div className="security-ambient-orb orb-1" aria-hidden="true" />
+                <div className="security-ambient-orb orb-2" aria-hidden="true" />
+
+                <div className="panel-inner-container">
+                    {/* Brand Header */}
+                    <div className="brand-header-cluster">
+                        <div className="brand-emblem-wrap">
+                            <img src="/ai-legal-bg.png" alt="LexSetu Seal" className="login-logo-img" />
+                            <span className="live-shield-dot" title="Cryptographic Shield Active" />
+                        </div>
+                        <div className="brand-text-block">
+                            <div className="brand-title-row">
+                                <h1>LexSetu</h1>
+                                <span className="security-badge-pill">
+                                    <ShieldCheck size={12} /> SOVEREIGN VAULT
+                                </span>
+                            </div>
+                            <p className="brand-tagline">Enterprise Legal Intelligence & Judicial Drafting Infrastructure</p>
+                        </div>
                     </div>
-                    <div className="graphic-item">
-                        <div className="g-icon"><Shield size={18} /></div>
-                        <span>JWT Secured Authentication</span>
+
+                    {/* High-Impact Trust Hero Banner */}
+                    <div className="trust-hero-card">
+                        <div className="trust-hero-header">
+                            <div className="trust-hero-icon-ring">
+                                <ShieldCheck size={28} className="trust-shield-icon" />
+                            </div>
+                            <div className="trust-hero-copy">
+                                <h3>Statutory Privacy & Data Sovereignty Guarantee</h3>
+                                <p>Built specifically for Advocates, Law Chambers, and Legal Counsel handling sensitive case matters and privileged client records.</p>
+                            </div>
+                        </div>
+
+                        <div className="trust-status-strip">
+                            <div className="trust-status-item">
+                                <span className="pulse-indicator" />
+                                <span>256-Bit Hardware Encryption Active</span>
+                            </div>
+                            <span className="trust-dot-sep">•</span>
+                            <div className="trust-status-item">
+                                <CheckCircle2 size={14} className="green-check" />
+                                <span>Zero Model Training on Your Data</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4 Core Security & Privilege Pillars */}
+                    <div className="security-pillars-grid">
+                        <div className="security-pillar-card">
+                            <div className="pillar-icon-box">
+                                <Scale size={18} />
+                            </div>
+                            <div className="pillar-content">
+                                <h4>Statutory Advocate-Client Privilege</h4>
+                                <p>Protected under Section 126 Evidence Act & Section 132 Bharatiya Sakshya Adhiniyam. Your filings and drafts are legally privileged.</p>
+                            </div>
+                        </div>
+
+                        <div className="security-pillar-card">
+                            <div className="pillar-icon-box">
+                                <Lock size={18} />
+                            </div>
+                            <div className="pillar-content">
+                                <h4>End-to-End AES-256 Vault</h4>
+                                <p>All documents, inquiries, and case records are encrypted in transit via TLS 1.3 and stored in isolated encrypted enclaves.</p>
+                            </div>
+                        </div>
+
+                        <div className="security-pillar-card">
+                            <div className="pillar-icon-box">
+                                <FileCheck size={18} />
+                            </div>
+                            <div className="pillar-content">
+                                <h4>Zero AI Training Retention</h4>
+                                <p>Private client names, factual pleadings, and drafts are never retained or fed into public LLM training datasets.</p>
+                            </div>
+                        </div>
+
+                        <div className="security-pillar-card">
+                            <div className="pillar-icon-box">
+                                <KeyRound size={18} />
+                            </div>
+                            <div className="pillar-content">
+                                <h4>Argon2id & Cryptographic Revocation</h4>
+                                <p>Brute-force lockout protection, timing-attack proof hash validation, and real-time session revocation.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bottom Security Standards Strip */}
+                    <div className="security-compliance-footer">
+                        <div className="compliance-badge">
+                            <Lock size={12} />
+                            <span>AES-256-GCM Vault</span>
+                        </div>
+                        <div className="compliance-badge">
+                            <Shield size={12} />
+                            <span>BSA § 132 Privileged</span>
+                        </div>
+                        <div className="compliance-badge">
+                            <Database size={12} />
+                            <span>India Data Sovereignty</span>
+                        </div>
+                        <div className="compliance-badge">
+                            <Sparkles size={12} />
+                            <span>Airgapped Inference</span>
+                        </div>
                     </div>
                 </div>
             </div>
 
+            {/* Right Interactive Form Panel */}
             <div className="login-interactive-panel">
                 <div className="login-card">
                     <div className="login-tabs">
                         <button
+                            type="button"
                             className={`login-tab ${tab === 'login' ? 'active' : ''}`}
                             onClick={() => { setTab('login'); setError(''); }}
                         >
                             Sign In
                         </button>
                         <button
+                            type="button"
                             className={`login-tab ${tab === 'register' ? 'active' : ''}`}
                             onClick={() => { setTab('register'); setError(''); }}
                         >
@@ -96,12 +198,14 @@ const Login = () => {
                         </button>
                     </div>
 
-                    <h2>{tab === 'login' ? 'Welcome back' : 'Create Account'}</h2>
-                    <p className="login-subtitle">
-                        {tab === 'login'
-                            ? 'Enter your credentials to access the workspace.'
-                            : 'Join LexSetu to get started.'}
-                    </p>
+                    <div className="login-card-header">
+                        <h2>{tab === 'login' ? 'Welcome back' : 'Create Account'}</h2>
+                        <p className="login-subtitle">
+                            {tab === 'login'
+                                ? 'Enter your credentials to access your secure legal workspace.'
+                                : 'Join LexSetu to unlock protected AI legal intelligence.'}
+                        </p>
+                    </div>
 
                     {error && (
                         <div className="login-error-flag animate-fade-in" role="alert">
@@ -148,27 +252,36 @@ const Login = () => {
                             <div className="input-wrapper">
                                 <Lock size={18} className="input-icon" />
                                 <input
-                                    type="password"
+                                    type={showPassword ? 'text' : 'password'}
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
                                 />
+                                <button
+                                    type="button"
+                                    className="password-toggle-btn"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    title={showPassword ? "Hide password" : "Show password"}
+                                    aria-label="Toggle password visibility"
+                                >
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
                             </div>
                         </div>
 
                         {tab === 'register' && (
                             <div className="input-group">
-                                <label>Role</label>
+                                <label>Professional Role</label>
                                 <div className="input-wrapper">
                                     <select
                                         value={role}
                                         onChange={(e) => setRole(e.target.value)}
-                                        style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', background: 'transparent', border: 'none', outline: 'none' }}
+                                        className="role-select"
                                     >
-                                        <option value="advocate">Advocate</option>
-                                        <option value="intern">Legal Intern</option>
-                                        <option value="user">User</option>
+                                        <option value="advocate">Advocate / Legal Counsel</option>
+                                        <option value="intern">Legal Intern / Researcher</option>
+                                        <option value="user">General User / Litigant</option>
                                     </select>
                                 </div>
                             </div>
@@ -179,36 +292,33 @@ const Login = () => {
                             className={`login-submit-btn ${isLoading ? 'loading' : ''}`}
                             disabled={isLoading}
                         >
-                            {isLoading ? 'Authenticating...' : (
-                                <>{tab === 'login' ? 'Sign in' : 'Create Account'} <ArrowRight size={18} /></>
+                            {isLoading ? (
+                                <><Sparkles size={18} className="spin-loader" /> Authenticating...</>
+                            ) : (
+                                <>{tab === 'login' ? 'Sign in to Secure Workspace' : 'Create Protected Account'} <ArrowRight size={18} /></>
                             )}
                         </button>
                     </form>
 
+                    {/* Security & Data Safety Note under form */}
+                    <div className="form-security-guarantee">
+                        <ShieldCheck size={14} className="guarantee-icon" />
+                        <span>Protected by 256-bit TLS encryption • Data stored in India</span>
+                    </div>
+
                     {tab === 'login' && (
-                        <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid #c98659' }}>
+                        <div className="demo-sign-in-section">
+                            <div className="demo-divider">
+                                <span>or continue with test credentials</span>
+                            </div>
                             <button
                                 type="button"
                                 onClick={handleDemoLogin}
                                 disabled={isLoading}
-                                style={{
-                                    width: '100%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '0.5rem',
-                                    padding: '0.75rem 1rem',
-                                    background: 'rgba(99, 18, 14, 0.08)',
-                                    color: '#63120e',
-                                    border: '1px dashed #63120e',
-                                    borderRadius: '8px',
-                                    fontWeight: 600,
-                                    fontSize: '0.88rem',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                }}
+                                className="demo-sign-in-btn"
                             >
-                                <Sparkles size={16} color="#8c3a2a" /> Quick Demo Sign-in (Advocate)
+                                <Sparkles size={15} />
+                                <span>Quick Demo Sign-in <strong>(Advocate Persona)</strong></span>
                             </button>
                         </div>
                     )}
