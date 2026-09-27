@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -85,17 +85,29 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-app.include_router(auth.router,       prefix="/auth",       tags=["Authentication"])
-app.include_router(workflow.router,   prefix="/workflow",   tags=["Workflow & Tasks"])
-app.include_router(compliance.router, prefix="/compliance", tags=["Compliance Monitor"])
-app.include_router(documents.router,  prefix="/documents",  tags=["Document Automation"])
-app.include_router(cases.router,      prefix="/cases",      tags=["Case Search"])
-app.include_router(legal_aid.router,  prefix="/legal-aid",  tags=["Legal Aid"])
-app.include_router(review.router,     prefix="/review",     tags=["Legal Draft Review"])
-app.include_router(citations.router,  prefix="/citations",  tags=["Citation Verification"])
-app.include_router(statutes.router,   prefix="/statutes",   tags=["Statutes & India Code"])
-app.include_router(admin.router,      prefix="/admin",      tags=["Admin"])
-app.include_router(translate.router,  prefix="/translate",  tags=["Translation"])
+# ── Route Registration (Dual Mounting: / and /api) ───────────────────────────
+# Mounts routers under both root (e.g. /auth/login) and /api (e.g. /api/auth/login)
+# so that reverse proxies (Render, Vercel, Vite, Nginx) work seamlessly whether
+# they forward with or without stripping the /api prefix.
+api_router = APIRouter(prefix="/api")
+
+_ROUTE_REGISTRY = [
+    (auth.router,       "/auth",       ["Authentication"]),
+    (workflow.router,   "/workflow",   ["Workflow & Tasks"]),
+    (compliance.router, "/compliance", ["Compliance Monitor"]),
+    (documents.router,  "/documents",  ["Document Automation"]),
+    (cases.router,      "/cases",      ["Case Search"]),
+    (legal_aid.router,  "/legal-aid",  ["Legal Aid"]),
+    (review.router,     "/review",     ["Legal Draft Review"]),
+    (citations.router,  "/citations",  ["Citation Verification"]),
+    (statutes.router,   "/statutes",   ["Statutes & India Code"]),
+    (admin.router,      "/admin",      ["Admin"]),
+    (translate.router,  "/translate",  ["Translation"]),
+]
+
+for sub_router, prefix, tags in _ROUTE_REGISTRY:
+    app.include_router(sub_router, prefix=prefix, tags=tags)
+    api_router.include_router(sub_router, prefix=prefix, tags=tags)
 
 
 @app.get("/", tags=["Health"])
@@ -110,11 +122,13 @@ def root():
 
 
 @app.get("/health", tags=["Health"])
+@api_router.get("/health", tags=["Health"])
 def health():
     return {"status": "ok"}
 
 
 @app.get("/health/ready", tags=["Health"])
+@api_router.get("/health/ready", tags=["Health"])
 def readiness():
     """
     Readiness probe for zero-downtime deployment: confirms database and vector store connectivity.
@@ -150,3 +164,6 @@ def readiness():
             "version": "1.0.0"
         }
     )
+
+
+app.include_router(api_router)
