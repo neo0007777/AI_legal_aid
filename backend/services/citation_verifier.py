@@ -34,6 +34,7 @@ import json
 import re
 import threading
 import time
+import urllib.parse
 from difflib import SequenceMatcher
 
 from services.judgment_search import (
@@ -426,13 +427,18 @@ def verify_citation(citation: dict) -> dict:
     # ── STAGE 1: Internal Identity Resolution ─────────────────────────────────
     internal_case = resolve_internal_case_identity(parsed)
     if internal_case:
+        cid = re.sub(r"^ik_", "", str(internal_case.get("case_id", "")))
+        if cid.isdigit():
+            k_url = f"https://indiankanoon.org/doc/{cid}/"
+        else:
+            k_url = f"https://indiankanoon.org/search/?formInput={urllib.parse.quote(internal_case.get('case_name') or claimed_name)}"
         matched_authority = {
             "canonical_case_id": internal_case["case_id"],
             "case_name": internal_case["case_name"],
             "citation": internal_case["citation"],
             "court": internal_case["court"],
             "date": internal_case["date"],
-            "source_url": f"/judgments/{internal_case['case_id']}",
+            "source_url": k_url,
             "document_hash": hashlib.sha256((internal_case.get("full_text") or "").encode("utf-8")).hexdigest(),
         }
         identity_status = "VERIFIED"
@@ -539,6 +545,8 @@ def verify_citation(citation: dict) -> dict:
     source_name = "Indexed corpus (Supreme Court)" if retrieval_source == "internal" else (
         "Indian Kanoon" if retrieval_source == "external" else None
     )
+    kanoon_fallback_url = f"https://indiankanoon.org/search/?formInput={urllib.parse.quote((case_name or '') + (' ' + citation_string if citation_string else ''))}"
+    final_source_url = (matched_authority.get("source_url") if matched_authority else None) or kanoon_fallback_url
 
     return {
         # STAGE 10 Core Specification Fields
@@ -563,7 +571,7 @@ def verify_citation(citation: dict) -> dict:
         "source": {
             "retrieval_type": retrieval_source,
             "source_name": source_name,
-            "source_url": matched_authority["source_url"] if matched_authority else None,
+            "source_url": final_source_url,
             "canonical_case_id": matched_authority["canonical_case_id"] if matched_authority else None,
             "document_hash": matched_authority["document_hash"] if matched_authority else None,
         },
@@ -589,13 +597,13 @@ def verify_citation(citation: dict) -> dict:
             "reasoning": reasoning,
             "technical_failure": technical_failure,
         } if proposition_status != "NOT_RUN" else None,
-        "source_link": matched_authority["source_url"] if matched_authority else None,
+        "source_link": final_source_url,
         "external_lookup": {
-            "state": "FOUND" if retrieval_source == "external" else "NOT_FOUND",
+            "state": "FOUND" if retrieval_source == "external" else ("INTERNAL" if retrieval_source == "internal" else "NOT_FOUND"),
             "source": source_name,
-            "canonical_title": matched_authority["case_name"] if matched_authority else None,
-            "doc_url": matched_authority["source_url"] if matched_authority else None,
-        } if retrieval_source == "external" else None,
+            "canonical_title": matched_authority["case_name"] if matched_authority else case_name,
+            "doc_url": final_source_url,
+        },
     }
 
 

@@ -495,6 +495,11 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff, reportId, cita
     const evidencePassageIndex = citation.proposition_verification?.evidence_passage_index || null;
     const relatedAuthorities = Array.isArray(citation.related_authorities) ? citation.related_authorities : [];
 
+    const kanoonLink = citation.source?.source_url ||
+                       citation.source_link ||
+                       citation.external_lookup?.doc_url ||
+                       `https://indiankanoon.org/search/?formInput=${encodeURIComponent((caseName || '') + (citation.citation_string ? ' ' + citation.citation_string : ''))}`;
+
     return (
         <div className={`citation-card ${expanded ? 'expanded' : ''}`}>
             <button className="citation-card-header" onClick={onToggle}>
@@ -507,6 +512,30 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff, reportId, cita
                     </span>
                 </div>
                 <div className="citation-card-right">
+                    <a
+                        href={kanoonLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="related-case-link"
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '0.22rem 0.6rem',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            color: '#60a5fa',
+                            background: 'rgba(37, 99, 235, 0.12)',
+                            border: '1px solid rgba(59, 130, 246, 0.35)',
+                            borderRadius: '4px',
+                            textDecoration: 'none',
+                            whiteSpace: 'nowrap'
+                        }}
+                        title="Open directly in Indian Kanoon"
+                    >
+                        <ExternalLink size={12} /> Kanoon
+                    </a>
                     <AdjustmentBadge interactive={false} correctionMeta={citation.adjusted_from_correction ? citation.correction_meta : null} />
                     <RetrievalSourceBadge
                         retrievalSource={citation.retrieval_source}
@@ -549,6 +578,24 @@ const CitationCard = ({ citation, expanded, onToggle, onOpenDiff, reportId, cita
                                 <span style={{ textTransform: 'capitalize' }}>
                                     {citation.citation_identity?.resolution_method?.replace(/_/g, ' ') || 'None (No match)'}
                                 </span>
+                            </div>
+                            <div className="stage-info-cell">
+                                <strong>Direct Authority</strong>
+                                <a
+                                    href={kanoonLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        color: '#60a5fa',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontWeight: 600,
+                                        textDecoration: 'none'
+                                    }}
+                                >
+                                    View on Indian Kanoon <ExternalLink size={12} />
+                                </a>
                             </div>
                         </div>
 

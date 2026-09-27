@@ -282,6 +282,29 @@ const CaseFinder = () => {
                                     </button>
                                 </div>
                                 <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.7' }}>{aiAnswer}</p>
+                                <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                                    <a
+                                        href={`https://indiankanoon.org/search/?formInput=${encodeURIComponent(searchQuery)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '0.35rem 0.75rem',
+                                            background: 'rgba(37, 99, 235, 0.15)',
+                                            border: '1px solid rgba(59, 130, 246, 0.4)',
+                                            borderRadius: '6px',
+                                            color: '#93c5fd',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 600,
+                                            textDecoration: 'none'
+                                        }}
+                                        title="Search full live Indian Kanoon database for this query"
+                                    >
+                                        <ExternalLink size={13} /> View Live Results on Indian Kanoon
+                                    </a>
+                                </div>
                             </div>
 
                             {liveCases.length > 0 && (
@@ -295,7 +318,7 @@ const CaseFinder = () => {
                                                 <div className="case-card-header">
                                                     <h3>{c.title}</h3>
                                                     <a
-                                                        href={c.link}
+                                                        href={c.link || `https://indiankanoon.org/search/?formInput=${encodeURIComponent(c.title)}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="case-citation"

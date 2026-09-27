@@ -139,19 +139,55 @@ def _fetch_indiankanoon_api(query: str, max_results: int, token: str) -> list:
 
 # ─── Source 2: Indian Kanoon web scrape (fallback) ───────────────────────────
 
+# ─── Source 2: Indian Kanoon web scrape (fallback) ───────────────────────────
+
 def _fetch_indiankanoon_scrape(query: str, max_results: int) -> list:
     url = f"{BASE_URL}/search/?formInput={quote(query)}"
 
-    with httpx.Client(headers=HEADERS, timeout=5.0, follow_redirects=True) as client:
+    with httpx.Client(headers=HEADERS, timeout=12.0, follow_redirects=True) as client:
         response = client.get(url)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
 
     found = []
 
-    # Strategy 1: id="res_N" divs (Indian Kanoon's actual HTML structure)
-    result_divs = soup.find_all("div", id=lambda x: x and x.startswith("res_"))
-    if result_divs:
+    # Strategy 1: <article class="result"> (current Indian Kanoon HTML structure)
+    articles = soup.find_all("article", class_=lambda c: c and "result" in c)
+    if articles:
+        for art in articles[:max_results]:
+            # Title
+            title_tag = art.find(class_=lambda c: c and "title" in c)
+            raw_title = title_tag.get_text(separator=" ", strip=True) if title_tag else ""
+            
+            # Direct link to document: extract doc ID from /doc/ or /docfragment/
+            doc_a = art.find("a", href=lambda h: h and ("/doc/" in str(h) or "/docfragment/" in str(h)))
+            href = doc_a.get("href", "") if doc_a else ""
+            m = re.search(r"/(?:doc|docfragment)/(\d+)/", href)
+            link = f"{BASE_URL}/doc/{m.group(1)}/" if m else (BASE_URL + href if href.startswith("/") else href)
+
+            if not raw_title or raw_title.lower() in ("full document", "take notes", "cites", "cited by"):
+                if doc_a and doc_a.get_text(strip=True).lower() not in ("full document", "take notes"):
+                    raw_title = doc_a.get_text(separator=" ", strip=True)
+                else:
+                    raw_title = query.title()
+
+            # Court source
+            source_tag = art.find(class_=lambda c: c and "docsource" in c)
+            court = source_tag.get_text(strip=True) if source_tag else "Indian Kanoon"
+
+            # Snippet / headline
+            snippet_tag = art.find(class_=lambda c: c and ("headline" in c or "snippet" in c))
+            if snippet_tag:
+                snippet = snippet_tag.get_text(separator=" ", strip=True)[:400]
+            else:
+                snippet = art.get_text(separator=" ", strip=True).replace(raw_title, "").strip()[:400]
+
+            if raw_title and link:
+                found.append((raw_title, link, snippet, court))
+
+    # Strategy 2: id="res_N" divs (legacy fallback)
+    if not found:
+        result_divs = soup.find_all("div", id=lambda x: x and x.startswith("res_"))
         for div in result_divs[:max_results]:
             a_tag = div.find("a")
             if not a_tag:
@@ -160,39 +196,44 @@ def _fetch_indiankanoon_scrape(query: str, max_results: int) -> list:
             href = a_tag.get("href", "")
             if not href or len(title) < 5:
                 continue
-            link = BASE_URL + href if href.startswith("/") else href
+            m = re.search(r"/(?:doc|docfragment)/(\d+)/", href)
+            link = f"{BASE_URL}/doc/{m.group(1)}/" if m else (BASE_URL + href if href.startswith("/") else href)
             p_tag = div.find("p")
             snippet = p_tag.get_text(separator=" ", strip=True)[:400] if p_tag else ""
-            if not snippet:
-                snippet = div.get_text(separator=" ", strip=True).replace(title, "").strip()[:300]
-            found.append((title, link, snippet))
+            found.append((title, link, snippet, "Indian Kanoon"))
 
-    # Strategy 2: any /doc/ links
+    # Strategy 3: any /doc/ links (safety fallback)
     if not found:
         seen = set()
         for a_tag in soup.find_all("a", href=lambda h: h and "/doc/" in str(h)):
             title = a_tag.get_text(strip=True)
             href = a_tag.get("href", "")
-            if not title or len(title) < 5 or href in seen:
+            m = re.search(r"/doc/(\d+)/", href)
+            doc_id = m.group(1) if m else href
+            if doc_id in seen or not href:
                 continue
-            seen.add(href)
-            link = BASE_URL + href if href.startswith("/") else href
-            parent = a_tag.find_parent("div")
+            seen.add(doc_id)
+            link = f"{BASE_URL}/doc/{doc_id}/" if m else (BASE_URL + href if href.startswith("/") else href)
+            parent = a_tag.find_parent(["article", "div"])
             snippet = ""
             if parent:
                 snippet = parent.get_text(separator=" ", strip=True).replace(title, "").strip()[:400]
-            found.append((title, link, snippet))
+            found.append((query.title() if title.lower() == "full document" else title, link, snippet, "Indian Kanoon"))
             if len(found) >= max_results:
                 break
 
     results = []
-    for title, link, snippet in found[:max_results]:
+    for item in found[:max_results]:
+        title = item[0]
+        link = item[1]
+        snippet = item[2]
+        court = item[3] if len(item) > 3 else "Indian Kanoon"
         keywords = extract_keywords_from_text(snippet, top_n=6) if snippet else []
         results.append({
             "title": title,
             "link": link,
             "snippet": snippet,
-            "source": "Indian Kanoon",
+            "source": court,
             "keywords": keywords,
         })
     return results
