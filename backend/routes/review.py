@@ -74,7 +74,9 @@ async def review_uploaded_file(
     except Exception as ctx_err:
         print(f"[ReviewRoute] Context build notice: {ctx_err}")
 
-    return run_hybrid_review(extracted_text, document_type, fact_manifest=manifest, procedural_posture=posture)
+    res = run_hybrid_review(extracted_text, document_type, fact_manifest=manifest, procedural_posture=posture)
+    res.extracted_text = extracted_text
+    return res
 
 
 @router.post("/fix", response_model=FixResponse)
@@ -103,8 +105,136 @@ def fix_draft(req: FixRequest):
             procedural_posture=posture
         )
     except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
         print(f"[ReviewRoute] Error in fix_draft: {e}")
         raise HTTPException(status_code=500, detail=f"Auto-fix engine failed: {str(e)}")
+
+
+from pydantic import BaseModel
+from services.translate_output import SUPPORTED_LANGUAGES, normalize_target_language, TRANSLATION_DISCLAIMER, translate_grounded_output
+from services.llm import call_groq
+import hashlib
+
+_REVIEW_TRANSLATION_CACHE = {}
+
+
+class TranslateReportRequest(BaseModel):
+    report: dict
+    target_lang: str
+
+
+@router.post("/translate-report")
+def translate_review_report(req: TranslateReportRequest):
+    """Translates the analysis report (summary, issues, recommendations) to the target language."""
+    resolved_lang = normalize_target_language(req.target_lang)
+    if resolved_lang not in SUPPORTED_LANGUAGES or resolved_lang == "english":
+        return req.report
+
+    rep = req.report
+    cache_key = hashlib.sha256(f"{resolved_lang}:{json.dumps(rep, sort_keys=True)}".encode("utf-8")).hexdigest()
+    if cache_key in _REVIEW_TRANSLATION_CACHE:
+        return _REVIEW_TRANSLATION_CACHE[cache_key]
+
+    payload_to_translate = {
+        "summary": rep.get("summary", ""),
+        "document_type": rep.get("document_type", ""),
+        "missing_sections": rep.get("missing_sections", []),
+        "critical": [
+            {"id": x.get("id"), "title": x.get("title", ""), "description": x.get("description", ""), "suggested_fix": x.get("suggested_fix", "")}
+            for x in rep.get("critical", [])
+        ],
+        "warnings": [
+            {"id": x.get("id"), "title": x.get("title", ""), "description": x.get("description", ""), "suggested_fix": x.get("suggested_fix", "")}
+            for x in rep.get("warnings", [])
+        ],
+        "suggestions": [
+            {"id": x.get("id"), "title": x.get("title", ""), "description": x.get("description", ""), "suggested_fix": x.get("suggested_fix", "")}
+            for x in rep.get("suggestions", [])
+        ],
+    }
+
+    target_lang_desc = SUPPORTED_LANGUAGES[resolved_lang]
+    prompt = (
+        f"Translate the values of this legal review report into {target_lang_desc}. "
+        "Keep exact keys and structure. Keep Section numbers, Case names, and Act names in English. "
+        "Return valid JSON only."
+    )
+    try:
+        translated_json_str = call_llm(prompt, json.dumps(payload_to_translate), json_mode=True)
+        cleaned = translated_json_str.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("```")[1]
+            if cleaned.startswith("json"):
+                cleaned = cleaned[4:]
+            cleaned = cleaned.strip()
+        translated_data = json.loads(cleaned)
+
+        result = dict(rep)
+        result["summary"] = translated_data.get("summary", rep.get("summary", ""))
+        result["document_type"] = translated_data.get("document_type", rep.get("document_type", ""))
+        result["missing_sections"] = translated_data.get("missing_sections", rep.get("missing_sections", []))
+        if "critical" in translated_data:
+            result["critical"] = translated_data["critical"]
+        if "warnings" in translated_data:
+            result["warnings"] = translated_data["warnings"]
+        if "suggestions" in translated_data:
+            result["suggestions"] = translated_data["suggestions"]
+        result["disclaimer"] = TRANSLATION_DISCLAIMER
+        result["target_lang"] = resolved_lang
+
+        _REVIEW_TRANSLATION_CACHE[cache_key] = result
+        return result
+    except Exception as e:
+        print(f"[ReviewRoute] translate_review_report notice: {e}")
+        return rep
+
+
+class TranslateFixRequest(BaseModel):
+    corrected_draft: str
+    changes_made: list[str] = []
+    target_lang: str
+
+
+@router.post("/translate-fix")
+def translate_fix_results(req: TranslateFixRequest):
+    """Translates the auto-fixed draft and changes_made list to the target language."""
+    resolved_lang = normalize_target_language(req.target_lang)
+    if resolved_lang not in SUPPORTED_LANGUAGES or resolved_lang == "english":
+        return {
+            "translated_corrected_draft": req.corrected_draft,
+            "translated_changes_made": req.changes_made,
+            "target_lang": "english",
+        }
+
+    translated_draft = ""
+    if req.corrected_draft.strip():
+        draft_res = translate_grounded_output(req.corrected_draft, [], resolved_lang)
+        translated_draft = draft_res.get("translated_text", "")
+
+    translated_changes = req.changes_made
+    if req.changes_made:
+        try:
+            target_lang_desc = SUPPORTED_LANGUAGES[resolved_lang]
+            changes_prompt = f"Translate this list of remediation actions into {target_lang_desc}. Keep legal section numbers and Acts in English. Return valid JSON only with a 'changes' key containing the list."
+            res_str = call_llm(changes_prompt, json.dumps({"changes": req.changes_made}), json_mode=True)
+            cleaned = res_str.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("```")[1]
+                if cleaned.startswith("json"):
+                    cleaned = cleaned[4:]
+                cleaned = cleaned.strip()
+            data = json.loads(cleaned)
+            translated_changes = data.get("changes", req.changes_made)
+        except Exception as e:
+            print(f"[ReviewRoute] translate changes notice: {e}")
+
+    return {
+        "translated_corrected_draft": translated_draft,
+        "translated_changes_made": translated_changes,
+        "target_lang": resolved_lang,
+        "disclaimer": TRANSLATION_DISCLAIMER,
+    }
 
 
 def load_docx_bytes(content_bytes: bytes) -> str:

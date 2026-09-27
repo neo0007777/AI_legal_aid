@@ -142,26 +142,30 @@ def extract_statute_references(text: str) -> List[Dict[str, str]]:
     return extracted
 
 
-def verify_single_statute(act_id: str, section_number: str) -> Dict[str, Any]:
+def verify_single_statute(act_id: str, section_number: str, db: Any = None) -> Dict[str, Any]:
     """
     Verifies a single statute section against the official India Code database (PostgreSQL/SQLite).
     Fetches exact title/heading, checks transition mappings (IPC <-> BNS, CrPC <-> BNSS),
     and determines verified status.
     """
-    try:
-        from models.database import SessionLocal, Provision, StatuteMapping
-        db = SessionLocal()
-    except Exception as e:
-        logger.error(f"Failed to obtain database session: {e}")
-        return {
-            "act_id": act_id,
-            "section_number": section_number,
-            "status": "UNVERIFIED",
-            "heading": "",
-            "note": f"Database unavailable: {e}"
-        }
+    close_db = False
+    if db is None:
+        try:
+            from models.database import SessionLocal
+            db = SessionLocal()
+            close_db = True
+        except Exception as e:
+            logger.error(f"Failed to obtain database session: {e}")
+            return {
+                "act_id": act_id,
+                "section_number": section_number,
+                "status": "UNVERIFIED",
+                "heading": "",
+                "note": f"Database unavailable: {e}"
+            }
 
     try:
+        from models.database import Provision, StatuteMapping
         # 1. Query the section in provisions table
         prov = db.query(Provision).filter(
             Provision.act_source_id == act_id,
@@ -249,10 +253,11 @@ def verify_single_statute(act_id: str, section_number: str) -> Dict[str, Any]:
             "note": f"Query error: {e}"
         }
     finally:
-        db.close()
+        if close_db and db:
+            db.close()
 
 
-def verify_draft_statutes(draft_text: str, document_category: str = "") -> Dict[str, Any]:
+def verify_draft_statutes(draft_text: str, document_category: str = "", db: Any = None) -> Dict[str, Any]:
     """
     Main entry point for verifying all statutory provisions cited in a legal draft.
     Returns audit findings, overall verdict, and 2024 transition advisories.
@@ -269,18 +274,31 @@ def verify_draft_statutes(draft_text: str, document_category: str = "") -> Dict[
             "summary": "No specific statutory sections detected in the document text."
         }
 
+    close_db = False
+    if db is None:
+        try:
+            from models.database import SessionLocal
+            db = SessionLocal()
+            close_db = True
+        except Exception as e:
+            logger.error(f"Failed to obtain database session for verify_draft_statutes: {e}")
+
     findings = []
     verified_count = 0
     warning_count = 0
 
-    for item in extracted:
-        res = verify_single_statute(item["act_id"], item["section_number"])
-        res["raw_mention"] = item["raw_mention"]
-        findings.append(res)
-        if res["status"] == "VERIFIED":
-            verified_count += 1
-        else:
-            warning_count += 1
+    try:
+        for item in extracted:
+            res = verify_single_statute(item["act_id"], item["section_number"], db=db)
+            res["raw_mention"] = item["raw_mention"]
+            findings.append(res)
+            if res["status"] == "VERIFIED":
+                verified_count += 1
+            else:
+                warning_count += 1
+    finally:
+        if close_db and db:
+            db.close()
 
     all_verified = (warning_count == 0 and verified_count > 0)
 

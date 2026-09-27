@@ -82,7 +82,13 @@ def get_embeddings(texts: list, batch_size: int = 32) -> list:
     return all_embeddings
 
 
+_collection_ensured = False
+
+
 def ensure_collection():
+    global _collection_ensured
+    if _collection_ensured:
+        return
     client = get_qdrant()
     existing = [c.name for c in client.get_collections().collections]
     if COLLECTION_NAME not in existing:
@@ -100,6 +106,7 @@ def ensure_collection():
         )
     except Exception:
         pass
+    _collection_ensured = True
 
 
 def get_collection_count() -> int:
@@ -215,9 +222,6 @@ def ingest_documents(stream_batch_size: int = 128):
 def search_drafts(query: str, n_results: int = 5, category_filter: str = None) -> list:
     try:
         ensure_collection()
-
-        if get_collection_count() == 0:
-            return []
 
         query_embedding = get_embeddings([query])[0]
 

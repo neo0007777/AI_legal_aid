@@ -266,9 +266,16 @@ This is for informational purposes only. Please consult a qualified advocate for
 @router.get("/memory", response_model=LegalAidMemoryResponse)
 def get_legal_aid_memory(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_optional_current_user)
 ):
     """Retrieve saved structure and formatting memory for AI Legal Aid."""
+    if not current_user:
+        return LegalAidMemoryResponse(
+            structure_mode="standard",
+            structure_title="Standard Judicial",
+            custom_instructions=None,
+            updated_at=None,
+        )
     mem = db.query(LegalAidMemory).filter(LegalAidMemory.user_id == current_user.id).first()
     if not mem:
         return LegalAidMemoryResponse(
@@ -331,7 +338,7 @@ async def ask_legal_question_stream(
     question: str,
     n_results: int,
     db: Session,
-    current_user: User,
+    current_user: Optional[User] = None,
     structure_mode: Optional[str] = None,
     custom_instructions: Optional[str] = None,
     save_to_memory: bool = False,
@@ -353,13 +360,13 @@ async def ask_legal_question_stream(
         is_pro = bool(upgrade_to_pro)
 
         # 1. Resolve user formatting memory and structure guidance
-        saved_memory = db.query(LegalAidMemory).filter(LegalAidMemory.user_id == current_user.id).first()
+        saved_memory = db.query(LegalAidMemory).filter(LegalAidMemory.user_id == current_user.id).first() if current_user else None
         detected_mode, detected_guidance = detect_structure_from_query(question)
 
         effective_mode = structure_mode or detected_mode or (saved_memory.structure_mode if saved_memory else "standard")
         effective_custom = custom_instructions or detected_guidance or (saved_memory.custom_instructions if saved_memory else None)
 
-        if save_to_memory:
+        if save_to_memory and current_user:
             if not saved_memory:
                 saved_memory = LegalAidMemory(user_id=current_user.id)
                 db.add(saved_memory)
@@ -522,7 +529,7 @@ Formatting Rules:
         yield {"type": "stage", "stage": "attaching_sources", "status": "started"}
         try:
             db.add(QueryLog(
-                user_id=current_user.id,
+                user_id=current_user.id if current_user else None,
                 query_type="legal_aid",
                 encrypted_query=encrypt(question),
             ))
@@ -562,7 +569,7 @@ Formatting Rules:
 async def ask_legal_aid(
     req: LegalAidRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_optional_current_user)
 ):
     if not req.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")

@@ -1,37 +1,52 @@
-import React, { createContext, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const LanguageContext = createContext();
 export const useLanguage = () => useContext(LanguageContext);
 
-// App-wide language preference (generalizes the Hindi-only "regional-language
-// grounded mode" into a curated Eighth-Schedule-first language list). This is
-// a RENDERING preference only -- see translate_output.py for the correctness
-// rule it must never violate: retrieval/verification always run in English,
-// language selection happens strictly after generation is complete.
-//
-// Adding a language later is a data change to this list (+ a locale JSON file
-// for static UI strings), not a rewrite -- nothing else hardcodes "Hindi".
-const STORAGE_KEY = 'lexsetu_language';
-
 export const SUPPORTED_LANGUAGES = [
-    { code: 'en', label: 'English', nativeLabel: 'English', i18nCode: 'en' },
+    { code: 'en', label: 'English',    nativeLabel: 'English',    i18nCode: 'en' },
+    { code: 'hi', label: 'Hindi',      nativeLabel: 'हिन्दी',      i18nCode: 'hi' },
+    { code: 'mr', label: 'Marathi',    nativeLabel: 'मराठी',       i18nCode: 'mr' },
+    { code: 'bn', label: 'Bengali',    nativeLabel: 'বাংলা',       i18nCode: 'bn' },
+    { code: 'ta', label: 'Tamil',      nativeLabel: 'தமிழ்',       i18nCode: 'ta' },
+    { code: 'te', label: 'Telugu',     nativeLabel: 'తెలుగు',      i18nCode: 'te' },
+    { code: 'kn', label: 'Kannada',    nativeLabel: 'ಕನ್ನಡ',       i18nCode: 'kn' },
+    { code: 'gu', label: 'Gujarati',   nativeLabel: 'ગુજરાતી',     i18nCode: 'gu' },
+    { code: 'ml', label: 'Malayalam',  nativeLabel: 'മലയാളം',      i18nCode: 'ml' },
+    { code: 'pa', label: 'Punjabi',    nativeLabel: 'ਪੰਜਾਬੀ',      i18nCode: 'pa' },
+    { code: 'or', label: 'Odia',       nativeLabel: 'ଓଡ଼ିଆ',       i18nCode: 'or' },
 ];
+
+const STORAGE_KEY = 'lexsetu_language';
 
 export const LanguageProvider = ({ children }) => {
     const { i18n } = useTranslation();
 
-    useEffect(() => {
+    const [languageCode, setLanguageCode] = useState(() => {
         try {
-            localStorage.removeItem(STORAGE_KEY);
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved && SUPPORTED_LANGUAGES.some(l => l.code === saved)) return saved;
         } catch { /* ignore */ }
-        i18n.changeLanguage('en');
-    }, [i18n]);
+        return 'en';
+    });
+
+    useEffect(() => {
+        i18n.changeLanguage(languageCode);
+    }, [languageCode, i18n]);
+
+    const setLanguage = (code) => {
+        if (!SUPPORTED_LANGUAGES.some(l => l.code === code)) return;
+        setLanguageCode(code);
+        try { localStorage.setItem(STORAGE_KEY, code); } catch { /* ignore */ }
+    };
+
+    const currentLanguage = SUPPORTED_LANGUAGES.find(l => l.code === languageCode) || SUPPORTED_LANGUAGES[0];
 
     const value = {
-        languageCode: 'en',
-        setLanguage: () => {},
-        currentLanguage: SUPPORTED_LANGUAGES[0],
+        languageCode,
+        setLanguage,
+        currentLanguage,
         languages: SUPPORTED_LANGUAGES,
     };
 
@@ -41,3 +56,4 @@ export const LanguageProvider = ({ children }) => {
         </LanguageContext.Provider>
     );
 };
+

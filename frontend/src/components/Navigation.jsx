@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Scale, BookOpen, MessageSquare, Home as HomeIcon, FileSearch, Clock, User, LogOut, FileCheck, ShieldCheck, Menu, X, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import LocalModeToggle from './LocalModeToggle';
+import LanguageSwitcher from './LanguageSwitcher';
 import './Navigation.css';
 
 const Navigation = () => {
@@ -92,14 +93,15 @@ const Navigation = () => {
                 <div className="sidebar-section">
                     <p className="section-title">{t('nav.recentActivity')}</p>
                     <div className="recent-list">
-                        <div className="recent-item"><Clock size={14} /> Case Search</div>
-                        <div className="recent-item"><Clock size={14} /> Draft Assistant</div>
-                        <div className="recent-item"><Clock size={14} /> Legal Aid Q&A</div>
+                        <div className="recent-item"><Clock size={14} /> {t('nav.caseFinder', 'Case Search')}</div>
+                        <div className="recent-item"><Clock size={14} /> {t('nav.draftAssistant', 'Draft Assistant')}</div>
+                        <div className="recent-item"><Clock size={14} /> {t('nav.aiLegalAid', 'Legal Aid Q&A')}</div>
                     </div>
                 </div>
 
                 <div className="sidebar-section">
                     <LocalModeToggle />
+                    <LanguageSwitcher />
                 </div>
             </div>
 

@@ -1,5 +1,6 @@
 import re
 import json
+import asyncio
 import logging
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
@@ -171,7 +172,7 @@ def _build_provenance_report(manifest) -> dict:
 # DraftReview.jsx). These 5 stages are relabeled to match what actually runs:
 # fact-manifest + posture planning, statute source-locking, template
 # retrieval, generation, and the post-generation consistency/statute audit.
-async def generate_draft_stream(req: DraftRequest, local_only: bool, db: Session, current_user: User):
+async def generate_draft_stream(req: DraftRequest, local_only: bool, db: Session, current_user: Optional[User] = None):
     """Mirrors citation_verifier.verify_filing_stream's shape: one {"type": "stage",
     stage, status} event per real transition, a single terminal {"type": "done", ...}
     event carrying today's /draft response body, or {"type": "error", message} on failure."""
@@ -252,10 +253,10 @@ async def generate_draft_stream(req: DraftRequest, local_only: bool, db: Session
             yield {"type": "error", "message": "No templates found. Make sure you have run ingest.py first."}
             return
 
-        # Cap reference templates to Top 2 and max 1500 chars each to respect Groq token limits
+        # Cap reference templates to Top 1 and max 800 chars to respect Groq token limits
         context = "\n\n---\n\n".join([
-            f"Template: {r['metadata']['filename']}\nCategory: {r['metadata']['category']}\n\n{r['text'][:1500]}"
-            for r in results[:2]
+            f"Template: {r['metadata']['filename']}\nCategory: {r['metadata']['category']}\n\n{r['text'][:800]}"
+            for r in results[:1]
         ])
         yield {"type": "stage", "stage": "retrieving_templates", "status": "done"}
 
@@ -288,12 +289,12 @@ Draft all 8 sections concisely, authoritatively, and completely. Keep grounds, f
 Reference Templates from Database:
 {context}"""
 
-        # ── Step 6: Generate draft with higher token budget ──
+        # ── Step 6: Generate draft with tuned token budget ──
         yield {"type": "stage", "stage": "generating_draft", "status": "started"}
         initial_draft = call_llm(
             full_system_prompt, user_message,
             force_local=local_only,
-            max_tokens=2800,
+            max_tokens=900,
         )
 
         if not initial_draft or initial_draft.strip().startswith("⚠️ AI service temporarily unavailable"):
@@ -309,16 +310,13 @@ Reference Templates from Database:
             return
 
         # ── Step 7: Post-Generation Consistency Check & Source-Lock Enforcement ──
-        def regenerate_callback(sys_p: str, usr_m: str) -> str:
-            return call_llm(sys_p, usr_m, force_local=local_only, max_tokens=2800)
-
         final_draft, audit_violations = enforce_consistency_and_regenerate(
             document_text=initial_draft,
             locked_corpus=locked_corpus,
-            llm_regenerate_fn=regenerate_callback,
+            llm_regenerate_fn=None,
             original_system_prompt=full_system_prompt,
             original_user_message=user_message,
-            max_retries=1,
+            max_retries=0,
         )
         yield {"type": "stage", "stage": "generating_draft", "status": "done"}
 
@@ -328,11 +326,11 @@ Reference Templates from Database:
         provenance["source_locked_corpus"] = locked_corpus.to_dict()
         provenance["source_lock_violations_detected"] = len(audit_violations)
 
-        statute_audit = verify_draft_statutes(final_draft, document_category=req.category or "")
+        statute_audit = verify_draft_statutes(final_draft, document_category=req.category or "", db=db)
 
         try:
             db.add(QueryLog(
-                user_id=current_user.id,
+                user_id=current_user.id if current_user else None,
                 query_type="draft",
                 encrypted_query=encrypt(req.description),
             ))
@@ -370,7 +368,7 @@ async def generate_draft(
     req: DraftRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_optional_current_user)
 ):
     local_only = request.headers.get("x-local-only", "").lower() == "true"
     if not req.description.strip():
@@ -379,14 +377,23 @@ async def generate_draft(
     async def event_gen():
         async for event in generate_draft_stream(req, local_only, db, current_user):
             yield f"data: {json.dumps(event)}\n\n"
+            await asyncio.sleep(0)
 
-    return StreamingResponse(event_gen(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 @router.post("/scan-contradictions", response_model=ContradictionResponse)
 def scan_contradictions(
     req: ContradictionRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_optional_current_user)
 ):
     if not req.document_a.strip() or not req.document_b.strip():
         raise HTTPException(

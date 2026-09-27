@@ -1,15 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
+import { downloadFileFromBlob, exportPdfFromApi } from '../utils/downloadHelper';
 import './DraftReview.css';
 import {
     FileCheck, UploadCloud, AlertTriangle, AlertCircle, CheckCircle2, Sparkles,
-    ShieldAlert, RefreshCw, FileText, ArrowRight, Wand2, Check, Copy, Download
+    ShieldAlert, RefreshCw, FileText, ArrowRight, Wand2, Check, Copy, Download,
+    Loader2, FileDown
 } from 'lucide-react';
+
+const SAMPLE_DRAFT = `IN THE COURT OF THE SESSIONS JUDGE AT NEW DELHI
+BAIL APPLICATION NO. ______ OF 2024
+
+IN THE MATTER OF:
+RAMESH KUMAR, S/o Shri Surender Kumar,
+R/o House No. 42, Model Town, Delhi-110009
+... APPLICANT / ACCUSED
+
+VERSUS
+
+STATE (NCT OF DELHI)
+... RESPONDENT
+
+FIR NO.: 112/2024
+UNDER SECTIONS: 420, 406 IPC (NOW CORRESPONDING TO 318(4), 316 BNS, 2023)
+POLICE STATION: MODEL TOWN, DELHI
+
+APPLICATION UNDER SECTION 439 OF THE CODE OF CRIMINAL PROCEDURE, 1973 (CORRESPONDING TO SECTION 483 OF BHARATIYA NAGARIK SURAKSHA SANHITA, 2023) FOR GRANT OF REGULAR BAIL
+
+MOST RESPECTFULLY SHOWETH:
+1. That the Applicant is a law-abiding citizen of India residing at the aforementioned address and has no prior criminal antecedents.
+2. That the Applicant has been falsely implicated in FIR No. 112/2024 registered at P.S. Model Town for alleged offences under Sections 420/406 IPC.
+3. That the Applicant was arrested on [DATE] and has been in judicial custody since [DATE].
+4. That the investigation is substantially complete, custodial interrogation is no longer required, and the alleged offences are triable by Magistrate.
+5. That the Applicant undertakes to abide by all conditions imposed by this Hon'ble Court and will not tamper with prosecution evidence or influence witnesses.
+
+PRAYER:
+Wherefore, it is most respectfully prayed that this Hon'ble Court may graciously be pleased to:
+a) Release the Applicant on regular bail in FIR No. 112/2024, P.S. Model Town;
+b) Pass any other or further order as this Hon'ble Court may deem fit and proper in the interest of justice.
+
+APPLICANT
+THROUGH COUNSEL
+ADVOCATE FOR APPLICANT`;
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const DraftReview = () => {
     const location = useLocation();
+    const { t } = useTranslation();
+    const { getAuthHeaders } = useAuth();
+
     const [draftText, setDraftText] = useState(location.state?.draft || '');
     const [documentType, setDocumentType] = useState('auto');
     const [selectedFile, setSelectedFile] = useState(null);
@@ -17,10 +59,15 @@ const DraftReview = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isFixing, setIsFixing] = useState(false);
 
+    // English source-of-truth review report
     const [reviewReport, setReviewReport] = useState(location.state?.review || null);
+
+    // Auto-fix states
     const [correctedDraft, setCorrectedDraft] = useState(null);
     const [changesMade, setChangesMade] = useState([]);
+
     const [copied, setCopied] = useState(false);
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
 
     useEffect(() => {
         if (location.state?.draft) {
@@ -42,13 +89,14 @@ const DraftReview = () => {
     // Run Universal Review Engine
     const handleRunReview = async () => {
         if (!draftText.trim() && !selectedFile) {
-            alert("Please paste a legal draft or upload a document file (.pdf, .docx, .txt, .rtf).");
+            alert(t('draftReview.placeholder', 'Please paste a legal draft or upload a document file (.pdf, .docx, .txt, .rtf).'));
             return;
         }
 
         setIsAnalyzing(true);
         setReviewReport(null);
         setCorrectedDraft(null);
+        setChangesMade([]);
 
         try {
             let response;
@@ -60,12 +108,13 @@ const DraftReview = () => {
                 }
                 response = await fetch(`${API_BASE_URL}/review/file`, {
                     method: 'POST',
+                    headers: getAuthHeaders(),
                     body: formData,
                 });
             } else {
                 response = await fetch(`${API_BASE_URL}/review/analyze`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         draft: draftText,
                         document_type: documentType === 'auto' ? null : documentType
@@ -80,6 +129,9 @@ const DraftReview = () => {
 
             const data = await response.json();
             setReviewReport(data);
+            if (data.extracted_text) {
+                setDraftText(data.extracted_text);
+            }
         } catch (error) {
             console.error('Review Error:', error);
             alert(`Review Engine error: ${error.message}`);
@@ -91,6 +143,11 @@ const DraftReview = () => {
     // Run Auto Fix Engine
     const handleRunAutoFix = async () => {
         if (!reviewReport) return;
+        const currentDraft = draftText.trim();
+        if (!currentDraft && !selectedFile) {
+            alert('Cannot auto-fix without original draft text. Please paste draft or upload document.');
+            return;
+        }
 
         setIsFixing(true);
 
@@ -103,9 +160,9 @@ const DraftReview = () => {
         try {
             const response = await fetch(`${API_BASE_URL}/review/fix`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    draft: draftText || (selectedFile ? "Uploaded Document Text" : ""),
+                    draft: currentDraft || (selectedFile ? "Uploaded Document Text" : ""),
                     issues: allIssues,
                     missing_sections: reviewReport.missing_sections || [],
                     missing_fields: reviewReport.missing_fields || []
@@ -128,11 +185,48 @@ const DraftReview = () => {
         }
     };
 
+    // Active views
+    const activeReport = reviewReport;
+    const activeChanges = changesMade;
+    const activeCorrectedText = correctedDraft;
+
     const handleCopyFix = () => {
-        if (correctedDraft) {
-            navigator.clipboard.writeText(correctedDraft);
+        if (activeCorrectedText) {
+            navigator.clipboard.writeText(activeCorrectedText);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    const handleDownloadTxt = () => {
+        if (!activeCorrectedText) return;
+        const blob = new Blob([activeCorrectedText], { type: 'text/plain;charset=utf-8' });
+        downloadFileFromBlob(blob, `LexSetu_Corrected_Draft_${Date.now()}.txt`, 'text/plain');
+    };
+
+    const handleExportPdf = async () => {
+        if (!activeCorrectedText) return;
+        setIsExportingPdf(true);
+        try {
+            const docType = activeReport?.document_type || 'Reviewed Court Draft';
+            await exportPdfFromApi({
+                endpoint: '/api/documents/export-pdf',
+                body: {
+                    title: docType,
+                    draft_text: activeCorrectedText,
+                    court_name: 'IN THE COMPETENT COURT OF JURISDICTION',
+                    case_number: 'APPLICATION / PETITION NO. _____ OF 2026',
+                    applicant: 'APPLICANT / PETITIONER',
+                    respondent: 'RESPONDENT / OPPOSITE PARTY',
+                },
+                filename: `LexSetu_Corrected_${docType.replace(/\s+/g, '_')}.pdf`,
+                headers: getAuthHeaders(),
+            });
+        } catch (err) {
+            console.error('PDF export error:', err);
+            alert('Failed to export PDF: ' + err.message);
+        } finally {
+            setIsExportingPdf(false);
         }
     };
 
@@ -143,9 +237,9 @@ const DraftReview = () => {
     };
 
     const getRiskBadge = (risk) => {
-        if (risk === 'Low') return <span className="badge-risk low"><CheckCircle2 size={14} /> Low Risk</span>;
-        if (risk === 'Medium') return <span className="badge-risk medium"><AlertCircle size={14} /> Medium Risk</span>;
-        return <span className="badge-risk high"><ShieldAlert size={14} /> High Risk</span>;
+        if (risk === 'Low') return <span className="badge-risk low"><CheckCircle2 size={14} /> {t('draftReview.lowRisk', 'Low Risk')}</span>;
+        if (risk === 'Medium') return <span className="badge-risk medium"><AlertCircle size={14} /> {t('draftReview.mediumRisk', 'Medium Risk')}</span>;
+        return <span className="badge-risk high"><ShieldAlert size={14} /> {t('draftReview.highRisk', 'High Risk')}</span>;
     };
 
     return (
@@ -155,11 +249,11 @@ const DraftReview = () => {
                 <div>
                     <div className="badge-chip">
                         <FileCheck size={16} />
-                        <span>Universal AI Legal Review Engine</span>
+                        <span>{t('draftReview.badge', 'Universal AI Legal Review Engine')}</span>
                     </div>
-                    <h2>Legal Draft Review & Auto-Fix</h2>
+                    <h2>{t('draftReview.title', 'Legal Draft Review & Auto-Fix')}</h2>
                     <p className="subtitle">
-                        RAG-powered hybrid analysis comparing your draft against 50M+ precedents and 1,800+ landmark templates.
+                        {t('draftReview.subtitle', 'RAG-powered hybrid analysis comparing your draft against 50M+ precedents and 1,800+ landmark templates.')}
                     </p>
                 </div>
             </div>
@@ -168,7 +262,35 @@ const DraftReview = () => {
             <div className="review-grid">
                 {/* Left Panel: Input & Controls */}
                 <div className="review-input-card">
-                    <h3>1. Select Input Method</h3>
+                    <h3>{t('draftReview.selectInput', '1. Select Input Method')}</h3>
+
+                    {/* Document Category Dropdown */}
+                    <div className="doc-type-selector-box">
+                        <label htmlFor="doc-type-select" className="input-label-sm">
+                            {t('draftReview.docTypeLabel', 'Document Category / Context:')}
+                        </label>
+                        <select
+                            id="doc-type-select"
+                            className="doc-type-select"
+                            value={documentType}
+                            onChange={(e) => setDocumentType(e.target.value)}
+                        >
+                            <option value="auto">⚡ Auto-Detect Document Type</option>
+                            <option value="Bail Application">Bail Application (BNSS / CrPC)</option>
+                            <option value="Anticipatory Bail Application">Anticipatory Bail Application</option>
+                            <option value="Legal Notice">Legal Notice / Demand Notice</option>
+                            <option value="Reply to Legal Notice">Reply to Legal Notice</option>
+                            <option value="Affidavit">Affidavit</option>
+                            <option value="Lease / Rent Agreement">Lease / Rent Agreement</option>
+                            <option value="Civil Suit / Plaint">Civil Suit / Plaint</option>
+                            <option value="Writ Petition">Writ Petition</option>
+                            <option value="Section 138 NI Act Complaint">Section 138 NI Act (Cheque Bounce)</option>
+                            <option value="NDA / Confidentiality Agreement">NDA / Confidentiality Agreement</option>
+                            <option value="Employment Agreement">Employment Agreement</option>
+                            <option value="Power of Attorney">Power of Attorney</option>
+                            <option value="Sale Deed">Sale Deed</option>
+                        </select>
+                    </div>
 
                     {/* File Upload Zone */}
                     <div className="file-upload-box">
@@ -188,19 +310,35 @@ const DraftReview = () => {
                                 </div>
                             ) : (
                                 <div>
-                                    <p className="drop-title">Upload Draft (.pdf, .docx, .txt, .rtf)</p>
-                                    <p className="drop-sub">Drag & drop or click to browse file</p>
+                                    <p className="drop-title">{t('draftReview.uploadTitle', 'Upload Draft (.pdf, .docx, .txt, .rtf)')}</p>
+                                    <p className="drop-sub">{t('draftReview.uploadSub', 'Drag & drop or click to browse file')}</p>
                                 </div>
                             )}
                         </label>
                     </div>
 
-                    <div className="divider-text"><span>OR PASTE TEXT BELOW</span></div>
+                    <div className="divider-text"><span>{t('draftReview.orPaste', 'OR PASTE TEXT BELOW')}</span></div>
+
+                    <div className="paste-header-row">
+                        <span className="text-muted-sm">{t('draftReview.pasteDraftDesc', 'Paste draft text or load a template:')}</span>
+                        <button
+                            type="button"
+                            className="btn-sample-link"
+                            onClick={() => {
+                                setDraftText(SAMPLE_DRAFT);
+                                setSelectedFile(null);
+                                setDocumentType('Bail Application');
+                            }}
+                            title="Load pre-configured sample bail draft"
+                        >
+                            <FileText size={13} /> {t('draftReview.loadSample', 'Load Sample Draft')}
+                        </button>
+                    </div>
 
                     {/* Textarea */}
                     <textarea
                         className="draft-textarea"
-                        placeholder="Paste legal petition, contract, affidavit, or notice here..."
+                        placeholder={t('draftReview.placeholder', 'Paste legal petition, contract, affidavit, or notice here...')}
                         value={draftText}
                         onChange={(e) => {
                             setDraftText(e.target.value);
@@ -216,11 +354,11 @@ const DraftReview = () => {
                     >
                         {isAnalyzing ? (
                             <>
-                                <RefreshCw size={18} className="spin" /> Comparing against Qdrant Templates...
+                                <RefreshCw size={18} className="spin" /> {t('draftReview.comparing', 'Comparing against Qdrant Templates...')}
                             </>
                         ) : (
                             <>
-                                <Sparkles size={18} /> Run AI Legal Review Engine
+                                <Sparkles size={18} /> {t('draftReview.runReview', 'Run AI Legal Review Engine')}
                             </>
                         )}
                     </button>
@@ -231,30 +369,30 @@ const DraftReview = () => {
                     {!reviewReport && !isAnalyzing && (
                         <div className="empty-review-placeholder">
                             <FileCheck size={48} strokeWidth={1.2} />
-                            <h4>No Review Analysis Generated</h4>
-                            <p>Upload a document or paste text on the left to run the hybrid rule & RAG legal review pipeline.</p>
+                            <h4>{t('draftReview.noReviewTitle', 'No Review Analysis Generated')}</h4>
+                            <p>{t('draftReview.noReviewDesc', 'Upload a document or paste text on the left to run the hybrid rule & RAG legal review pipeline.')}</p>
                         </div>
                     )}
 
                     {isAnalyzing && (
                         <div className="review-analyzing-state">
                             <RefreshCw size={40} className="spin text-gold" />
-                            <h4>Analyzing Document & Retrieving Top-5 Qdrant Templates...</h4>
-                            <p>Scanning structural sections, placeholders, legal reasoning, and precedent compliance.</p>
+                            <h4>{t('draftReview.analyzingTitle', 'Analyzing Document & Retrieving Top-5 Qdrant Templates...')}</h4>
+                            <p>{t('draftReview.analyzingDesc', 'Scanning structural sections, placeholders, legal reasoning, and precedent compliance.')}</p>
                         </div>
                     )}
 
-                    {reviewReport && (
+                    {activeReport && (
                         <div className="review-report-container animate-fade-in">
                             {/* Score & Summary Banner */}
                             <div className="report-summary-banner">
                                 <div className="score-circle-wrapper">
                                     <div
                                         className="score-circle"
-                                        style={{ borderColor: getScoreColor(reviewReport.overall_score) }}
+                                        style={{ borderColor: getScoreColor(activeReport.overall_score) }}
                                     >
-                                        <span className="score-num" style={{ color: getScoreColor(reviewReport.overall_score) }}>
-                                            {reviewReport.overall_score}
+                                        <span className="score-num" style={{ color: getScoreColor(activeReport.overall_score) }}>
+                                            {activeReport.overall_score}
                                         </span>
                                         <span className="score-denom">/ 100</span>
                                     </div>
@@ -262,32 +400,32 @@ const DraftReview = () => {
 
                                 <div className="summary-details">
                                     <div className="summary-top-row">
-                                        <span className="doc-type-tag">{reviewReport.document_type}</span>
-                                        {getRiskBadge(reviewReport.risk_level)}
+                                        <span className="doc-type-tag">{activeReport.document_type}</span>
+                                        {getRiskBadge(activeReport.risk_level)}
                                     </div>
-                                    <p className="summary-text">{reviewReport.summary}</p>
+                                    <p className="summary-text">{activeReport.summary}</p>
                                 </div>
                             </div>
 
                             {/* Missing Sections & Placeholders */}
-                            {(reviewReport.missing_sections.length > 0 || reviewReport.missing_fields.length > 0) && (
+                            {(activeReport.missing_sections?.length > 0 || activeReport.missing_fields?.length > 0) && (
                                 <div className="missing-elements-section">
-                                    {reviewReport.missing_sections.length > 0 && (
+                                    {activeReport.missing_sections?.length > 0 && (
                                         <div className="missing-card">
-                                            <h5><AlertTriangle size={16} /> Missing Mandatory Sections ({reviewReport.missing_sections.length})</h5>
+                                            <h5><AlertTriangle size={16} /> {t('draftReview.missingSections', { count: activeReport.missing_sections.length, defaultValue: `Missing Mandatory Sections (${activeReport.missing_sections.length})` })}</h5>
                                             <div className="tags-flex">
-                                                {reviewReport.missing_sections.map((sec, idx) => (
+                                                {activeReport.missing_sections.map((sec, idx) => (
                                                     <span key={idx} className="tag-missing-sec">{sec}</span>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
 
-                                    {reviewReport.missing_fields.length > 0 && (
+                                    {activeReport.missing_fields?.length > 0 && (
                                         <div className="missing-card mt-2">
-                                            <h5><AlertCircle size={16} /> Unfilled Bracket Placeholders ({reviewReport.missing_fields.length})</h5>
+                                            <h5><AlertCircle size={16} /> {t('draftReview.unfilledPlaceholders', { count: activeReport.missing_fields.length, defaultValue: `Unfilled Bracket Placeholders (${activeReport.missing_fields.length})` })}</h5>
                                             <div className="tags-flex">
-                                                {reviewReport.missing_fields.map((mf, idx) => (
+                                                {activeReport.missing_fields.map((mf, idx) => (
                                                     <span key={idx} className="tag-missing-field">{mf.placeholder}</span>
                                                 ))}
                                             </div>
@@ -298,37 +436,37 @@ const DraftReview = () => {
 
                             {/* Detailed Issues List */}
                             <div className="issues-list-wrapper">
-                                <h4>Detected Legal & Structural Issues</h4>
+                                <h4>{t('draftReview.detectedIssues', 'Detected Legal & Structural Issues')}</h4>
 
-                                {reviewReport.critical.map((issue) => (
-                                    <div key={issue.id} className="issue-item critical">
-                                        <div className="issue-badge red">CRITICAL</div>
+                                {(activeReport.critical || []).map((issue) => (
+                                    <div key={issue.id || Math.random()} className="issue-item critical">
+                                        <div className="issue-badge red">{t('draftReview.criticalBadge', 'CRITICAL')}</div>
                                         <div>
                                             <h6>{issue.title}</h6>
                                             <p>{issue.description}</p>
-                                            {issue.suggested_fix && <div className="suggested-fix-box"><strong>Fix Recommendation:</strong> {issue.suggested_fix}</div>}
+                                            {issue.suggested_fix && <div className="suggested-fix-box"><strong>{t('draftReview.fixRecommendation', 'Fix Recommendation:')}</strong> {issue.suggested_fix}</div>}
                                         </div>
                                     </div>
                                 ))}
 
-                                {reviewReport.warnings.map((issue) => (
-                                    <div key={issue.id} className="issue-item warning">
-                                        <div className="issue-badge amber">WARNING</div>
+                                {(activeReport.warnings || []).map((issue) => (
+                                    <div key={issue.id || Math.random()} className="issue-item warning">
+                                        <div className="issue-badge amber">{t('draftReview.warningBadge', 'WARNING')}</div>
                                         <div>
                                             <h6>{issue.title}</h6>
                                             <p>{issue.description}</p>
-                                            {issue.suggested_fix && <div className="suggested-fix-box"><strong>Fix Recommendation:</strong> {issue.suggested_fix}</div>}
+                                            {issue.suggested_fix && <div className="suggested-fix-box"><strong>{t('draftReview.fixRecommendation', 'Fix Recommendation:')}</strong> {issue.suggested_fix}</div>}
                                         </div>
                                     </div>
                                 ))}
 
-                                {reviewReport.suggestions.map((issue) => (
-                                    <div key={issue.id} className="issue-item suggestion">
-                                        <div className="issue-badge blue">SUGGESTION</div>
+                                {(activeReport.suggestions || []).map((issue) => (
+                                    <div key={issue.id || Math.random()} className="issue-item suggestion">
+                                        <div className="issue-badge blue">{t('draftReview.suggestionBadge', 'SUGGESTION')}</div>
                                         <div>
                                             <h6>{issue.title}</h6>
                                             <p>{issue.description}</p>
-                                            {issue.suggested_fix && <div className="suggested-fix-box"><strong>Fix Recommendation:</strong> {issue.suggested_fix}</div>}
+                                            {issue.suggested_fix && <div className="suggested-fix-box"><strong>{t('draftReview.fixRecommendation', 'Fix Recommendation:')}</strong> {issue.suggested_fix}</div>}
                                         </div>
                                     </div>
                                 ))}
@@ -343,11 +481,11 @@ const DraftReview = () => {
                                 >
                                     {isFixing ? (
                                         <>
-                                            <RefreshCw size={18} className="spin" /> Fixing Detected Issues & Preserving Layout...
+                                            <RefreshCw size={18} className="spin" /> {t('draftReview.fixingStatus', 'Fixing Detected Issues & Preserving Layout...')}
                                         </>
                                     ) : (
                                         <>
-                                            <Wand2 size={18} /> Auto-Fix Detected Issues
+                                            <Wand2 size={18} /> {t('draftReview.autoFixBtn', 'Auto-Fix Detected Issues')}
                                         </>
                                     )}
                                 </button>
@@ -363,20 +501,27 @@ const DraftReview = () => {
                     <div className="corrected-header">
                         <div className="flex-align">
                             <Sparkles size={20} className="text-gold" />
-                            <h3>Auto-Fixed Corrected Draft</h3>
+                            <h3>{t('draftReview.autoFixedTitle', 'Auto-Fixed Corrected Draft')}</h3>
                         </div>
                         <div className="flex-align gap-2">
+                            <button className="secondary-btn btn-sm" onClick={handleDownloadTxt} title={t('draftReview.downloadTxt', 'Download as .txt')}>
+                                <Download size={15} /> {t('draftReview.downloadTxt', 'Download .txt')}
+                            </button>
+                            <button className="secondary-btn btn-sm" onClick={handleExportPdf} disabled={isExportingPdf} title={t('draftReview.exportPdf', 'Export Court-Ready PDF')}>
+                                {isExportingPdf ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}
+                                {t('draftReview.exportPdf', 'Export Court PDF')}
+                            </button>
                             <button className="secondary-btn btn-sm" onClick={handleCopyFix}>
-                                {copied ? <Check size={16} /> : <Copy size={16} />} {copied ? 'Copied' : 'Copy Corrected Draft'}
+                                {copied ? <Check size={16} /> : <Copy size={16} />} {copied ? t('draftReview.copied', 'Copied') : t('draftReview.copyFix', 'Copy Corrected Draft')}
                             </button>
                         </div>
                     </div>
 
-                    {changesMade.length > 0 && (
+                    {activeChanges.length > 0 && (
                         <div className="changes-summary-box">
-                            <strong>Applied Remediation Actions:</strong>
+                            <strong>{t('draftReview.appliedRemediation', 'Applied Remediation Actions:')}</strong>
                             <ul>
-                                {changesMade.map((ch, idx) => (
+                                {activeChanges.map((ch, idx) => (
                                     <li key={idx}>{ch}</li>
                                 ))}
                             </ul>
@@ -385,12 +530,12 @@ const DraftReview = () => {
 
                     <div className="split-comparison-grid">
                         <div className="split-pane">
-                            <h5>Original Draft</h5>
-                            <pre className="draft-pre-box">{draftText || "Uploaded File Draft"}</pre>
+                            <h5>{t('draftReview.originalDraft', 'Original Draft')}</h5>
+                            <pre className="draft-pre-box">{draftText || t('draftReview.uploadedFileDraft', 'Uploaded File Draft')}</pre>
                         </div>
                         <div className="split-pane fixed-pane">
-                            <h5>Corrected Draft (Preserved Layout)</h5>
-                            <pre className="draft-pre-box corrected">{correctedDraft}</pre>
+                            <h5>{t('draftReview.correctedDraft', 'Corrected Draft (Preserved Layout)')}</h5>
+                            <pre className="draft-pre-box corrected">{activeCorrectedText}</pre>
                         </div>
                     </div>
                 </div>

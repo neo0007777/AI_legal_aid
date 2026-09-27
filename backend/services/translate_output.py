@@ -32,6 +32,30 @@ SUPPORTED_LANGUAGES = {
     "odia": "Odia, written in the Odia script",
 }
 
+LANGUAGE_ALIASES = {
+    "hi": "hindi",
+    "mr": "marathi",
+    "bn": "bengali",
+    "ta": "tamil",
+    "te": "telugu",
+    "kn": "kannada",
+    "gu": "gujarati",
+    "ml": "malayalam",
+    "pa": "punjabi",
+    "or": "odia",
+    "od": "odia",
+    "panjabi": "punjabi",
+}
+
+
+def normalize_target_language(target_lang: str) -> str:
+    """Resolve 2-letter or alternative code to canonical SUPPORTED_LANGUAGES key."""
+    if not target_lang:
+        return "hindi"
+    key = target_lang.lower().strip()
+    return LANGUAGE_ALIASES.get(key, key)
+
+
 TRANSLATION_DISCLAIMER = "Translated from English — verification was performed in English"
 
 
@@ -45,7 +69,7 @@ def translate_grounded_output(text: str, source_citations: list, target_lang: st
         source_citations: Citations/sources attached to the original English
             result. Passed through completely unchanged -- translation never
             touches citation data, only the surrounding prose.
-        target_lang: One of SUPPORTED_LANGUAGES' keys.
+        target_lang: One of SUPPORTED_LANGUAGES' keys or 2-letter aliases.
 
     Returns:
         A dict with the translated text, the untouched citations, the
@@ -53,19 +77,20 @@ def translate_grounded_output(text: str, source_citations: list, target_lang: st
         it were a fresh verification result -- it is always a derived,
         translated VIEW of an English original.
     """
-    if target_lang not in SUPPORTED_LANGUAGES:
+    resolved_lang = normalize_target_language(target_lang)
+    if resolved_lang not in SUPPORTED_LANGUAGES:
         raise ValueError(f"Unsupported language: {target_lang!r}. Use one of {list(SUPPORTED_LANGUAGES)}.")
 
     if not text or not text.strip():
         return {
             "translated_text": text or "",
             "source_citations": source_citations or [],
-            "target_lang": target_lang,
+            "target_lang": resolved_lang,
             "disclaimer": TRANSLATION_DISCLAIMER,
         }
 
     system_prompt = (
-        f"Translate the following English legal text into {SUPPORTED_LANGUAGES[target_lang]}. "
+        f"Translate the following English legal text into {SUPPORTED_LANGUAGES[resolved_lang]}. "
         "Preserve every status marker such as [Not Provided], [Mismatch], [Verified], "
         "[REQUIRES VERIFICATION], or similar bracketed markers -- keep them as-is or use "
         "their natural equivalent phrase in the target language, but never drop them. Do "
@@ -78,11 +103,11 @@ def translate_grounded_output(text: str, source_citations: list, target_lang: st
         "descriptive language. Respond with ONLY the translated text -- no preamble, no "
         "commentary, no markdown code fences."
     )
-    translated_text = call_llm(system_prompt, text)
+    translated_text = call_llm(system_prompt, text, max_tokens=1500)
 
     return {
         "translated_text": translated_text,
         "source_citations": source_citations or [],
-        "target_lang": target_lang,
+        "target_lang": resolved_lang,
         "disclaimer": TRANSLATION_DISCLAIMER,
     }

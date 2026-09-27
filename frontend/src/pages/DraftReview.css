@@ -117,6 +117,70 @@
     color: #8c3a2a;
 }
 
+.doc-type-selector-box {
+    margin-bottom: 1.25rem;
+}
+
+.input-label-sm {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #63120e;
+    margin-bottom: 0.4rem;
+}
+
+.doc-type-select {
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    border-radius: 8px;
+    border: 1.5px solid #dfa46f;
+    background: #fff8ef;
+    color: #63120e;
+    font-size: 0.88rem;
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.doc-type-select:focus {
+    border-color: #8c3a2a;
+    box-shadow: 0 0 0 2px rgba(140, 58, 42, 0.15);
+}
+
+.paste-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.text-muted-sm {
+    font-size: 0.78rem;
+    color: #8c3a2a;
+}
+
+.btn-sample-link {
+    background: #fdf5eb;
+    border: 1px solid #dfa46f;
+    border-radius: 6px;
+    color: #8c3a2a;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.25rem 0.6rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-sample-link:hover {
+    background: #f1d1a6;
+    color: #63120e;
+    border-color: #c98659;
+}
+
 .divider-text {
     text-align: center;
     position: relative;
@@ -482,6 +546,8 @@
     align-items: center;
     gap: 0.5rem;
 }
+
+
 
 /* This page had zero responsive breakpoints (confirmed in UX audit: the
    fixed 2-column .review-grid forced the whole page wider than the

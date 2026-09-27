@@ -32,6 +32,7 @@ class ReviewResponse(BaseModel):
     suggestions: List[ReviewIssue] = []
     missing_sections: List[str] = []
     missing_fields: List[MissingField] = []
+    extracted_text: Optional[str] = None
 
 
 class FixRequest(BaseModel):

@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
 import { usePersona } from '../context/PersonaContext';
+import { useTranslation } from 'react-i18next';
 import PersonaSwitcher from '../components/PersonaSwitcher';
 import CitationStatusBadge, {
     ConfidenceBars, TechnicalFailureNote, RetrievalSourceBadge,
@@ -68,6 +69,7 @@ async function* streamSSE(response) {
 }
 
 const VerifyFiling = () => {
+    const { t } = useTranslation();
     const { token } = useAuth();
     const { localOnly } = useLocalMode();
     const { personaId, persona } = usePersona();
@@ -241,7 +243,7 @@ const VerifyFiling = () => {
             setPurging(false);
         }
         resetResults();
-        setPurgeNotice('Filing text & citation report completely purged from active server memory. Zero trace retained.');
+        setPurgeNotice(t('verifyFiling.purgedNotice', 'Filing text & citation report completely purged from active server memory. Zero trace retained.'));
         setTimeout(() => setPurgeNotice(null), 6000);
     };
 
@@ -258,16 +260,16 @@ const VerifyFiling = () => {
     return (
         <div className="verify-wrapper animate-fade-in">
             <div className="verify-header">
-                <div className="badge-chip"><FileCheck2 size={16} /><span>Verify-a-Filing</span></div>
-                <h2>Citation Integrity Check</h2>
-                <p className="subtitle persona-tagline">{PERSONA_INTRO[personaId]}</p>
+                <div className="badge-chip"><FileCheck2 size={16} /><span>{t('verifyFiling.badge', 'Verify-a-Filing')}</span></div>
+                <h2>{t('verifyFiling.title', 'Citation Integrity Check')}</h2>
+                <p className="subtitle persona-tagline">{t(`personas.${personaId}.tagline`, PERSONA_INTRO[personaId])}</p>
                 <PersonaSwitcher />
             </div>
 
             {/* UX item 2: real coverage banner, visible wherever verification starts */}
             <div className="coverage-banner">
                 <Info size={15} />
-                {coverage ? coverage.banner : 'Loading indexed corpus coverage…'}
+                {coverage ? (coverage.total_judgments ? t('verifyFiling.indexedCoverage', { count: coverage.total_judgments.toLocaleString(), years: `${coverage.year_min}–${coverage.year_max}`, defaultValue: coverage.banner }) : coverage.banner) : t('verifyFiling.loadingCoverage', 'Loading indexed corpus coverage…')}
             </div>
 
             {/* High-trust visible Attorney-Client Privilege Shield */}
@@ -283,9 +285,7 @@ const VerifyFiling = () => {
             {localOnly && (
                 <div className="local-only-block-banner">
                     <ShieldAlert size={16} />
-                    Citation checking is turned off in Local-only mode. Comparing a citation against the real
-                    judgment text needs an internet connection to our verification service, which Local-only mode
-                    switches off. Turn Local-only off in the sidebar to use this feature.
+                    {t('verifyFiling.localOnlyWarning', 'Citation checking is turned off in Local-only mode. Comparing a citation against the real judgment text needs an internet connection to our verification service, which Local-only mode switches off. Turn Local-only off in the sidebar to use this feature.')}
                 </div>
             )}
 
@@ -295,7 +295,7 @@ const VerifyFiling = () => {
                 exists gives the results/walkthrough the space back. */}
             {doneReport && !inputExpanded ? (
                 <button className="outline verify-input-collapsed" onClick={() => setInputExpanded(true)}>
-                    <FileCheck2 size={15} /> {filingLabel || 'Filing verified'} <span>— verify a different filing</span>
+                    <FileCheck2 size={15} /> {filingLabel || t('verifyFiling.verified', 'Filing verified')} <span>— {t('verifyFiling.verifyDifferent', 'verify a different filing')}</span>
                 </button>
             ) : (
                 <div className="verify-input-card">
@@ -310,8 +310,8 @@ const VerifyFiling = () => {
                                 </div>
                             ) : (
                                 <div>
-                                    <p className="drop-title">Upload a filing (.pdf or .txt)</p>
-                                    <p className="drop-sub">Any filing — not just one LexSetu drafted</p>
+                                    <p className="drop-title">{t('verifyFiling.uploadTitle', 'Upload a filing (.pdf or .txt)')}</p>
+                                    <p className="drop-sub">{t('verifyFiling.uploadSub', 'Any filing — not just one LexSetu drafted')}</p>
                                 </div>
                             )}
                         </label>
@@ -322,15 +322,15 @@ const VerifyFiling = () => {
                         onClick={() => file && runVerification(file)}
                         disabled={!file || verifying || localOnly}
                     >
-                        {verifying ? <><Loader2 size={18} className="spin" /> Verifying…</> : <><Sparkles size={18} /> Verify Citations</>}
+                        {verifying ? <><Loader2 size={18} className="spin" /> {t('verifyFiling.verifying', 'Verifying…')}</> : <><Sparkles size={18} /> {t('verifyFiling.verifyBtn', 'Verify Citations')}</>}
                     </button>
 
-                    <div className="divider-text"><span>OR TRY A VERIFIED SAMPLE</span></div>
+                    <div className="divider-text"><span>{t('verifyFiling.orSample', 'OR TRY A VERIFIED SAMPLE')}</span></div>
                     <div className="demo-filing-grid">
                         {DEMO_FILINGS.map((demo) => (
                             <button key={demo.id} className="outline demo-filing-card" onClick={() => loadDemoFiling(demo)} disabled={verifying || localOnly}>
-                                <strong>{demo.label}</strong>
-                                <span>{demo.blurb}</span>
+                                <strong>{t(`verifyFiling.${demo.id}Title`, demo.label)}</strong>
+                                <span>{t(`verifyFiling.${demo.id}Blurb`, demo.blurb)}</span>
                             </button>
                         ))}
                     </div>
@@ -344,7 +344,7 @@ const VerifyFiling = () => {
             {verifying && totalCount === 0 && (
                 <div className="verify-progress-state">
                     <Loader2 size={28} className="spin" />
-                    <p>Reading filing and extracting citations…</p>
+                    <p>{t('verifyFiling.readingFiling', 'Reading filing and extracting citations…')}</p>
                 </div>
             )}
 
@@ -353,7 +353,11 @@ const VerifyFiling = () => {
                     {verifying && (
                         <div className="verify-progress-strip">
                             <Loader2 size={16} className="spin" />
-                            Checking citation {Math.min(completedCount + 1, totalCount)} of {totalCount}…
+                            {t('verifyFiling.checkingCitation', {
+                                current: Math.min(completedCount + 1, totalCount),
+                                total: totalCount,
+                                defaultValue: `Checking citation ${Math.min(completedCount + 1, totalCount)} of ${totalCount}…`
+                            })}
                             <div className="verify-progress-track">
                                 <div className="verify-progress-fill" style={{ width: `${(completedCount / totalCount) * 100}%` }} />
                             </div>
@@ -370,38 +374,38 @@ const VerifyFiling = () => {
 
                     {doneReport && (
                         <div className="verify-summary-strip">
-                            <span className="summary-count verified">{doneReport.summary.verified} Verified</span>
+                            <span className="summary-count verified">{doneReport.summary.verified} {t('verifyFiling.verifiedCount', 'Verified')}</span>
                             {doneReport.summary.partial_match > 0 && (
-                                <span className="summary-count partial">{doneReport.summary.partial_match} Partial</span>
+                                <span className="summary-count partial">{doneReport.summary.partial_match} {t('verifyFiling.partialCount', 'Partial')}</span>
                             )}
-                            <span className="summary-count mismatch">{doneReport.summary.mismatch} Mismatch</span>
+                            <span className="summary-count mismatch">{doneReport.summary.mismatch} {t('verifyFiling.mismatchCount', 'Mismatch')}</span>
                             {doneReport.summary.possible_fabrication > 0 && (
-                                <span className="summary-count fabrication">{doneReport.summary.possible_fabrication} Fabrication</span>
+                                <span className="summary-count fabrication">{doneReport.summary.possible_fabrication} {t('verifyFiling.fabricationCount', 'Fabrication')}</span>
                             )}
                             {doneReport.summary.unverified > 0 && (
-                                <span className="summary-count unverified">{doneReport.summary.unverified} Unverified</span>
+                                <span className="summary-count unverified">{doneReport.summary.unverified} {t('verifyFiling.unverifiedCount', 'Unverified')}</span>
                             )}
                             {doneReport.summary.not_found > 0 && !doneReport.summary.possible_fabrication && !doneReport.summary.unverified && (
-                                <span className="summary-count not-found">{doneReport.summary.not_found} Not in Index</span>
+                                <span className="summary-count not-found">{doneReport.summary.not_found} {t('verifyFiling.notInIndexCount', 'Not in Index')}</span>
                             )}
                             {doneReport.summary.external_error > 0 && (
-                                <span className="summary-count ext-error">{doneReport.summary.external_error} Source unavailable</span>
+                                <span className="summary-count ext-error">{doneReport.summary.external_error} {t('verifyFiling.sourceUnavailableCount', 'Source unavailable')}</span>
                             )}
 
                             <div className={`export-actions ${persona.emphasizeExport ? 'emphasized' : ''}`}>
                                 <button className="outline btn-sm" onClick={() => downloadExport('csv')} disabled={exporting === 'csv'}>
-                                    {exporting === 'csv' ? <Loader2 size={15} className="spin" /> : <Download size={15} />} Export CSV
+                                    {exporting === 'csv' ? <Loader2 size={15} className="spin" /> : <Download size={15} />} {t('verifyFiling.exportCsv', 'Export CSV')}
                                 </button>
                                 <button className="outline btn-sm" onClick={() => downloadExport('pdf')} disabled={exporting === 'pdf'}>
-                                    {exporting === 'pdf' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} Export PDF
+                                    {exporting === 'pdf' ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} {t('verifyFiling.exportPdf', 'Export Court PDF')}
                                 </button>
                                 <button
                                     className="outline btn-sm btn-purge-session"
                                     onClick={handlePurgeSession}
                                     disabled={purging}
-                                    title="Immediately wipe document and verification record from active server RAM"
+                                    title={t('verifyFiling.purgeTitle', 'Immediately wipe document and verification record from active server RAM')}
                                 >
-                                    {purging ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />} Purge RAM
+                                    {purging ? <Loader2 size={15} className="spin" /> : <Trash2 size={15} />} {t('verifyFiling.purgeRam', 'Purge RAM')}
                                 </button>
                             </div>
                         </div>
@@ -411,10 +415,10 @@ const VerifyFiling = () => {
                         <div className="view-mode-row">
                             <div className="view-mode-toggle" role="tablist">
                                 <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>
-                                    <LayoutList size={15} /> All results
+                                    <LayoutList size={15} /> {t('verifyFiling.allResults', 'All results')}
                                 </button>
                                 <button className={viewMode === 'walkthrough' ? 'active' : ''} onClick={() => setViewMode('walkthrough')}>
-                                    <ListOrdered size={15} /> Step-by-step walkthrough
+                                    <ListOrdered size={15} /> {t('verifyFiling.walkthrough', 'Step-by-step walkthrough')}
                                 </button>
                             </div>
                         </div>
@@ -447,8 +451,8 @@ const VerifyFiling = () => {
             {doneReport && totalCount === 0 && (
                 <div className="verify-empty-state">
                     <FileCheck2 size={40} strokeWidth={1.2} />
-                    <h4>No citations detected</h4>
-                    <p>This filing doesn't appear to reference any case judgments — nothing to verify.</p>
+                    <h4>{t('verifyFiling.noCitations', 'No citations detected')}</h4>
+                    <p>{t('verifyFiling.noCitationsDesc', "This filing doesn't appear to reference any case judgments — nothing to verify.")}</p>
                 </div>
             )}
 

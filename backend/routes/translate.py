@@ -2,10 +2,11 @@ import hashlib
 
 from fastapi import APIRouter, HTTPException, Depends
 
+from typing import Optional
 from models.database import User
 from models.schemas import TranslateRequest, TranslateResponse
-from services.translate_output import translate_grounded_output, SUPPORTED_LANGUAGES
-from utils.auth import get_current_user
+from services.translate_output import translate_grounded_output, SUPPORTED_LANGUAGES, normalize_target_language
+from utils.auth import get_optional_current_user
 
 router = APIRouter()
 
@@ -27,18 +28,19 @@ def list_languages():
 
 
 @router.post("", response_model=TranslateResponse)
-def translate(body: TranslateRequest, current_user: User = Depends(get_current_user)):
-    if body.target_lang not in SUPPORTED_LANGUAGES:
-        raise HTTPException(status_code=400, detail=f"target_lang must be one of {list(SUPPORTED_LANGUAGES)}.")
+def translate(body: TranslateRequest, current_user: Optional[User] = Depends(get_optional_current_user)):
+    resolved_lang = normalize_target_language(body.target_lang)
+    if resolved_lang not in SUPPORTED_LANGUAGES:
+        raise HTTPException(status_code=400, detail=f"target_lang must be one of {list(SUPPORTED_LANGUAGES)} or recognized code.")
     if not body.text or not body.text.strip():
         raise HTTPException(status_code=400, detail="No English source text to translate.")
 
-    key = _cache_key(body.source_type, body.target_lang, body.text)
+    key = _cache_key(body.source_type, resolved_lang, body.text)
     if key in _TRANSLATION_CACHE:
         return _TRANSLATION_CACHE[key]
 
     try:
-        result = translate_grounded_output(body.text, body.citations or [], body.target_lang)
+        result = translate_grounded_output(body.text, body.citations or [], resolved_lang)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

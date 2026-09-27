@@ -16,8 +16,14 @@ from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 
 
+import os
+
+UNICODE_FONT_PATH = "/Library/Fonts/Arial Unicode.ttf"
+HAS_UNICODE_FONT = os.path.exists(UNICODE_FONT_PATH)
+
+
 def clean_pdf_text(text: str) -> str:
-    """Sanitizes text to be completely compatible with standard PDF Helvetica encoding."""
+    """Sanitizes text to be completely compatible with PDF generation."""
     if not text:
         return ""
     replacements = {
@@ -55,8 +61,10 @@ def clean_pdf_text(text: str) -> str:
     text = re.sub(r"\*{2,3}(.*?)\*{2,3}", r"\1", text)
     text = re.sub(r"#{1,6}\s*", "", text)
     
-    # Ensure all chars fall into Latin-1
-    return text.encode("latin-1", errors="replace").decode("latin-1")
+    # Only force latin-1 fallback if Unicode font is not present
+    if not HAS_UNICODE_FONT:
+        return text.encode("latin-1", errors="replace").decode("latin-1")
+    return text
 
 
 class BaseLexSetuPDF(FPDF):
@@ -417,17 +425,29 @@ class CourtPleadingPDF(FPDF):
         super().__init__(*args, **kwargs)
         self.set_margins(30, 25, 18)
         self.set_auto_page_break(auto=True, margin=20)
+        if HAS_UNICODE_FONT:
+            try:
+                self.add_font("ArialUnicode", "", UNICODE_FONT_PATH)
+                self.add_font("ArialUnicode", "B", UNICODE_FONT_PATH)
+                self.add_font("ArialUnicode", "I", UNICODE_FONT_PATH)
+                self.add_font("ArialUnicode", "BI", UNICODE_FONT_PATH)
+                self.main_font = "ArialUnicode"
+            except Exception as e:
+                print(f"[PDF] Could not load Arial Unicode font: {e}")
+                self.main_font = "Helvetica"
+        else:
+            self.main_font = "Helvetica"
 
     def header(self):
         if self.page_no() > 1:
-            self.set_font("Helvetica", "I", 8)
+            self.set_font(self.main_font, "I", 8)
             self.set_text_color(140, 140, 140)
             self.cell(self.epw, 6, clean_pdf_text("[ COURT PLEADING -- IN RE: LEGAL PROCEEDINGS ]"), align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             self.ln(2)
 
     def footer(self):
         self.set_y(-15)
-        self.set_font("Helvetica", "", 9)
+        self.set_font(self.main_font, "", 9)
         self.set_text_color(80, 80, 80)
         self.cell(self.epw, 8, clean_pdf_text(f"- {self.page_no()} -"), align="C")
 
@@ -452,10 +472,11 @@ def generate_court_draft_pdf(
     pdf = CourtPleadingPDF()
     pdf.alias_nb_pages()
     pdf.add_page()
+    f = pdf.main_font
 
     # 1. Court Name Header (Centered, Bold, Uppercase)
     court_title = court_name.strip() if court_name and court_name.strip() else "IN THE COURT OF THE PRINCIPAL DISTRICT & SESSIONS JUDGE"
-    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_font(f, "B", 11)
     pdf.set_text_color(0, 0, 0)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(pdf.epw, 5.5, clean_pdf_text(court_title.upper()), align="C")
@@ -463,12 +484,12 @@ def generate_court_draft_pdf(
 
     # 2. Case Number / Category
     case_no_str = case_number.strip() if case_number and case_number.strip() else "CRIMINAL / CIVIL MISC. APPLICATION NO. _______ OF 2026"
-    pdf.set_font("Helvetica", "B", 9.5)
+    pdf.set_font(f, "B", 9.5)
     pdf.cell(pdf.epw, 5.5, clean_pdf_text(case_no_str.upper()), align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(5)
 
     # 3. Cause Title / Parties Block
-    pdf.set_font("Helvetica", "B", 9.5)
+    pdf.set_font(f, "B", 9.5)
     pdf.cell(pdf.epw, 5, clean_pdf_text("IN THE MATTER OF:"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(1)
 
@@ -478,34 +499,34 @@ def generate_court_draft_pdf(
     w_half = pdf.epw * 0.65
     w_role = pdf.epw * 0.35
 
-    pdf.set_font("Helvetica", "", 9.5)
+    pdf.set_font(f, "", 9.5)
     pdf.cell(w_half, 5.5, clean_pdf_text(app_name))
-    pdf.set_font("Helvetica", "B", 8.5)
+    pdf.set_font(f, "B", 8.5)
     pdf.cell(w_role, 5.5, "... APPLICANT / PETITIONER", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-    pdf.set_font("Helvetica", "B", 9.5)
+    pdf.set_font(f, "B", 9.5)
     pdf.cell(pdf.epw, 6, "VERSUS", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-    pdf.set_font("Helvetica", "", 9.5)
+    pdf.set_font(f, "", 9.5)
     pdf.cell(w_half, 5.5, clean_pdf_text(resp_name))
-    pdf.set_font("Helvetica", "B", 8.5)
+    pdf.set_font(f, "B", 8.5)
     pdf.cell(w_role, 5.5, "... RESPONDENT", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(5)
 
     # 4. Heading / Application Title (Centered, Bold, Underlined)
     app_title = title.strip() if title and title.strip() else "APPLICATION UNDER RELEVANT PROVISIONS OF LAW"
-    pdf.set_font("Helvetica", "BU", 10.5)
+    pdf.set_font(f, "BU", 10.5)
     pdf.set_x(pdf.l_margin)
     pdf.multi_cell(pdf.epw, 5.5, clean_pdf_text(app_title.upper()), align="C")
     pdf.ln(4)
 
     # 5. Respectful Submission Header
-    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_font(f, "B", 10)
     pdf.cell(pdf.epw, 6, clean_pdf_text("MOST RESPECTFULLY SHOWETH:"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(2)
 
     # 6. Parse Draft Content into Pleading Paragraphs
-    pdf.set_font("Helvetica", "", 10)
+    pdf.set_font(f, "", 10)
     paragraphs = draft_text.split("\n\n")
 
     in_prayer = False
@@ -521,10 +542,10 @@ def generate_court_draft_pdf(
         if "PRAYER" in p_upper or p_upper.startswith("PRAYER:"):
             in_prayer = True
             pdf.ln(4)
-            pdf.set_font("Helvetica", "BU", 10)
+            pdf.set_font(f, "BU", 10)
             pdf.cell(pdf.epw, 6, "PRAYER", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.ln(2)
-            pdf.set_font("Helvetica", "", 9.5)
+            pdf.set_font(f, "", 9.5)
             sub_text = re.sub(r"^PRAYER:?\s*", "", p_clean, flags=re.IGNORECASE).strip()
             if sub_text:
                 pdf.set_x(pdf.l_margin)
@@ -534,17 +555,17 @@ def generate_court_draft_pdf(
         if "VERIFICATION" in p_upper or p_upper.startswith("VERIFICATION:"):
             in_verification = True
             pdf.ln(5)
-            pdf.set_font("Helvetica", "BU", 10)
+            pdf.set_font(f, "BU", 10)
             pdf.cell(pdf.epw, 6, "VERIFICATION", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.ln(2)
-            pdf.set_font("Helvetica", "", 9.5)
+            pdf.set_font(f, "", 9.5)
             sub_text = re.sub(r"^VERIFICATION:?\s*", "", p_clean, flags=re.IGNORECASE).strip()
             if sub_text:
                 pdf.set_x(pdf.l_margin)
                 pdf.multi_cell(pdf.epw, 5.2, clean_pdf_text(sub_text))
             continue
 
-        pdf.set_font("Helvetica", "", 9.5)
+        pdf.set_font(f, "", 9.5)
         cleaned_para = clean_pdf_text(p_clean)
         pdf.set_x(pdf.l_margin)
         pdf.multi_cell(pdf.epw, 5.2, cleaned_para)
@@ -553,10 +574,10 @@ def generate_court_draft_pdf(
     # 7. Verification Clause (if not already found in text)
     if not in_verification:
         pdf.ln(5)
-        pdf.set_font("Helvetica", "BU", 10)
+        pdf.set_font(f, "BU", 10)
         pdf.cell(pdf.epw, 6, "VERIFICATION", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(2)
-        pdf.set_font("Helvetica", "", 9)
+        pdf.set_font(f, "", 9)
         verif_text = (
             "Verified at New Delhi on this day that the contents of the above application are true "
             "and correct to the best of my knowledge, and derived from legal records believed to be true. "
@@ -565,17 +586,17 @@ def generate_court_draft_pdf(
         pdf.set_x(pdf.l_margin)
         pdf.multi_cell(pdf.epw, 5, clean_pdf_text(verif_text))
         pdf.ln(6)
-        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_font(f, "B", 9)
         pdf.cell(pdf.epw, 5, "DEPONENT", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     # 8. Advocate Sign-off Block
     pdf.ln(6)
-    pdf.set_font("Helvetica", "B", 8.5)
+    pdf.set_font(f, "B", 8.5)
     col_w = pdf.epw * 0.5
     pdf.cell(col_w, 4.5, "FILED BY:", align="L")
     pdf.cell(col_w, 4.5, "THROUGH", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     
-    pdf.set_font("Helvetica", "", 8.5)
+    pdf.set_font(f, "", 8.5)
     pdf.cell(col_w, 4.5, "Advocate for Applicant", align="L")
     pdf.cell(col_w, 4.5, "[ADVOCATE ON RECORD]", align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 

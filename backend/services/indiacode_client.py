@@ -31,7 +31,7 @@ class IndiaCodeClient:
     Never alters legal text, never fabricates metadata, never uses LLMs.
     """
 
-    def __init__(self, base_url: str = INDIACODE_API_BASE, timeout: float = 10.0, max_retries: int = 3):
+    def __init__(self, base_url: str = INDIACODE_API_BASE, timeout: float = 3.0, max_retries: int = 1):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries

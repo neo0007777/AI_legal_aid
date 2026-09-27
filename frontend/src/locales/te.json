@@ -40,5 +40,334 @@
     "unalteredText": "మార్పు చేయని న్యాయ పాఠ్యం",
     "englishOnlyNotice": "శాసనపరమైన పాఠ్యం ఆంగ్లంలో మాత్రమే చూపబడుతుంది — ఇది మూలానికి వ్యతిరేకంగా ధృవీకరించబడిన ఖచ్చితమైన పదజాలాన్ని కాపాడుతుంది మరియు మీ భాషా ఎంపిక దీనిని ప్రభావితం చేయదు.",
     "provenanceAudit": "మూలం & సమగ్రత ఆడిట్"
+  },
+  "personas": {
+    "lawyer": {
+      "label": "వకీల్",
+      "tagline": "ఈ దాఖలు కోర్టుకు చేరుకునే ముందు ప్రతి సూచనను నిర్ధారించండి."
+    },
+    "paralegal": {
+      "label": "పారాలీగల్",
+      "tagline": "సీనియర్ భాగస్వామి సమీక్షకు ముందు విరిగిన సూచనలను మరియు లేని ముందస్తు తీర్పులను పట్టుకోండి."
+    },
+    "student": {
+      "label": "చట్ట విద్యార్థి",
+      "tagline": "ఒక దశలో ఒకసారి, సూచన ఎందుకు స్థాపించబడిందో — లేదా లేదో — నేర్చుకోండి."
+    },
+    "law_student": {
+      "label": "చట్ట విద్యార్థి",
+      "tagline": "ఒక దశలో ఒకసారి, సూచన ఎందుకు స్థాపించబడిందో — లేదా లేదో — నేర్చుకోండి."
+    },
+    "judge": {
+      "label": "న్యాయమూర్తి",
+      "tagline": "అది పట్టుకునే పొర."
+    }
+  },
+  "privilege": {
+    "title": "అటార్నీ-క్లయింట్ ప్రివిలేజ్ గార్డ్",
+    "ephemeral": "తాత్కాలిక జీరో-రిటెన్షన్ RAM",
+    "airgapped": "ఎయిర్-గ్యాప్డ్ లోకల్ మోడ్",
+    "tagline": "క్లయింట్ గోప్యత పరిరక్షించబడింది • జీరో AI మోడల్ ట్రైనింగ్ • Sec. 126 IEA / Sec. 132 BSA అనుగుణంగా",
+    "audit": "సెక్యూరిటీ ఆడిట్",
+    "hideAudit": "ఆడిట్ దాచు",
+    "active": "ప్రివిలేజ్ షీల్డ్ యాక్టివ్",
+    "zeroAi": "ఫైలింగ్స్ పబ్లిక్ లేదా ప్రైవేట్ LLMలను ఎప్పుడూ ట్రెయిన్ చేయవు.",
+    "ramOnly": "క్లయింట్ పత్రాల స్థిరమైన డిస్క్ నిల్వ లేదు.",
+    "dpdp": "Sec 126 IEA / Sec 132 BSA చుట్టూ రూపొందించబడింది.",
+    "zeroAiTitle": "జీరో ఎల్ఎల్ఎం శిక్షణ",
+    "zeroAiDesc": "క్లయింట్ వాస్తవాలు, పేర్లు, మరియు డ్రాఫ్ట్లు ప్రజా లేదా ప్రైవేట్ AI మోడళ్లను శిక్షణ లేదా సున్నితంగా సవరించడానికి ఎప్పుడూ ఉపయోగించబడవు.",
+    "volatileRamTitle": "వోలటైల్ RAM మాత్రమే",
+    "volatileRamDesc": "అప్‌లోడ్ చేసిన పత్రాలు ధృవీకరణ సమయంలో మాత్రమే సర్వర్ RAM లో ఉంటాయి మరియు స్వయంచాలకంగా తొలగించబడతాయి.",
+    "statutoryPrivilegeTitle": "చట్టబద్ధ ప్రత్యేక హక్కు",
+    "statutoryPrivilegeDesc": "Section 126 IEA / Section 132 BSA మరియు DPDP Act 2023 కింద చట్టపరమైన వృత్తిపరమైన ప్రత్యేక హక్కును గౌరవించడానికి రూపొందించబడింది.",
+    "airgappedOptionTitle": "ఎయిర్-గ్యాప్డ్ ఎంపిక",
+    "airgappedOptionDesc": "పూర్తి ఆఫ్‌లైన్ ఐసోలేషన్ అవసరమా? సైడ్బార్ స్విచ్‌ను స్థానిక-మాత్రమే మోడ్‌కు మార్చి 0 అవుట్‌బౌండ్ నెట్‌వర్క్ ప్యాకెట్లను పొందండి.",
+    "activeOfflineState": "సక్రియ నెట్‌వర్క్ స్థితి: 100% ఆఫ్‌లైన్ / ఎయిర్-గ్యాప్డ్. జీరో అవుట్‌బౌండ్ బైట్లు.",
+    "activeCloudState": "సక్రియ నెట్‌వర్క్ స్థితి: ఎండ్-టు-ఎండ్ TLS ఎన్‌క్రిప్టెడ్ స్ట్రీమ్. మెమరీ తాత్కాలిక."
+  },
+  "verifyFiling": {
+    "badge": "వెరిఫై-ఎ-ఫైలింగ్",
+    "title": "సైటేషన్ సమగ్రత తనిఖీ",
+    "subtitle": "ఈ ఫైలింగ్ కోర్టుకు చేరుకునే ముందు ప్రతి సైటేషన్‌ను నిర్ధారించండి.",
+    "loadingCoverage": "ఇండెక్స్ చేయబడిన కార్పస్ కవరేజ్‌ను లోడ్ చేస్తోంది…",
+    "indexedCoverage": "ఇండెక్స్ చేయబడింది: {{count}} సుప్రీం కోర్టు తీర్పులు, {{years}}.",
+    "uploadTitle": "ఒక ఫైలింగ్‌ను అప్లోడ్ చేయండి (.pdf లేదా .txt)",
+    "uploadSub": "ఏ ఫైలింగ్ అయినా — కేవలం LexSetu రూపొందించినది మాత్రమే కాదు",
+    "verifyBtn": "సైటేషన్లను నిర్ధారించండి",
+    "verifying": "నిర్ధారిస్తోంది…",
+    "orSample": "లేదా ఒక నిర్ధారిత నమూనాను ప్రయత్నించండి",
+    "writTitle": "వ్రైట్ పిటిషన్ (నమూనా)",
+    "writBlurb": "మా సూచిక కోర్పస్‌లో సరిపోలని ఒక సూచన (\"Meera Devi v. Union of India\") మరియు రెండు నిజమైన, సరిగా సూచించబడిన తీర్పులను కలిగి ఉంది.",
+    "bailTitle": "బైల్ అప్పీల్ (నమూనా)",
+    "bailBlurb": "ఒక నిజమైన తీర్పు (\"Tarun Kumar v. ED\") ను, అది వాస్తవంగా మద్దతు ఇవ్వని క్లెయిమ్ కోసం సూచించబడింది.",
+    "demo1Title": "వ్రైట్ పిటిషన్ (నమూనా)",
+    "demo1Blurb": "మా సూచిక కోర్పస్‌లో సరిపోలని ఒక సూచన (\"Meera Devi v. Union of India\") మరియు రెండు నిజమైన, సరిగా సూచించబడిన తీర్పులను కలిగి ఉంది.",
+    "demo2Title": "బైల్ అప్పీల్ (నమూనా)",
+    "demo2Blurb": "ఒక నిజమైన తీర్పు (\"Tarun Kumar v. ED\") ను, అది వాస్తవంగా మద్దతు ఇవ్వని క్లెయిమ్ కోసం సూచించబడింది.",
+    "verified": "ఫైలింగ్ నిర్ధారించబడింది",
+    "verifyDifferent": "వేరే ఫైలింగ్‌ను నిర్ధారించండి",
+    "allResults": "అన్ని ఫలితాలు",
+    "walkthrough": "దశలవారీగా మార్గదర్శకము",
+    "exportCsv": "CSV ఎగుమతి",
+    "exportPdf": "కోర్టు PDF ఎగుమతి",
+    "purgeRam": "RAM శుభ్రపరచు",
+    "purgeTitle": "క్రియాశీల సర్వర్ RAM నుండి పత్రం మరియు ధృవీకరణ రికార్డును తక్షణమే తొలగించండి",
+    "readingFiling": "ఫైలింగ్ చదవడం మరియు సూచనలను వెలికితీయడం…",
+    "checkingCitation": "సూచన {{current}} ను {{total}} లో తనిఖీ చేస్తోంది…",
+    "verifiedCount": "ధృవీకరించబడింది",
+    "partialCount": "భాగిక",
+    "mismatchCount": "అసమానత",
+    "fabricationCount": "నకిలీ",
+    "unverifiedCount": "నిర్ధారించని",
+    "notInIndexCount": "సూచికలో లేదు",
+    "sourceUnavailableCount": "మూలం అందుబాటులో లేదు",
+    "localOnlyWarning": "సూచన తనిఖీ స్థానిక-మాత్రం మోడ్‌లో ఆపబడింది. ఒక సూచనను నిజమైన తీర్పు పాఠ్యంతో పోల్చడానికి మా నిర్ధారణ సేవకు ఇంటర్నెట్ కనెక్షన్ అవసరం, ఇది స్థానిక-మాత్రం మోడ్ ఆపేస్తుంది. ఈ ఫీచర్‌ను ఉపయోగించడానికి సైడ్బార్‌లో స్థానిక-మాత్రం మోడ్‌ను ఆఫ్ చేయండి.",
+    "purgedNotice": "ఫైలింగ్ పాఠ్యం & సూచన నివేదిక పూర్తిగా సక్రియ సర్వర్ మెమరీ నుండి తొలగించబడింది. ఏ గుర్తు కూడా నిల్వ చేయబడలేదు.",
+    "translationNotice": "ఇంగ్లీషులో నిర్ధారించబడిన ఫలితాన్ని అనువదించారు — తీర్పులు మరియు సూచన డేటా మారలేదు, కేవలం ఈ పాఠ్యం మాత్రమే.",
+    "noCitations": "ఏ సూచనలు గుర్తించబడలేదు",
+    "noCitationsDesc": "ఈ ఫైలింగ్ ఏ కేసు తీర్పులను సూచించట్లేదు — నిర్ధారించడానికి ఏదీ లేదు."
+  },
+  "legalAid": {
+    "badge": "చట్ట-ఆధారిత న్యాయ ప్రశ్నోత్తరాలు",
+    "title": "లెక్స్‌సెట్ మీ న్యాయ విచారణకు ఈరోజు ఎలా సహాయం చేయగలదు?",
+    "subtitle": "సారాంశ శిక్షా బాధ్యతలు, పౌర ప్రక్రియలు, ఒప్పంద అమలు, లేదా చట్టబద్ధ బైల్ గురించి అడగండి.",
+    "adaptiveBanner": "మీరు AI ని ఏదైనా నిర్దిష్ట ఫార్మాట్ (బులెట్లు, పట్టికలు, IRAC, లేదా కస్టమ్) లో సమాధానం ఇవ్వడానికి మార్గనిర్దేశం చేయవచ్చు. పైగా ఒక ప్రీసెట్‌ను ఎంచుకోండి లేదా గైడ్ స్ట్రక్చర్‌పై క్లిక్ చేసి మెమరీలో సేవ్ చేయండి.",
+    "adaptiveStructure": "అనుకూల నిర్మాణం:",
+    "statutoryNoticeTitle": "చట్టబద్ధ సూచన:",
+    "statutoryNotice": "ఈ AI సహాయకుడు పరిశోధన మరియు ప్రక్రియ మార్గదర్శకత్వాన్ని అందిస్తుంది. ఇది అధికారిక వకీల్-క్లయింట్ ప్రతినిధిత్వాన్ని కలిగించదు.",
+    "headerTitle": "AI న్యాయ సలహా",
+    "headerSubtitle": "కోర్టు-స్థాయి చట్టబద్ధ ప్రశ్నోత్తరాలు ద్వంద్వ BNS/IPC కోడిఫికేషన్‌తో",
+    "inputPlaceholder": "ఏ న్యాయ ప్రశ్నైనా అడగండి (ఉదా. 'నాన్-బైబుల్ నేరాల్లో ముందస్తు బైల్ ఇవ్వబడుతుందా?') లేదా ఫార్మాట్‌ను మార్గనిర్దేశం చేయండి...",
+    "askBtn": "లీగల్ AI ను అడగండి",
+    "reset": "రీసెట్",
+    "sessionExpired": "సెషన్ ముగిసింది",
+    "sessionExpiredDesc": "మీ లాగిన్ సెషన్ ముగిసింది. మెమరీ ప్రాధాన్యతలను సేవ్ చేయడం మరియు లీగల్ మార్గదర్శకత్వాన్ని పొందడం కొనసాగించడానికి మళ్లీ లాగిన్ చేయండి.",
+    "loginAgain": "మళ్లీ లాగిన్ చేయండి",
+    "structureMode": "సంరచన మోడ్:",
+    "savedInMemory": "మెమరీలో సేవ్ చేయబడింది",
+    "standard": "స్టాండర్డ్",
+    "executive": "ఎగ్జిక్యూటివ్",
+    "irac": "IRAC",
+    "bullets": "బులెట్లు",
+    "guideStructure": "గైడ్ నిర్మాణం"
+  },
+  "draftAssistant": {
+    "draftLibrary": "డ్రాఫ్ట్ లైబ్రరీ",
+    "collapseLibrary": "లైబ్రరీను సంకుచించండి",
+    "expandLibrary": "లైబ్రరీను విస్తరించండి",
+    "categories": {
+      "criminal": "అపరాధ",
+      "civil": "నాగరిక",
+      "contracts": "ఒప్పందాలు",
+      "courtForms": "కోర్టు ఫార్మ్స్"
+    },
+    "templates": {
+      "bail": "బైల్ దరఖాస్తు",
+      "anticipatory": "అంచనా బైల్",
+      "plaint": "నాగరిక కేసు / ప్లెయింట్",
+      "injunction": "ఇంజంక్షన్ దరఖాస్తు",
+      "rent": "వాటా ఒప్పందం",
+      "employment": "ఉద్యోగ ఒప్పందం",
+      "nda": "NDA",
+      "vakalatnama": "వకలత్నామా",
+      "affidavit": "అఫిడవిట్"
+    },
+    "fields": {
+      "accused": {
+        "label": "అభియోగితుడి పేరు",
+        "placeholder": "e.g. Ramesh Kumar"
+      },
+      "fir": {
+        "label": "FIR సంఖ్య / సంవత్సరం",
+        "placeholder": "e.g. 124/2023"
+      },
+      "sections": {
+        "label": "సంబంధిత సెక్షన్లు",
+        "placeholder": "e.g. 302, 307 IPC"
+      },
+      "court": {
+        "label": "అధికార పరిధి / కోర్టు",
+        "placeholder": "e.g. Sessions Court, Delhi"
+      },
+      "facts": {
+        "label": "సంక్షిప్త రక్షణ వాస్తవాలు",
+        "placeholder": "e.g. Falsely implicated..."
+      },
+      "apprehended": {
+        "label": "వ్యక్తి పేరు",
+        "placeholder": "e.g. Suresh Singh"
+      },
+      "ps": {
+        "label": "పోలీసు స్టేషన్",
+        "placeholder": "e.g. Vasant Kunj"
+      },
+      "offense": {
+        "label": "అపరాధం",
+        "placeholder": "e.g. 498A IPC"
+      },
+      "reasons": {
+        "label": "కారణాలు",
+        "placeholder": "e.g. Matrimonial dispute..."
+      },
+      "plaintiff": {
+        "label": "వాదికుడు",
+        "placeholder": "e.g. ABC Corp."
+      },
+      "defendant": {
+        "label": "వాదివాడు",
+        "placeholder": "e.g. XYZ Ltd."
+      },
+      "suitValue": {
+        "label": "కేసు విలువ",
+        "placeholder": "e.g. Rs. 50,00,000/-"
+      },
+      "cause": {
+        "label": "కారణం",
+        "placeholder": "e.g. Breach of contract..."
+      },
+      "applicant": {
+        "label": "అప్లికెంట్",
+        "placeholder": "e.g. Rahul Verma"
+      },
+      "respondent": {
+        "label": "ప్రతివాది",
+        "placeholder": "e.g. Municipal Corp."
+      },
+      "property": {
+        "label": "విషయం",
+        "placeholder": "e.g. Plot No. 42, Sector 5"
+      },
+      "urgency": {
+        "label": "అవసరత యొక్క ఆధారాలు",
+        "placeholder": "e.g. Illegal demolition..."
+      },
+      "landlord": {
+        "label": "జమీనుదారు",
+        "placeholder": "e.g. Sunil Gupta"
+      },
+      "tenant": {
+        "label": "వాటికుదారు",
+        "placeholder": "e.g. Priya Sharma"
+      },
+      "rent": {
+        "label": "మాసిక అద్దె",
+        "placeholder": "e.g. Rs. 25,000/-"
+      },
+      "duration": {
+        "label": "వ్యవధి",
+        "placeholder": "e.g. 11 Months"
+      },
+      "company": {
+        "label": "కంపెనీ",
+        "placeholder": "e.g. TechCorp Solutions"
+      },
+      "employee": {
+        "label": "ఉద్యోగి",
+        "placeholder": "e.g. Anil Kumar"
+      },
+      "role": {
+        "label": "పని పదవి",
+        "placeholder": "e.g. Senior Engineer"
+      },
+      "salary": {
+        "label": "వార్షిక CTC",
+        "placeholder": "e.g. Rs. 15,00,000"
+      }
+    },
+    "stages": {
+      "building_manifest": "Building fact manifest & procedural posture",
+      "resolving_statutes": "Resolving & locking statutory sources",
+      "retrieving_templates": "Retrieving matching templates",
+      "generating_draft": "Generating draft",
+      "verifying_draft": "Verifying statute citations & source-lock consistency"
+    },
+    "generateTitle": "Draft: {{title}}",
+    "generateSubtitle": "Fill in the details below. LexSetu AI will generate a grounded legal document using real Indian legal templates. Missing information will be explicitly marked as [NOT PROVIDED] — not assumed or fabricated.",
+    "sessionExpiredLabel": "Session Expired:",
+    "sessionExpiredDesc": "మీ లాగిన్ టోకెన్ గడువు ముగిసింది. దయచేసి మళ్లీ లాగిన్ చేసి డ్రాఫ్టింగ్ కొనసాగించండి.",
+    "loginAgain": "మళ్లీ లాగిన్ చేయండి",
+    "missingInfo": "లభించని సమాచారం",
+    "missingFieldsDesc": "క్రింది ఫీల్డ్స్ అందించబడలేదు మరియు రూపొందించిన డ్రాఫ్ట్‌లో [NOT PROVIDED] గా కనిపిస్తాయి:",
+    "missingFieldsNote": "మీరు ఇంకా డ్రాఫ్ట్‌ను రూపొందించవచ్చు — అసంపూర్ణ సమాచారం స్పష్టంగా గుర్తించబడుతుంది, కల్పించబడదు.",
+    "generateAnyway": "అయినా కూడా రూపొందించండి",
+    "goBack": "వెనక్కి వెళ్లండి",
+    "requiredBadge": "అవసరం",
+    "generateBtn": "గ్రౌండెడ్ డ్రాఫ్ట్ రూపొందించండి",
+    "generatingTitle": "గ్రౌండెడ్ డ్రాఫ్ట్ రూపొందిస్తోంది...",
+    "connLost": "ప్రగతిని నిర్ధారించలేకపోయాం — ఫలితం ఇంకా సరైనదిగా ఉండవచ్చు.",
+    "localOnlyBadge": "స్థానికంగా రూపొందించబడింది (Ollama) — స్థానిక-మాత్రం మోడ్‌లో మెరుగుదల దాటవేయబడింది",
+    "groundedScore": "ఆధారిత & మెరుగుపరచబడింది (స్కోరు: {{score}}/100)",
+    "groundedVerified": "ఆధారిత & మెరుగుపరచబడింది (నిర్ధారించబడింది)",
+    "courtView": "కోర్టు వీక్షణ",
+    "editText": "పాఠ్యాన్ని సవరించండి",
+    "inspectReview": "డ్రాఫ్ట్ సమీక్షలో పరిశీలించండి",
+    "editDetails": "వివరాలను సవరించండి",
+    "regenerate": "మళ్లీ సృష్టించండి",
+    "copy": "నకలు",
+    "copied": "నకలు చేయబడింది!",
+    "exportPdf": "కోర్టు PDF ను ఎగుమతి చేయండి",
+    "download": "డౌన్‌లోడ్ (.txt)",
+    "provenanceTitle": "మూలం & మూలాలు",
+    "generatePrompt": "ప్రొవెనెన్స్ ట్రాకింగ్‌ను చూడటానికి ఒక డ్రాఫ్ట్ రూపొందించండి — మీ ఇన్‌పుట్ నుండి వచ్చిన వాస్తవాలు ఏవి, ఏవి లేనివిగా గుర్తించబడ్డాయో.",
+    "statuteAudit": "చట్టం & సెక్షన్ ఆడిట్",
+    "recheck": "మళ్లీ తనిఖీ",
+    "checking": "తనిఖీ చేస్తోంది...",
+    "clickRecheck": "ఈ డ్రాఫ్ట్‌లో చట్ట విభాగాలను ఆడిట్ చేయడానికి \"మళ్లీ తనిఖీ\" పై క్లిక్ చేయండి.",
+    "factProvenance": "వాస్తవ మూలం",
+    "fromInput": "✅ మీ ఇన్‌పుట్ నుండి ({{count}})",
+    "missingMaterial": "⚠️ లేమి — పదార్థం ({{count}})",
+    "missingMaterialNote": "ఇవి డ్రాఫ్ట్‌లో [NOT PROVIDED] గా కనిపిస్తాయి",
+    "missingOptional": "📋 లేమి — ఐచ్చికం ({{count}})",
+    "notProvided": "[NOT PROVIDED]",
+    "referenceTemplates": "సూచన టెంప్లేట్లు",
+    "aiReferenced": "AI ఈ నిజమైన పత్రాలను చట్ట డేటాబేస్ నుండి సూచించింది:",
+    "categoryMatch": "వర్గం: {{category}} | సరిపోలిక: {{score}}%",
+    "runIngest": "సూచన-ఆధారిత జనరేషన్ కోసం చట్ట టెంప్లేట్లను లోడ్ చేయడానికి ingest.py ను నడపండి.",
+    "translatingDraft": "డ్రాఫ్ట్‌ను {{language}} కు అనువదిస్తోంది...",
+    "translateDisclaimer": "ఇంగ్లీష్ నుండి అనువదించబడింది — డ్రాఫ్ట్ రూపొందించబడింది మరియు ప్రమాణిక భారతీయ చట్ట మూలాలపై నిర్ధారించబడింది",
+    "viewOriginalDraft": "మూలాన్ని వీక్షించండి (English)",
+    "viewTranslatedDraft": "అనువదించబడినది చూడండి ({{language}})"
+  },
+  "draftReview": {
+    "badge": "యూనివర్సల్ AI లీగల్ రివ్యూ ఇంజిన్",
+    "title": "లీగల్ డ్రాఫ్ట్ రివ్యూ & ఆటో-ఫిక్స్",
+    "subtitle": "RAG-శక్తితో కూడిన హైబ్రిడ్ విశ్లేషణ, మీ డ్రాఫ్ట్‌ను 50M+ ప్రీసిడెంట్స్ మరియు 1,800+ ల్యాండ్‌మార్క్ టెంప్లేట్స్‌తో పోల్చుతుంది.",
+    "selectInput": "1. ఇన్‌పుట్ విధానాన్ని ఎంచుకోండి",
+    "uploadTitle": "డ్రాఫ్ట్‌ను అప్‌లోడ్ చేయండి (.pdf, .docx, .txt, .rtf)",
+    "uploadSub": "డ్రాగ్ & డ్రాప్ లేదా ఫైల్‌ను బ్రౌజ్ చేయడానికి క్లిక్ చేయండి",
+    "orPaste": "లేదా క్రింద టెక్స్ట్ పేస్ట్ చేయండి",
+    "placeholder": "ఇక్కడ లీగల్ పిటిషన్, కాంట్రాక్ట్, అఫిడవిట్ లేదా నోటీస్‌ను పేస్ట్ చేయండి...",
+    "runReview": "AI లీగల్ రివ్యూ ఇంజిన్‌ను నడపండి",
+    "comparing": "Qdrant టెంప్లేట్స్‌తో పోల్చుతోంది...",
+    "noReviewTitle": "సమీక్ష విశ్లేషణ రూపొందించబడలేదు",
+    "noReviewDesc": "ఎడమవైపు ఒక పత్రాన్ని అప్లోడ్ చేయండి లేదా పాఠ్యాన్ని అతికించండి, హైబ్రిడ్ నియమ & RAG చట్ట సమీక్ష పైప్‌లైన్‌ను నడిపించడానికి.",
+    "analyzingTitle": "పత్రాన్ని విశ్లేషిస్తోంది & టాప్-5 Qdrant టెంప్లేట్లను పొందుతోంది...",
+    "analyzingDesc": "సంరచనాత్మక విభాగాలు, ప్లేస్‌హోల్డర్లు, చట్ట తర్కం, మరియు ముందస్తు అనుసరణను స్కాన్ చేస్తోంది.",
+    "lowRisk": "తక్కువ ప్రమాదం",
+    "mediumRisk": "మధ్యస్థ ప్రమాదం",
+    "highRisk": "అధిక ప్రమాదం",
+    "missingSections": "అనివార్య విభాగాలు లేవు ({{count}})",
+    "unfilledPlaceholders": "పూరించని బ్రాకెట్ ప్లేస్‌హోల్డర్లు ({{count}})",
+    "detectedIssues": "గుర్తించిన చట్ట & నిర్మాణ సమస్యలు",
+    "criticalBadge": "అత్యవసరం",
+    "warningBadge": "హెచ్చరిక",
+    "suggestionBadge": "సూచన",
+    "fixRecommendation": "సరిదిద్దు సిఫార్సు:",
+    "autoFixBtn": "కనుగొన్న సమస్యలను ఆటో-ఫిక్స్ చేయండి",
+    "fixingStatus": "కనుగొన్న సమస్యలను సరిచేస్తున్నాం & లేఅవుట్‌ను నిలుపుకుంటున్నాం...",
+    "autoFixedTitle": "ఆటో-ఫిక్స్ చేసిన సరిచేసిన డ్రాఫ్ట్",
+    "copyFix": "సరిచేసిన డ్రాఫ్ట్‌ను కాపీ చేయండి",
+    "copied": "కాపీ చేయబడింది",
+    "appliedRemediation": "అన్వయించిన పరిహార చర్యలు:",
+    "originalDraft": "మూల డ్రాఫ్ట్",
+    "correctedDraft": "సరిచేసిన డ్రాఫ్ట్ (లేఅవుట్ నిలుపబడింది)",
+    "uploadedFileDraft": "అప్‌లోడ్ చేసిన ఫైల్ డ్రాఫ్ట్",
+    "viewTranslated": "అనువదించినది చూడండి ({{language}})",
+    "viewOriginal": "అసలు చూడండి (English)",
+    "translatingFix": "సరిచేసిన డ్రాఫ్ట్‌ను {{language}}కి అనువదిస్తోంది...",
+    "translateDisclaimer": "ఇంగ్లీష్ నుండి అనువదించబడింది — సమీక్ష విశ్లేషణ మరియు సవరణలు భారతీయ న్యాయ ప్రమాణాలపై ధృవీకరించబడ్డాయి",
+    "reportDisclaimer": "ఇంగ్లీష్ నుండి అనువదించబడింది — సమీక్ష విశ్లేషణ మరియు సూచనలను 50M+ ప్రమాణాలపై ఇంగ్లీష్‌లో ధృవీకరించారు",
+    "downloadTxt": ".txt ను డౌన్‌లోడ్ చేయండి",
+    "exportPdf": "కోర్ట్ PDF ను ఎగుమతి చేయండి"
   }
 }

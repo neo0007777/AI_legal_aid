@@ -1,11 +1,12 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
-    FileText, Wand2, RotateCcw, Download, Copy, RefreshCw, Edit3,
+    FileText, Wand2, Download, Copy, RefreshCw, Edit3,
     Sparkles, CornerDownRight, Check, Loader2, ShieldAlert, AlertOctagon,
     Scale, BookmarkMinus, Briefcase, Users, Lock, FileSignature,
-    UploadCloud, X, AlertTriangle, ListChecks, ArrowRightCircle,
-    ChevronLeft, ChevronRight, FileCheck, CheckCircle2, Info, CircleAlert, Eye, FileDown
+    AlertTriangle, ChevronLeft, ChevronRight, FileCheck, CheckCircle2,
+    Info, CircleAlert, Eye, FileDown
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLocalMode } from '../context/LocalModeContext';
@@ -17,11 +18,6 @@ import { useStageStream } from '../hooks/useStageStream';
 import './DraftAssistant.css';
 
 // Real, distinct steps backend/routes/documents.py's /draft stream actually emits
-// (see generate_draft_stream). Relabeled from a proposed list that included a
-// two-pass review -- run_two_pass_refinement is never called in this endpoint
-// (that's the separate /review flow behind DraftReview.jsx) -- to the steps
-// that actually run: manifest/posture planning, statute source-locking,
-// template retrieval, generation, and the post-generation consistency/statute audit.
 const DRAFT_STAGE_ORDER = ['building_manifest', 'resolving_statutes', 'retrieving_templates', 'generating_draft', 'verifying_draft'];
 const DRAFT_STAGE_LABELS = {
     building_manifest: 'Building fact manifest & procedural posture',
@@ -260,6 +256,7 @@ const MATERIAL_FIELDS = {
 
 const TEMPLATE_GROUPS = [
     {
+        groupId: 'criminal',
         groupTitle: 'CRIMINAL',
         templates: [
             { id: 'bail', title: 'Bail Application', icon: ShieldAlert, category: 'Petition', fields: [{ id: 'accused', label: 'Name of Accused', placeholder: 'e.g. Ramesh Kumar', material: true }, { id: 'fir', label: 'FIR No. / Year', placeholder: 'e.g. 124/2023' }, { id: 'sections', label: 'Relevant Sections', placeholder: 'e.g. 302, 307 IPC', material: true }, { id: 'court', label: 'Jurisdiction / Court', placeholder: 'e.g. Sessions Court, Delhi', material: true }, { id: 'facts', label: 'Brief Defense Facts', placeholder: 'e.g. Falsely implicated...', type: 'textarea' }] },
@@ -267,6 +264,7 @@ const TEMPLATE_GROUPS = [
         ]
     },
     {
+        groupId: 'civil',
         groupTitle: 'CIVIL',
         templates: [
             { id: 'plaint', title: 'Civil Suit / Plaint', icon: Scale, category: 'Plaint and Written statement', fields: [{ id: 'plaintiff', label: 'Plaintiff', placeholder: 'e.g. ABC Corp.', material: true }, { id: 'defendant', label: 'Defendant', placeholder: 'e.g. XYZ Ltd.', material: true }, { id: 'court', label: 'Court', placeholder: 'e.g. District Court, Mumbai', material: true }, { id: 'suitValue', label: 'Suit Value', placeholder: 'e.g. Rs. 50,00,000/-' }, { id: 'cause', label: 'Cause of Action', placeholder: 'e.g. Breach of contract...', type: 'textarea', material: true }] },
@@ -274,6 +272,7 @@ const TEMPLATE_GROUPS = [
         ]
     },
     {
+        groupId: 'contracts',
         groupTitle: 'CONTRACTS',
         templates: [
             { id: 'rent', title: 'Rent Agreement', icon: Briefcase, category: 'Lease Financing', fields: [{ id: 'landlord', label: 'Landlord', placeholder: 'e.g. Sunil Gupta', material: true }, { id: 'tenant', label: 'Tenant', placeholder: 'e.g. Priya Sharma', material: true }, { id: 'property', label: 'Property Address', placeholder: 'e.g. Flat 101, A-Wing...', material: true }, { id: 'rent', label: 'Monthly Rent', placeholder: 'e.g. Rs. 25,000/-', material: true }, { id: 'duration', label: 'Duration', placeholder: 'e.g. 11 Months' }] },
@@ -282,6 +281,7 @@ const TEMPLATE_GROUPS = [
         ]
     },
     {
+        groupId: 'courtForms',
         groupTitle: 'COURT FORMS',
         templates: [
             { id: 'vakalatnama', title: 'Vakalatnama', icon: FileSignature, category: 'Vakalatnama', fields: [{ id: 'court', label: 'Court Name', placeholder: 'e.g. Supreme Court of India', material: true }, { id: 'client', label: 'Client Name', placeholder: 'e.g. XYZ Ltd.', material: true }, { id: 'advocate', label: 'Advocate Name', placeholder: 'e.g. Sharma Sr. Counsel', material: true }, { id: 'caseNo', label: 'Case No.', placeholder: 'e.g. SLP (C) 1245/2026' }] },
@@ -292,7 +292,8 @@ const TEMPLATE_GROUPS = [
 
 const DraftAssistant = () => {
     const navigate = useNavigate();
-    const { getAuthHeaders } = useAuth();
+    const { t } = useTranslation();
+    const { getAuthHeaders, logout } = useAuth();
     const { localOnly } = useLocalMode();
     const allTemplates = TEMPLATE_GROUPS.flatMap(g => g.templates);
     const [activeTemplateId, setActiveTemplateId] = useState('bail');
@@ -316,6 +317,21 @@ const DraftAssistant = () => {
     const [isVerifyingStatutes, setIsVerifyingStatutes] = useState(false);
     const [exportingPdf, setExportingPdf] = useState(false);
     const editorRef = useRef(null);
+
+    // Helpers to get localized strings
+    const getGroupTitle = (group) => t(`draftAssistant.categories.${group.groupId}`, group.groupTitle);
+    const getTemplateTitle = (tpl) => t(`draftAssistant.templates.${tpl.id}`, tpl.title);
+    const getFieldLabel = (field) => t(`draftAssistant.fields.${field.id}.label`, field.label);
+    const getFieldPlaceholder = (field) => t(`draftAssistant.fields.${field.id}.placeholder`, field.placeholder);
+
+    // Localized pipeline stage labels
+    const localizedStageLabels = useMemo(() => ({
+        building_manifest: t('draftAssistant.stages.building_manifest', DRAFT_STAGE_LABELS.building_manifest),
+        resolving_statutes: t('draftAssistant.stages.resolving_statutes', DRAFT_STAGE_LABELS.resolving_statutes),
+        retrieving_templates: t('draftAssistant.stages.retrieving_templates', DRAFT_STAGE_LABELS.retrieving_templates),
+        generating_draft: t('draftAssistant.stages.generating_draft', DRAFT_STAGE_LABELS.generating_draft),
+        verifying_draft: t('draftAssistant.stages.verifying_draft', DRAFT_STAGE_LABELS.verifying_draft),
+    }), [t]);
 
     const switchTemplate = (id) => {
         setActiveTemplateId(id);
@@ -341,8 +357,8 @@ const DraftAssistant = () => {
         const materialIds = MATERIAL_FIELDS[activeTemplateId] || [];
         return currentTemplate.fields
             .filter(f => materialIds.includes(f.id) && !formData[f.id]?.trim())
-            .map(f => f.label);
-    }, [activeTemplateId, formData, currentTemplate]);
+            .map(f => getFieldLabel(f));
+    }, [activeTemplateId, formData, currentTemplate, t]);
 
     const buildDescription = () => {
         const parts = [`Generate a ${currentTemplate.title} with the following details:`];
@@ -437,15 +453,17 @@ const DraftAssistant = () => {
         }
     };
 
+    const activeDraftText = documentContent;
+
     const handleCopy = () => {
-        const cleanText = sanitizeDraftText(documentContent);
+        const cleanText = sanitizeDraftText(activeDraftText);
         navigator.clipboard.writeText(cleanText);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
     const handleExportPdf = async () => {
-        if (!documentContent) return;
+        if (!activeDraftText) return;
         setExportingPdf(true);
         try {
             const slug = (currentTemplate?.title || 'Court_Pleading').replace(/\s+/g, '_');
@@ -453,7 +471,7 @@ const DraftAssistant = () => {
                 endpoint: '/api/documents/export-pdf',
                 body: {
                     title: currentTemplate?.title || 'Court Application',
-                    draft_text: sanitizeDraftText(documentContent),
+                    draft_text: sanitizeDraftText(activeDraftText),
                     court_name: formData?.court || formData?.court_name || 'IN THE COURT OF THE PRINCIPAL DISTRICT & SESSIONS JUDGE',
                     case_number: formData?.case_number || (formData?.fir_number ? `CASE / FIR NO. ${formData.fir_number}` : 'APPLICATION NO. _____ OF 2026'),
                     applicant: formData?.applicant_name || formData?.client_name || formData?.complainant || formData?.tenant_name || formData?.landlord_name || 'APPLICANT / PETITIONER',
@@ -471,7 +489,7 @@ const DraftAssistant = () => {
     };
 
     const handleDownload = () => {
-        const cleanText = sanitizeDraftText(documentContent);
+        const cleanText = sanitizeDraftText(activeDraftText);
         const blob = new Blob([cleanText], { type: 'text/plain;charset=utf-8' });
         const slug = (currentTemplate?.title || 'Draft').replace(/\s+/g, '_');
         downloadFileFromBlob(blob, `${slug}_LexSetu.txt`, 'text/plain;charset=utf-8');
@@ -480,7 +498,7 @@ const DraftAssistant = () => {
     const handleOpenInReview = () => {
         navigate('/draft-review', {
             state: {
-                draft: documentContent,
+                draft: activeDraftText,
                 review: reviewData
             }
         });
@@ -491,11 +509,11 @@ const DraftAssistant = () => {
             <aside className={`draft-sidebar ${sidebarOpen ? '' : 'sidebar-collapsed'}`}>
                 <div className="sidebar-header-workspace">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        {sidebarOpen && <h3>Draft Library</h3>}
+                        {sidebarOpen && <h3>{t('draftAssistant.draftLibrary', 'Draft Library')}</h3>}
                         <button
                             className="panel-toggle-btn"
                             onClick={() => setSidebarOpen(!sidebarOpen)}
-                            title={sidebarOpen ? 'Collapse library' : 'Expand library'}
+                            title={sidebarOpen ? t('draftAssistant.collapseLibrary', 'Collapse library') : t('draftAssistant.expandLibrary', 'Expand library')}
                         >
                             {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
                         </button>
@@ -505,15 +523,15 @@ const DraftAssistant = () => {
                 <div className="template-list">
                     {TEMPLATE_GROUPS.map((group, gIdx) => (
                         <div key={gIdx} className="sidebar-category-group">
-                            <h5 className="sidebar-category-title">{group.groupTitle}</h5>
-                            {group.templates.map(t => (
+                            <h5 className="sidebar-category-title">{getGroupTitle(group)}</h5>
+                            {group.templates.map(tItem => (
                                 <div
-                                    key={t.id}
-                                    className={`template-item ${activeTemplateId === t.id ? 'active' : ''}`}
-                                    onClick={() => switchTemplate(t.id)}
+                                    key={tItem.id}
+                                    className={`template-item ${activeTemplateId === tItem.id ? 'active' : ''}`}
+                                    onClick={() => switchTemplate(tItem.id)}
                                 >
-                                    <t.icon size={18} className="template-icon" />
-                                    <div><h4>{t.title}</h4></div>
+                                    <tItem.icon size={18} className="template-icon" />
+                                    <div><h4>{getTemplateTitle(tItem)}</h4></div>
                                 </div>
                             ))}
                         </div>
@@ -529,8 +547,8 @@ const DraftAssistant = () => {
                             <div className="draft-form-header">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
                                     <div style={{ flex: '1', minWidth: '240px' }}>
-                                        <h2>Draft: {currentTemplate.title}</h2>
-                                        <p>Fill in the details below. LexSetu AI will generate a grounded legal document using real Indian legal templates. Missing information will be explicitly marked as [NOT PROVIDED] — not assumed or fabricated.</p>
+                                        <h2>{t('draftAssistant.generateTitle', { title: getTemplateTitle(currentTemplate) })}</h2>
+                                        <p>{t('draftAssistant.generateSubtitle', 'Fill in the details below. LexSetu AI will generate a grounded legal document using real Indian legal templates. Missing information will be explicitly marked as [NOT PROVIDED] — not assumed or fabricated.')}</p>
                                     </div>
                                     <PrivilegeShield compact={true} />
                                 </div>
@@ -538,7 +556,29 @@ const DraftAssistant = () => {
                             <div className="draft-form-body">
                                 {error && (
                                     <div style={{ padding: '0.75rem', background: '#fee2e2', borderRadius: '6px', color: '#991b1b', marginBottom: '1rem', fontSize: '0.9rem' }}>
-                                        {error}
+                                        {/token|expired|session|unauthorized/i.test(error) ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                <span><strong>{t('draftAssistant.sessionExpiredLabel', 'Session Expired:')}</strong> {t('draftAssistant.sessionExpiredDesc', 'Your login token has expired. Please log in again to continue drafting.')}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => logout()}
+                                                    style={{
+                                                        background: '#991b1b',
+                                                        color: '#fff',
+                                                        border: 'none',
+                                                        padding: '0.35rem 0.75rem',
+                                                        borderRadius: '4px',
+                                                        fontWeight: 600,
+                                                        fontSize: '0.8rem',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    {t('draftAssistant.loginAgain', 'Log In Again')}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            error
+                                        )}
                                     </div>
                                 )}
 
@@ -547,23 +587,23 @@ const DraftAssistant = () => {
                                     <div className="missing-fields-warning">
                                         <div className="missing-warning-header">
                                             <AlertTriangle size={18} />
-                                            <strong>Missing Information</strong>
+                                            <strong>{t('draftAssistant.missingInfo', 'Missing Information')}</strong>
                                         </div>
-                                        <p>The following fields were not provided and will appear as <code>[NOT PROVIDED]</code> in the generated draft:</p>
+                                        <p>{t('draftAssistant.missingFieldsDesc', 'The following fields were not provided and will appear as [NOT PROVIDED] in the generated draft:')}</p>
                                         <ul>
                                             {missingMaterialFields.map((label, i) => (
                                                 <li key={i}>{label}</li>
                                             ))}
                                         </ul>
                                         <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                                            You can still generate the draft — incomplete information will be clearly flagged, not fabricated.
+                                            {t('draftAssistant.missingFieldsNote', 'You can still generate the draft — incomplete information will be clearly flagged, not fabricated.')}
                                         </p>
                                         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem' }}>
                                             <button className="smart-generate-btn" onClick={triggerGeneration} style={{ flex: 1 }}>
-                                                <Sparkles size={18} /> Generate Anyway
+                                                <Sparkles size={18} /> {t('draftAssistant.generateAnyway', 'Generate Anyway')}
                                             </button>
                                             <button className="editor-action-btn secondary" onClick={() => setShowMissingWarning(false)} style={{ flex: 0 }}>
-                                                Go Back
+                                                {t('draftAssistant.goBack', 'Go Back')}
                                             </button>
                                         </div>
                                     </div>
@@ -573,14 +613,14 @@ const DraftAssistant = () => {
                                     {currentTemplate.fields.map(field => (
                                         <div key={field.id} className={`form-group-premium ${field.type === 'textarea' ? 'full-width' : ''}`}>
                                             <label>
-                                                {field.label}
-                                                {field.material && <span className="material-badge" title="Important for accuracy">Required</span>}
+                                                {getFieldLabel(field)}
+                                                {field.material && <span className="material-badge" title="Important for accuracy">{t('draftAssistant.requiredBadge', 'Required')}</span>}
                                             </label>
                                             {field.type === 'textarea' ? (
                                                 <div className="textarea-with-voice">
                                                     <textarea
                                                         rows="3"
-                                                        placeholder={field.placeholder}
+                                                        placeholder={getFieldPlaceholder(field)}
                                                         value={formData[field.id] || ''}
                                                         onChange={(e) => handleInputChange(field.id, e.target.value)}
                                                     />
@@ -594,7 +634,7 @@ const DraftAssistant = () => {
                                             ) : (
                                                 <input
                                                     type="text"
-                                                    placeholder={field.placeholder}
+                                                    placeholder={getFieldPlaceholder(field)}
                                                     value={formData[field.id] || ''}
                                                     onChange={(e) => handleInputChange(field.id, e.target.value)}
                                                 />
@@ -604,7 +644,7 @@ const DraftAssistant = () => {
                                 </div>
                                 {!showMissingWarning && (
                                     <button className="smart-generate-btn" onClick={triggerGeneration}>
-                                        <Sparkles size={20} /> Generate Grounded Draft
+                                        <Sparkles size={20} /> {t('draftAssistant.generateBtn', 'Generate Grounded Draft')}
                                     </button>
                                 )}
                             </div>
@@ -614,18 +654,15 @@ const DraftAssistant = () => {
 
                 {isGenerating && (
                     <div className="generation-loading-state animate-fade-in">
-                        <h3>Generating Grounded Draft...</h3>
-                        {/* Live, backend-truthful pipeline stage trace -- same visual language
-                            as Verify Filing's CitationStageList, driven by real SSE stage
-                            events, never a client-side timer. */}
+                        <h3>{t('draftAssistant.generatingTitle', 'Generating Grounded Draft...')}</h3>
                         <PipelineStageList
                             stages={draftStages}
                             stageOrder={DRAFT_STAGE_ORDER}
-                            stageLabels={DRAFT_STAGE_LABELS}
+                            stageLabels={localizedStageLabels}
                         />
                         {connectionLost && (
                             <p className="stage-connection-lost">
-                                <AlertTriangle size={14} /> Couldn't confirm progress — result may still be correct.
+                                <AlertTriangle size={14} /> {t('draftAssistant.connLost', "Couldn't confirm progress — result may still be correct.")}
                             </p>
                         )}
                     </div>
@@ -633,13 +670,15 @@ const DraftAssistant = () => {
 
                 {hasGenerated && (
                     <div className="canvas-wrapper">
-                        <div className="editor-controls animate-fade-in">
+                        <div className="editor-controls animate-fade-in" style={{ flexWrap: 'wrap', gap: '8px' }}>
                             <div className="refinement-status-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', background: localOnly ? '#FEF3C7' : '#f1d1a6', color: localOnly ? '#92400E' : '#63120e', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700', border: localOnly ? '1px solid #F59E0B' : '1px solid #dfa46f' }}>
                                 <CheckCircle2 size={15} style={{ color: localOnly ? '#92400E' : '#10B981' }} />
                                 <span>
                                     {localOnly
-                                        ? 'Generated locally (Ollama) — refinement skipped in local-only mode'
-                                        : `Grounded & Refined ${reviewData?.overall_score ? `(Score: ${reviewData.overall_score}/100)` : '(Verified)'}`}
+                                        ? t('draftAssistant.localOnlyBadge', 'Generated locally (Ollama) — refinement skipped in local-only mode')
+                                        : (reviewData?.overall_score 
+                                            ? t('draftAssistant.groundedScore', { score: reviewData.overall_score, defaultValue: `Grounded & Refined (Score: ${reviewData.overall_score}/100)` })
+                                            : t('draftAssistant.groundedVerified', 'Grounded & Refined (Verified)'))}
                                 </span>
                             </div>
 
@@ -649,30 +688,30 @@ const DraftAssistant = () => {
                                     onClick={() => setViewMode('court')}
                                     title="Court-ready styled document"
                                 >
-                                    <Eye size={14} /> Court View
+                                    <Eye size={14} /> {t('draftAssistant.courtView', 'Court View')}
                                 </button>
                                 <button
                                     className={`view-toggle-btn ${viewMode === 'edit' ? 'active' : ''}`}
                                     onClick={() => setViewMode('edit')}
                                     title="Directly edit text"
                                 >
-                                    <Edit3 size={14} /> Edit Text
+                                    <Edit3 size={14} /> {t('draftAssistant.editText', 'Edit Text')}
                                 </button>
                             </div>
 
-                            <div className="editor-actions ml-auto" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div className="editor-actions ml-auto" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                 <PrivilegeShield compact={true} />
                                 <button className="editor-action-btn secondary" onClick={handleOpenInReview}>
-                                    <FileCheck size={15} /> Inspect in Draft Review
+                                    <FileCheck size={15} /> {t('draftAssistant.inspectReview', 'Inspect in Draft Review')}
                                 </button>
                                 <button className="editor-action-btn secondary" onClick={() => { setHasGenerated(false); setShowMissingWarning(false); }}>
-                                    <Edit3 size={15} /> Edit Details
+                                    <Edit3 size={15} /> {t('draftAssistant.editDetails', 'Edit Details')}
                                 </button>
                                 <button className="editor-action-btn secondary" onClick={triggerGeneration}>
-                                    <RefreshCw size={15} /> Regenerate
+                                    <RefreshCw size={15} /> {t('draftAssistant.regenerate', 'Regenerate')}
                                 </button>
                                 <button className="editor-action-btn secondary" onClick={handleCopy}>
-                                    {copied ? <><Check size={15} /> Copied!</> : <><Copy size={15} /> Copy</>}
+                                    {copied ? <><Check size={15} /> {t('draftAssistant.copied', 'Copied!')}</> : <><Copy size={15} /> {t('draftAssistant.copy', 'Copy')}</>}
                                 </button>
                                 <button
                                     className="editor-action-btn primary"
@@ -681,26 +720,28 @@ const DraftAssistant = () => {
                                     title="Download court-formatted A4 Pleading PDF with official legal margins"
                                     style={{ background: '#63120e', color: '#f9eedc', borderColor: '#8c3a2a' }}
                                 >
-                                    {exportingPdf ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} Export Court PDF
+                                    {exportingPdf ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />} {t('draftAssistant.exportPdf', 'Export Court PDF')}
                                 </button>
                                 <button className="editor-action-btn secondary" onClick={handleDownload} title="Download plain text (.txt)">
-                                    <Download size={15} /> Download (.txt)
+                                    <Download size={15} /> {t('draftAssistant.download', 'Download (.txt)')}
                                 </button>
                             </div>
                         </div>
+
                         <div className="a4-canvas animate-fade-in">
                             {viewMode === 'court' ? (
                                 <div className="a4-page court-view-mode" ref={editorRef}>
-                                    {renderCourtDocument(documentContent)}
+                                    {renderCourtDocument(activeDraftText)}
                                 </div>
                             ) : (
                                 <div className="a4-page edit-view-mode">
                                     <textarea
                                         className="a4-editor-textarea"
-                                        value={documentContent}
+                                        value={activeDraftText}
                                         onChange={(e) => setDocumentContent(e.target.value)}
                                         placeholder="Draft document content..."
                                         spellCheck={false}
+                                        rows={30}
                                     />
                                 </div>
                             )}
@@ -721,7 +762,7 @@ const DraftAssistant = () => {
                     {panelOpen && (
                         <>
                             <Sparkles size={18} className="text-primary" />
-                            <h3>Provenance & Sources</h3>
+                            <h3>{t('draftAssistant.provenanceTitle', 'Provenance & Sources')}</h3>
                         </>
                     )}
                 </div>
@@ -730,7 +771,7 @@ const DraftAssistant = () => {
                     {!hasGenerated && (
                         <div className="empty-suggestions">
                             <Wand2 size={32} className="text-secondary mx-auto mb-4 opacity-50" />
-                            <p>Generate a draft to see provenance tracking — what facts came from your input vs. what was marked as missing.</p>
+                            <p>{t('draftAssistant.generatePrompt', 'Generate a draft to see provenance tracking — what facts came from your input vs. what was marked as missing.')}</p>
                         </div>
                     )}
 
@@ -740,7 +781,7 @@ const DraftAssistant = () => {
                             <div className="statute-audit-header">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                                     <Scale size={16} className="text-primary" />
-                                    <h4 className="provenance-heading" style={{ margin: 0 }}>Statute & Section Audit</h4>
+                                    <h4 className="provenance-heading" style={{ margin: 0 }}>{t('draftAssistant.statuteAudit', 'Statute & Section Audit')}</h4>
                                 </div>
                                 <button
                                     className="recheck-statute-btn"
@@ -753,7 +794,7 @@ const DraftAssistant = () => {
                                     ) : (
                                         <RefreshCw size={12} />
                                     )}
-                                    <span>{isVerifyingStatutes ? 'Checking...' : 'Re-check'}</span>
+                                    <span>{isVerifyingStatutes ? t('draftAssistant.checking', 'Checking...') : t('draftAssistant.recheck', 'Re-check')}</span>
                                 </button>
                             </div>
 
@@ -812,7 +853,7 @@ const DraftAssistant = () => {
                                 </>
                             ) : (
                                 <div className="empty-statute-audit">
-                                    <p>Click "Re-check" to audit statutory sections in this draft.</p>
+                                    <p>{t('draftAssistant.clickRecheck', 'Click "Re-check" to audit statutory sections in this draft.')}</p>
                                 </div>
                             )}
                         </div>
@@ -822,12 +863,12 @@ const DraftAssistant = () => {
                     {hasGenerated && provenanceData && (
                         <div className="provenance-section animate-fade-in">
                             <h4 className="provenance-heading">
-                                <Info size={15} /> Fact Provenance
+                                <Info size={15} /> {t('draftAssistant.factProvenance', 'Fact Provenance')}
                             </h4>
 
                             {provenanceData.provided_facts?.length > 0 && (
                                 <div className="provenance-group provenance-provided">
-                                    <h5>✅ From Your Input ({provenanceData.total_provided})</h5>
+                                    <h5>{t('draftAssistant.fromInput', { count: provenanceData.total_provided, defaultValue: `✅ From Your Input (${provenanceData.total_provided})` })}</h5>
                                     {provenanceData.provided_facts.map((f, i) => (
                                         <div key={i} className="provenance-item">
                                             <span className="provenance-label">{f.field}</span>
@@ -839,12 +880,12 @@ const DraftAssistant = () => {
 
                             {provenanceData.missing_material?.length > 0 && (
                                 <div className="provenance-group provenance-missing-material">
-                                    <h5>⚠️ Missing — Material ({provenanceData.total_missing_material})</h5>
-                                    <p className="provenance-note">These appear as [NOT PROVIDED] in the draft</p>
+                                    <h5>{t('draftAssistant.missingMaterial', { count: provenanceData.total_missing_material, defaultValue: `⚠️ Missing — Material (${provenanceData.total_missing_material})` })}</h5>
+                                    <p className="provenance-note">{t('draftAssistant.missingMaterialNote', 'These appear as [NOT PROVIDED] in the draft')}</p>
                                     {provenanceData.missing_material.map((f, i) => (
                                         <div key={i} className="provenance-item">
                                             <span className="provenance-label">{f.field}</span>
-                                            <span className="provenance-status">[NOT PROVIDED]</span>
+                                            <span className="provenance-status">{t('draftAssistant.notProvided', '[NOT PROVIDED]')}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -852,11 +893,11 @@ const DraftAssistant = () => {
 
                             {provenanceData.missing_optional?.length > 0 && (
                                 <div className="provenance-group provenance-missing-optional">
-                                    <h5>📋 Missing — Optional ({provenanceData.total_missing_optional})</h5>
+                                    <h5>{t('draftAssistant.missingOptional', { count: provenanceData.total_missing_optional, defaultValue: `📋 Missing — Optional (${provenanceData.total_missing_optional})` })}</h5>
                                     {provenanceData.missing_optional.map((f, i) => (
                                         <div key={i} className="provenance-item">
                                             <span className="provenance-label">{f.field}</span>
-                                            <span className="provenance-status">[NOT PROVIDED]</span>
+                                            <span className="provenance-status">{t('draftAssistant.notProvided', '[NOT PROVIDED]')}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -868,22 +909,22 @@ const DraftAssistant = () => {
                     {hasGenerated && sources.length > 0 && (
                         <div className="animate-fade-in" style={{ marginTop: '1rem' }}>
                             <h4 className="provenance-heading">
-                                <CornerDownRight size={15} /> Reference Templates
+                                <CornerDownRight size={15} /> {t('draftAssistant.referenceTemplates', 'Reference Templates')}
                             </h4>
                             <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.75rem' }}>
-                                AI referenced these real documents from the legal database:
+                                {t('draftAssistant.aiReferenced', 'AI referenced these real documents from the legal database:')}
                             </p>
                             {sources.map((s, i) => (
                                 <div key={i} className="suggestion-card">
                                     <h5><CornerDownRight size={14} className="text-secondary" /> {s.filename}</h5>
-                                    <p>Category: {s.category} | Match: {(s.score * 100).toFixed(0)}%</p>
+                                    <p>{t('draftAssistant.categoryMatch', { category: s.category, score: (s.score * 100).toFixed(0), defaultValue: `Category: ${s.category} | Match: ${(s.score * 100).toFixed(0)}%` })}</p>
                                 </div>
                             ))}
                         </div>
                     )}
                     {hasGenerated && sources.length === 0 && (
                         <p style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                            Run ingest.py to load legal templates for reference-based generation.
+                            {t('draftAssistant.runIngest', 'Run ingest.py to load legal templates for reference-based generation.')}
                         </p>
                     )}
                 </div>

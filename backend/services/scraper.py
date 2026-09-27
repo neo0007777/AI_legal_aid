@@ -142,7 +142,7 @@ def _fetch_indiankanoon_api(query: str, max_results: int, token: str) -> list:
 def _fetch_indiankanoon_scrape(query: str, max_results: int) -> list:
     url = f"{BASE_URL}/search/?formInput={quote(query)}"
 
-    with httpx.Client(headers=HEADERS, timeout=15, follow_redirects=True) as client:
+    with httpx.Client(headers=HEADERS, timeout=5.0, follow_redirects=True) as client:
         response = client.get(url)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
@@ -206,7 +206,7 @@ def _fetch_commonlii(query: str, max_results: int) -> list:
         f"?method=auto&query={quote(query)}&results={max_results}&meta=/in"
     )
 
-    with httpx.Client(headers=HEADERS, timeout=20, follow_redirects=True) as client:
+    with httpx.Client(headers=HEADERS, timeout=5.0, follow_redirects=True) as client:
         response = client.get(url)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")

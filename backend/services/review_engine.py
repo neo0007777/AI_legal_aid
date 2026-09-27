@@ -3,6 +3,7 @@ import json
 from typing import Dict, Any, List, Optional
 from services.llm import call_llm
 from services.rag import search_drafts
+from fastapi import HTTPException
 from models.review_models import (
     ReviewResponse, ReviewIssue, MissingField, FixResponse
 )
@@ -41,6 +42,8 @@ def classify_document_type(text: str, user_hint: Optional[str] = None) -> str:
         return "Affidavit"
     if "legal notice" in text_head or "demand notice" in text_head:
         return "Legal Notice"
+    if "reply to legal notice" in text_head or "reply to notice" in text_head:
+        return "Reply to Legal Notice"
     if "power of attorney" in text_head or "poa" in text_head:
         return "Power of Attorney"
     if "sale deed" in text_head or "conveyance" in text_head:
@@ -53,6 +56,32 @@ def classify_document_type(text: str, user_hint: Optional[str] = None) -> str:
         return "Partition Deed"
     if "mortgage" in text_head or "hypothecation" in text_head:
         return "Mortgage / Hypothecation Deed"
+    if "partnership" in text_head or "partnership deed" in text_head:
+        return "Partnership Deed"
+    if "gift deed" in text_head:
+        return "Gift Deed"
+    if "will" in text_head and ("testament" in text_head or "bequeath" in text_head):
+        return "Will / Testament"
+    if "writ" in text_head or "article 226" in text_head or "article 32" in text_head:
+        return "Writ Petition"
+    if "quash" in text_head or "section 482" in text_head or "section 528" in text_head:
+        return "Section 528 BNSS / 482 CrPC Quashing Petition"
+    if "injunction" in text_head or "order 39" in text_head:
+        return "Injunction Application"
+    if "cheque" in text_head or "section 138" in text_head or "negotiable instruments" in text_head:
+        return "Section 138 NI Act Complaint"
+    if "consumer" in text_head or "deficiency of service" in text_head:
+        return "Consumer Complaint"
+    if "divorce" in text_head or "hindu marriage act" in text_head:
+        return "Divorce Petition"
+    if "appeal" in text_head or "memorandum of appeal" in text_head:
+        return "Appeal"
+    if "revision" in text_head:
+        return "Revision Petition"
+    if "written statement" in text_head:
+        return "Written Statement"
+    if "rejoinder" in text_head:
+        return "Rejoinder"
     if "vakalatnama" in text_head:
         return "Vakalatnama"
 
@@ -61,7 +90,10 @@ def classify_document_type(text: str, user_hint: Optional[str] = None) -> str:
 Respond ONLY with the document title name (max 4 words)."""
     try:
         raw_res = call_llm(system_prompt, f"Text sample:\n{text[:1000]}")
-        return raw_res.strip().title()
+        cleaned = raw_res.strip().title()
+        if not cleaned or cleaned.startswith("⚠️") or "error" in cleaned.lower() or "unavailable" in cleaned.lower() or len(cleaned) > 60:
+            return "Legal Document"
+        return cleaned
     except Exception:
         return "Legal Document"
 
@@ -131,13 +163,13 @@ def run_hybrid_review(
     doc_type = classify_document_type(draft, document_hint)
 
     # 2. Retrieve Top-5 Most Relevant Templates from Qdrant
-    search_query = f"{doc_type}\n{draft[:600]}"
-    qdrant_results = search_drafts(search_query, n_results=5)
+    search_query = f"{doc_type}\n{draft[:400]}"
+    qdrant_results = search_drafts(search_query, n_results=3)
     if not qdrant_results:
-        qdrant_results = search_drafts(draft[:400], n_results=5)
+        qdrant_results = search_drafts(draft[:300], n_results=3)
 
     ref_templates_text = "\n\n---\n\n".join([
-        f"Reference Template ({r['metadata']['category']} - {r['metadata']['filename']}):\n{r['text']}"
+        f"Reference Template ({r['metadata']['category']} - {r['metadata']['filename']}):\n{r['text'][:400]}"
         for r in qdrant_results
     ]) if qdrant_results else "No reference template retrieved."
 
@@ -205,10 +237,10 @@ STRICT REVIEW & CALIBRATION GUIDELINES:
     user_msg = f"""Document Type: {doc_type}
 
 User Draft to Review:
-{draft[:14000]}
+{draft[:5000]}
 
 Reference Structure Highlights:
-{ref_templates_text[:1200]}"""
+{ref_templates_text[:800]}"""
 
     summary_text = ""
     missing_sections = []
@@ -382,7 +414,7 @@ Reference Structure Highlights:
         return sec_l not in text_lower
 
     try:
-        raw_llm_json = call_llm(system_prompt, user_msg, json_mode=True, max_tokens=1500)
+        raw_llm_json = call_llm(system_prompt, user_msg, json_mode=True, max_tokens=1200)
         clean_json = raw_llm_json
         if "```json" in clean_json:
             clean_json = clean_json.split("```json")[1].split("```")[0].strip()
@@ -390,29 +422,32 @@ Reference Structure Highlights:
             clean_json = clean_json.split("```")[1].strip()
 
         parsed = json.loads(clean_json)
-        summary_text = parsed.get("summary", "")
-        for ms in parsed.get("missing_sections", []):
-            if isinstance(ms, str) and section_actually_missing(ms, draft_lower):
-                if ms not in missing_sections:
-                    missing_sections.append(ms)
+        if isinstance(parsed, dict) and "error" not in parsed:
+            summary_text = parsed.get("summary", "")
+            for ms in parsed.get("missing_sections", []):
+                if isinstance(ms, str) and section_actually_missing(ms, draft_lower):
+                    if ms not in missing_sections:
+                        missing_sections.append(ms)
 
-        for c in parsed.get("critical", []):
-            if isinstance(c, dict):
-                critical_issues.append(ReviewIssue(**c))
-            elif isinstance(c, str):
-                critical_issues.append(ReviewIssue(id=f"CRIT_{len(critical_issues)+1}", category="critical", title=c[:40], description=c, suggested_fix="Address this critical defect."))
+            for c in parsed.get("critical", []):
+                if isinstance(c, dict):
+                    critical_issues.append(ReviewIssue(**c))
+                elif isinstance(c, str):
+                    critical_issues.append(ReviewIssue(id=f"CRIT_{len(critical_issues)+1}", category="critical", title=c[:40], description=c, suggested_fix="Address this critical defect."))
 
-        for w in parsed.get("warnings", []):
-            if isinstance(w, dict):
-                warning_issues.append(ReviewIssue(**w))
-            elif isinstance(w, str):
-                warning_issues.append(ReviewIssue(id=f"WARN_{len(warning_issues)+1}", category="warning", title=w[:40], description=w, suggested_fix="Address this procedural warning."))
+            for w in parsed.get("warnings", []):
+                if isinstance(w, dict):
+                    warning_issues.append(ReviewIssue(**w))
+                elif isinstance(w, str):
+                    warning_issues.append(ReviewIssue(id=f"WARN_{len(warning_issues)+1}", category="warning", title=w[:40], description=w, suggested_fix="Address this procedural warning."))
 
-        for s in parsed.get("suggestions", []):
-            if isinstance(s, dict):
-                suggestion_issues.append(ReviewIssue(**s))
-            elif isinstance(s, str):
-                suggestion_issues.append(ReviewIssue(id=f"SUGG_{len(suggestion_issues)+1}", category="suggestion", title=s[:40], description=s, suggested_fix="Consider this drafting suggestion."))
+            for s in parsed.get("suggestions", []):
+                if isinstance(s, dict):
+                    suggestion_issues.append(ReviewIssue(**s))
+                elif isinstance(s, str):
+                    suggestion_issues.append(ReviewIssue(id=f"SUGG_{len(suggestion_issues)+1}", category="suggestion", title=s[:40], description=s, suggested_fix="Consider this drafting suggestion."))
+        elif isinstance(parsed, dict) and "error" in parsed:
+            print(f"[ReviewEngine] LLM returned error notice: {parsed.get('error')}")
     except Exception as e:
         print(f"[ReviewEngine] Generic LLM comparison error: {e}")
 
@@ -470,19 +505,31 @@ def auto_fix_draft(
     if not doc_type:
         doc_type = classify_document_type(draft)
 
-    # 1. Retrieve real case law from Indian Kanoon / CommonLII via scraper if needed
+    # 1. Retrieve real case law (local judgments vector DB first, scraper as fallback)
     case_law_text = "No additional case law retrieved."
     if missing_sections:
         case_query = f"{doc_type} {' '.join(missing_sections[:2])}".strip()
         try:
-            from services.scraper import search_cases
-            case_results = search_cases(case_query, max_results=2)
-            if case_results:
+            from services.judgment_search import search_judgments
+            j_results = search_judgments(case_query, top_k=2)
+            if j_results:
                 case_law_text = "\n".join(
-                    f"- {c['title']} — {c['link']}" for c in case_results
+                    f"- {j['metadata'].get('case_name', 'Precedent')} ({j['metadata'].get('court', 'Court')}) — {j['metadata'].get('citation', '')}"
+                    for j in j_results if j.get("metadata")
                 )
-        except Exception as e:
-            print(f"[ReviewEngine] Case law retrieval notice: {e}")
+        except Exception as j_err:
+            print(f"[ReviewEngine] Local judgment search notice: {j_err}")
+
+        if case_law_text == "No additional case law retrieved.":
+            try:
+                from services.scraper import search_cases
+                case_results = search_cases(case_query, max_results=2)
+                if case_results:
+                    case_law_text = "\n".join(
+                        f"- {c['title']} — {c['link']}" for c in case_results
+                    )
+            except Exception as e:
+                print(f"[ReviewEngine] Case law retrieval notice: {e}")
 
     # Auto-detect posture and manifest if not provided
     if procedural_posture is None and any(kw in draft.lower() for kw in ["bail", "anticipatory", "fir", "police station", "remand", "custody"]):
@@ -660,19 +707,34 @@ Cite from this list ONLY — never fabricate:
 {case_law_text}{fact_manifest_block}"""
 
 
-    issues_str = json.dumps({
-        "critical_and_warnings": issues,
-        "missing_sections": missing_sections,
-        "missing_fields": missing_fields
-    }, indent=2)
+    issue_bullets = []
+    for iss in issues[:8]:
+        cat = iss.get("category", "issue").upper()
+        title = iss.get("title", "")
+        fix = iss.get("suggested_fix") or iss.get("description", "")
+        issue_bullets.append(f"- [{cat}] {title}: {fix}")
+    if missing_sections:
+        issue_bullets.append(f"- Missing Mandatory Sections: {', '.join(missing_sections[:6])}")
+    if missing_fields:
+        ph_list = [f.placeholder if hasattr(f, 'placeholder') else f.get('placeholder', '') for f in missing_fields[:8]]
+        ph_list = [p for p in ph_list if p]
+        if ph_list:
+            issue_bullets.append(f"- Unfilled Placeholders: {', '.join(ph_list)}")
+    issues_str = "\n".join(issue_bullets) if issue_bullets else "No specific structural issues."
 
     user_msg = f"""Reported Issues & Missing Elements to Fix:
 {issues_str}
 
 Original Draft:
-{draft}"""
+{draft[:5000]}"""
 
-    corrected_text = call_llm(system_prompt, user_msg)
+    corrected_text = call_llm(system_prompt, user_msg, max_tokens=1500)
+
+    if not corrected_text or corrected_text.strip().startswith("⚠️ AI service temporarily unavailable"):
+        raise HTTPException(
+            status_code=503,
+            detail="AI service temporarily unavailable. Groq rate limit reached. Please wait a few moments and try again."
+        )
 
     changes_summary = []
     if missing_sections:

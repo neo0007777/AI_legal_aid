@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { usePersona, PERSONAS } from '../context/PersonaContext';
 import './PersonaSwitcher.css';
 
@@ -5,6 +6,7 @@ import './PersonaSwitcher.css';
 // someone needs -- not four separate UIs. Switching persona never hides
 // anything from the others, it only changes default view/copy emphasis.
 const PersonaSwitcher = () => {
+    const { t } = useTranslation();
     const { personaId, setPersonaId } = usePersona();
 
     return (
@@ -18,7 +20,7 @@ const PersonaSwitcher = () => {
                     className={`persona-pill ${personaId === p.id ? 'active' : ''}`}
                     onClick={() => setPersonaId(p.id)}
                 >
-                    <p.icon size={15} /> {p.label}
+                    <p.icon size={15} /> {t(`personas.${p.id}.label`, p.label)}
                 </button>
             ))}
         </div>

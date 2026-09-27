@@ -204,10 +204,10 @@ def resolve_and_lock_statutory_metadata(
             g_prov = getattr(g, "legal_provision", "")
             m = re.search(r"Section\s+([0-9]+[A-Za-z\-]*)", g_prov)
             if m:
-                # Deduce statute
+                # Deduce statute: check longer acronyms first with word boundary to avoid "bns" matching inside "bnss"
                 g_stat = "bnss"
-                for ac, aid in ACRONYM_TO_ACT_ID.items():
-                    if ac.upper() in g_prov:
+                for ac, aid in sorted(ACRONYM_TO_ACT_ID.items(), key=lambda x: len(x[0]), reverse=True):
+                    if re.search(r"\b" + re.escape(ac) + r"\b", g_prov, re.IGNORECASE):
                         g_stat = aid
                         break
                 provisions_to_resolve.append((m.group(1), g_stat))
@@ -220,11 +220,17 @@ def resolve_and_lock_statutory_metadata(
 
     # De-duplicate provisions to resolve
     seen_provs = set()
+    STATUTE_MAX_SECTIONS = {"bns": 358, "bnss": 531, "bsa": 170, "ipc": 511, "crpc": 484, "iea": 167}
     for sec, act_id in provisions_to_resolve:
         key = (act_id, sec)
         if key in seen_provs:
             continue
         seen_provs.add(key)
+
+        # Skip provisions that exceed the act's section count to avoid slow 404 HTTP lookups
+        sec_num = int(re.sub(r'[^0-9]', '', sec) or 0)
+        if sec_num > STATUTE_MAX_SECTIONS.get(act_id, 1000):
+            continue
 
         # Lookup in DB
         prov_record = ingest_service.get_or_fetch_provision(act_id, sec, db)

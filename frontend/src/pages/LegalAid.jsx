@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Send, Sparkles, Scale, BookOpen, AlertTriangle,
     ShieldAlert, Search, FileText, Copy, Check,
@@ -388,7 +389,8 @@ const renderSectionIcon = (iconType) => {
 };
 
 const LegalAid = () => {
-    const { user, upgradeToPro, getAuthHeaders } = useAuth();
+    const { t } = useTranslation();
+    const { user, upgradeToPro, getAuthHeaders, logout } = useAuth();
     // Advocate Pro is NOT active by default. It is only activated when the user clicks on upgrade to pro.
     const [isProActive, setIsProActive] = useState(() => {
         return sessionStorage.getItem('lexsetu_pro_active') === 'true';
@@ -746,11 +748,11 @@ const LegalAid = () => {
             <div className="structure-memory-bar">
                 <div className="memory-info-chip">
                     <Zap size={14} className="text-copper" />
-                    <span className="memory-label">Structure Mode:</span>
+                    <span className="memory-label">{t('legalAid.structureMode', 'Structure Mode:')}</span>
                     <span className="memory-value">{structureTitle}</span>
                     {hasSavedMemory && (
                         <span className="memory-saved-badge" title="This layout is saved in your persistent memory">
-                            <BookmarkCheck size={12} /> Saved in Memory
+                            <BookmarkCheck size={12} /> {t('legalAid.savedInMemory', 'Saved in Memory')}
                         </span>
                     )}
                 </div>
@@ -761,35 +763,35 @@ const LegalAid = () => {
                         className={`preset-pill ${structureMode === 'standard' && !customInstructions ? 'active' : ''}`}
                         onClick={() => applyPreset('standard', 'Standard Judicial')}
                     >
-                        <Scale size={13} /> Standard
+                        <Scale size={13} /> {t('legalAid.standard', 'Standard')}
                     </button>
                     <button
                         type="button"
                         className={`preset-pill ${structureMode === 'executive_brief' ? 'active' : ''}`}
                         onClick={() => applyPreset('executive_brief', 'Executive Legal Brief')}
                     >
-                        <Briefcase size={13} /> Executive
+                        <Briefcase size={13} /> {t('legalAid.executive', 'Executive')}
                     </button>
                     <button
                         type="button"
                         className={`preset-pill ${structureMode === 'irac' ? 'active' : ''}`}
                         onClick={() => applyPreset('irac', 'IRAC Legal Framework')}
                     >
-                        <Gavel size={13} /> IRAC
+                        <Gavel size={13} /> {t('legalAid.irac', 'IRAC')}
                     </button>
                     <button
                         type="button"
                         className={`preset-pill ${structureMode === 'bullet_points' ? 'active' : ''}`}
                         onClick={() => applyPreset('bullet_points', 'Bullet Points & Checklist')}
                     >
-                        <ListChecks size={13} /> Bullets
+                        <ListChecks size={13} /> {t('legalAid.bullets', 'Bullets')}
                     </button>
                     <button
                         type="button"
                         className={`preset-pill custom-btn ${structureMode === 'custom' || customInstructions ? 'active' : ''}`}
                         onClick={() => setShowGuidanceModal(true)}
                     >
-                        <SlidersHorizontal size={13} /> Guide Structure
+                        <SlidersHorizontal size={13} /> {t('legalAid.guideStructure', 'Guide Structure')}
                     </button>
                     {hasSavedMemory && (
                         <button
@@ -798,7 +800,7 @@ const LegalAid = () => {
                             onClick={handleResetMemory}
                             title="Reset memory to Standard Judicial default"
                         >
-                            <RefreshCw size={12} /> Reset
+                            <RefreshCw size={12} /> {t('legalAid.reset', 'Reset')}
                         </button>
                     )}
                 </div>
@@ -808,7 +810,7 @@ const LegalAid = () => {
             <div className="legal-notice-banner">
                 <ShieldAlert size={16} className="notice-icon" />
                 <span>
-                    <strong>Statutory Reference:</strong> This AI assistant provides research and procedural guidance. It does not constitute formal advocate-client representation.
+                    <strong>{t('legalAid.statutoryNoticeTitle', 'Statutory Reference:')}</strong> {t('legalAid.statutoryNotice', 'This AI assistant provides research and procedural guidance. It does not constitute formal advocate-client representation.')}
                 </span>
             </div>
 
@@ -818,14 +820,14 @@ const LegalAid = () => {
                     <div className="legal-aid-empty-state">
                         <div className="empty-state-badge">
                             <Sparkles size={18} />
-                            <span>Statute-Grounded Legal Q&A</span>
+                            <span>{t('legalAid.badge', 'Statute-Grounded Legal Q&A')}</span>
                         </div>
-                        <h3>How can LexSetu assist your legal inquiry today?</h3>
-                        <p>Ask about substantive penal liabilities, civil procedures, contract enforceability, or statutory bail.</p>
+                        <h3>{t('legalAid.title', 'How can LexSetu assist your legal inquiry today?')}</h3>
+                        <p>{t('legalAid.subtitle', 'Ask about substantive penal liabilities, civil procedures, contract enforceability, or statutory bail.')}</p>
 
                         <div className="guidance-hint-banner">
                             <SlidersHorizontal size={15} />
-                            <span><strong>Adaptive Structure:</strong> You can guide the AI to answer in any particular format (bullets, tables, IRAC, or custom). Select a preset above or click <em>Guide Structure</em> to save it into memory.</span>
+                            <span><strong>{t('legalAid.adaptiveStructure', 'Adaptive Structure:')}</strong> {t('legalAid.adaptiveBanner', 'You can guide the AI to answer in any particular format (bullets, tables, IRAC, or custom). Select a preset above or click Guide Structure to save it into memory.')}</span>
                         </div>
 
                         <div className="suggestions-grid">
@@ -861,9 +863,40 @@ const LegalAid = () => {
                                 {msg.type === 'error' && (
                                     <div className="error-bubble">
                                         <AlertTriangle size={18} className="error-icon" />
-                                        <div>
-                                            <strong>Unable to retrieve advice:</strong> {msg.text}
-                                            <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>Please verify backend service status.</div>
+                                        <div style={{ flex: 1 }}>
+                                            {/token|expired|session|unauthorized/i.test(msg.text) ? (
+                                                <div>
+                                                    <strong style={{ color: '#ffb4a2' }}>Session Expired:</strong>
+                                                    <div style={{ fontSize: '0.85rem', margin: '0.35rem 0 0.6rem', color: '#f9eedc' }}>
+                                                        Your login session has expired. Please log in again to continue saving memory preferences and receiving legal guidance.
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => logout()}
+                                                        style={{
+                                                            background: 'linear-gradient(135deg, #dfa46f, #b87a42)',
+                                                            color: '#2a0907',
+                                                            border: 'none',
+                                                            padding: '0.45rem 1rem',
+                                                            borderRadius: '6px',
+                                                            fontWeight: '700',
+                                                            fontSize: '0.82rem',
+                                                            cursor: 'pointer',
+                                                            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.4rem'
+                                                        }}
+                                                    >
+                                                        Log In Again
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <strong>Unable to retrieve advice:</strong> {msg.text}
+                                                    <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>Please verify backend service status.</div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -939,7 +972,7 @@ const LegalAid = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Dynamic Section Rendering - Zero Mismatch */}
+                                            {/* Dynamic Section Rendering */}
                                             <div className="card-sections-body">
                                                 {msg.parsed && msg.parsed.sections && msg.parsed.sections.length > 0 ? (
                                                     msg.parsed.sections.map((sec) => (
@@ -965,56 +998,56 @@ const LegalAid = () => {
                                                         </div>
                                                     </div>
                                                 )}
+                                            </div>
 
-                                                {/* Professional Upgrade Plan Advisory Banner (When Blocked) */}
-                                                {msg.requires_upgrade && (
-                                                    <div className="upgrade-advisory-card animate-fade-in">
-                                                        <div className="upgrade-advisory-header">
-                                                            <div className="upgrade-crown-icon">
-                                                                <Crown size={20} />
-                                                            </div>
-                                                            <div className="upgrade-header-text">
-                                                                <h5>Plan Upgrade Required</h5>
-                                                                <p>Your current plan does not allow answering this inquiry. Inquiries regarding illicit substances, sensitive ethical conduct, or active penal liabilities require the LexSetu Advocate Pro tier.</p>
-                                                            </div>
-                                                            <span className="upgrade-plan-pill">{msg.upgrade_tier || 'Advocate Pro'}</span>
+                                            {/* Professional Upgrade Plan Advisory Banner (When Blocked) */}
+                                            {msg.requires_upgrade && (
+                                                <div className="upgrade-advisory-card animate-fade-in">
+                                                    <div className="upgrade-advisory-header">
+                                                        <div className="upgrade-crown-icon">
+                                                            <Crown size={20} />
                                                         </div>
-
-                                                        <div className="upgrade-benefits-grid">
-                                                            <div className="upgrade-benefit-item">
-                                                                <Lock size={14} className="benefit-icon-gold" />
-                                                                <span><strong>Privileged Legal Advisory:</strong> Attorney-client privilege under Section 126 Evidence Act / Section 132 BSA.</span>
-                                                            </div>
-                                                            <div className="upgrade-benefit-item">
-                                                                <Gavel size={14} className="benefit-icon-gold" />
-                                                                <span><strong>Empanelled Counsel Connect:</strong> Direct 1-on-1 strategy session with practicing High Court advocates.</span>
-                                                            </div>
-                                                            <div className="upgrade-benefit-item">
-                                                                <ShieldCheck size={14} className="benefit-icon-gold" />
-                                                                <span><strong>Forensic Case & Trial Review:</strong> Customized defense analysis and statutory limitation audit.</span>
-                                                            </div>
+                                                        <div className="upgrade-header-text">
+                                                            <h5>Plan Upgrade Required</h5>
+                                                            <p>Your current plan does not allow answering this inquiry. Inquiries regarding illicit substances, sensitive ethical conduct, or active penal liabilities require the LexSetu Advocate Pro tier.</p>
                                                         </div>
+                                                        <span className="upgrade-plan-pill">{msg.upgrade_tier || 'Advocate Pro'}</span>
+                                                    </div>
 
-                                                        <div className="upgrade-card-actions">
-                                                            <button
-                                                                type="button"
-                                                                className="primary-btn upgrade-cta-btn"
-                                                                onClick={() => handleUpgradeAndRetry(msg.question)}
-                                                                disabled={isThinking}
-                                                            >
-                                                                <Crown size={15} /> Upgrade to Advocate Pro & Answer Question
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="outline btn-sm upgrade-consult-btn"
-                                                                onClick={() => setShowUpgradeModal(true)}
-                                                            >
-                                                                View Pro Privileges <ArrowRight size={14} />
-                                                            </button>
+                                                    <div className="upgrade-benefits-grid">
+                                                        <div className="upgrade-benefit-item">
+                                                            <Lock size={14} className="benefit-icon-gold" />
+                                                            <span><strong>Privileged Legal Advisory:</strong> Attorney-client privilege under Section 126 Evidence Act / Section 132 BSA.</span>
+                                                        </div>
+                                                        <div className="upgrade-benefit-item">
+                                                            <Gavel size={14} className="benefit-icon-gold" />
+                                                            <span><strong>Empanelled Counsel Connect:</strong> Direct 1-on-1 strategy session with practicing High Court advocates.</span>
+                                                        </div>
+                                                        <div className="upgrade-benefit-item">
+                                                            <ShieldCheck size={14} className="benefit-icon-gold" />
+                                                            <span><strong>Forensic Case & Trial Review:</strong> Customized defense analysis and statutory limitation audit.</span>
                                                         </div>
                                                     </div>
-                                                )}
-                                            </div>
+
+                                                    <div className="upgrade-card-actions">
+                                                        <button
+                                                            type="button"
+                                                            className="primary-btn upgrade-cta-btn"
+                                                            onClick={() => handleUpgradeAndRetry(msg.question)}
+                                                            disabled={isThinking}
+                                                        >
+                                                            <Crown size={15} /> Upgrade to Advocate Pro & Answer Question
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="outline btn-sm upgrade-consult-btn"
+                                                            onClick={() => setShowUpgradeModal(true)}
+                                                        >
+                                                            View Pro Privileges <ArrowRight size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             {/* Card Footer with Tags and Disclaimer */}
                                             <div className="card-footer-bar">
@@ -1114,7 +1147,7 @@ const LegalAid = () => {
                     <textarea
                         ref={inputRef}
                         className="legal-aid-textarea"
-                        placeholder="Ask any legal question (e.g. 'Can anticipatory bail be granted in non-bailable offences?') or guide format..."
+                        placeholder={t('legalAid.inputPlaceholder', "Ask any legal question (e.g. 'Can anticipatory bail be granted in non-bailable offences?') or guide format...")}
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={(e) => {
