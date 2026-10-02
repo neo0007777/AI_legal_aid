@@ -1,4 +1,4 @@
-# LexSetu — न्यायसेतु
+# LexSetu
 
 **Bridge to Justice** | AI-powered legal assistant for advocates and legal interns
 
